@@ -1,0 +1,147 @@
+ReadMe.md
+Practicing Rust by Developing the Function Call Logger
+
+During the init the CallLogData registers the following callbacks with the CallGraph:
+* log_call(name: &str, call_depth: usize) // "<indent * call_depth>f() {"
+* log_ret(has_nested_calls: bool, name: &str, call_depth: usize) // If !has_nested_calls "}\n", otherwise "<indent * call_depth>} // f()\n"
+* log_repeat_count(count: usize, call_depth: usize)   // "<indent * call_depth>// Repeats 99 time(s)<Enter>"
+During run CallLogData calls CallGraph's
+* handle_call(name: &'static str) which calls back
+     log_call(name: &str, call_depth: usize) // "<indent * call_depth>f() {"
+* handle_ret([name: &'static str]) which calls back
+     For the last child: log_repeat_count(count: usize, call_depth: uszie[, name: &'static str])   // "// [f()] Repeats 99 time(s)<Enter>"
+     For the returning func: log_ret(name: &str, has_nested_calls: bool[, call_depth: usize]) // If !has_nested_calls "}<Enter>", otherwise "} // f()<Enter>"
+Run              Graph               Current     Call Stack          Screen                                  Note 
+                 pseudo {            &p          &p
+f() {              f() {             &f            ,&f               <Indent*call_depth>f() {                f() was called
+}                  }                 &p          &p                                          }\n             f() has returned
+g() {              g() {             &g            ,&g               <Indent*call_depth>g() {                g() was called
+}                  }                 &p          &p                                          }\n             g() has returned
+g() {              g() {             &g            ,&g                                                       g() was called again. Being cached. Nothing printed to the screen.
+}                        Remove                                                                              g() returned. It is removed from the graph, the previous g's repeat_count++.
+                   // Repeats 1      &p          &p
+g() {              g() {             &g            ,&g                                                       g() called 3rd time. Being cached. Nonthing onto screen. The 1st g is the caching_model.
+  h() {              h() {           &h               ,&h                                                    h() called. Still being cached. Nonthing onto screen. 
+  }                  }               &g          &p,&g                                                       h() returned. Still being cached. Nonthing onto screen. 
+}                  }                 &p          &p                  <Indent*call_depth>// g() Repests 1     Flush the 1st g's repeat count.
+                                                                     <Indent*call_depth>g() {                Log the latest g that differs from the previous g (has nested h()).
+                                                                     <Indent*call_depth>  h() {              Log line-by-line all the calls nested in latest g.
+                                                                                               }
+                                                                     <Indent*call_depth>} // g()             Log the latest g's return.
+
+
+Earlier (probably out-of-date) considerations
+///////////////////////////////////////
+// * Tasks/Problems:
+//   + Shrink repeated calls.
+//   + Write the desired result.
+// * Questions:
+//   + What is the function name for a closure (lambda)?
+//     Manually create the logger and explicitly provide the function name?
+//   + What is the situation with [de]mangled function names (generic functions)?
+// * Answers:
+//   + What about logging the {parameter and/or return} values?
+//     Is only available during the run time, not preprocessign or compile time.
+
+// Task/Problem Solution Sketches:
+//   + Shrink repeated calls.
+
+// // Non-shrunk, no nested calls:
+// h() {} // call 0
+// . . .
+// h() {} // call 99
+// // Shrunk, no nested calls:
+// h() {} // call 0
+// // Repeats 99 time(s).
+
+// // Non-shrunk, single nested call:
+// g() { // call 0
+//     h() {} // call 0
+//     . . .
+//     h() {} // call 99
+// }
+// . . .
+// g() { // call 4
+//     h() {} // call 0
+//     . . .
+//     h() {} // call 99
+// }
+// // Shrunk, single nested call:
+// f() {
+//     g() { // call 0
+//         h() {} // call 0
+//         // Repeats 99 time(s).
+//     }
+//     // Repeats 4 time(s).
+// }
+
+// // Non-shrunk:
+// f() {
+//     g() { // call 0
+//         h() {} // call 0
+//         . . .
+//         h() {} // call 99
+//     }
+//     . . .
+//     g() { // call 4
+//         h() {} // call 0
+//         . . .
+//         h() {} // call 99
+//     }
+//     g() { // call 6
+//         h() {} // call 0
+//         h() {} // call 1
+//         h() {} // call 2
+//     }
+//     g() { // call 7
+//         h() {} // call 0
+//         . . .
+//         h() {} // call 99
+//     }
+//     g() { // call 8
+//         h() {} // call 0
+//         . . .
+//         h() {} // call 99
+//     }
+// }
+// // Shrunk:
+// f() {
+//     g() { // call 0
+//         h() {} // call 0
+//         // Repeats 99 time(s).
+//     }
+//     // Repeats 4 time(s).
+//     g() { // call 6
+//         h() {} // call 0
+//         // Repeats 2 time(s).
+//     }
+//     g() { // call 7
+//         h() {} // call 0
+//         // Repeats 99 time(s).
+//     }
+//     // Repeats 1 time(s).
+// }
+
+//   + Write the desired result (use).
+
+// {fn|macro} enable_call_logging();
+// {fn|macro} disable_call_logging();
+// {fn|macro} call_logging_is_enabled() -> bool;
+
+// // How to mark the function as loggable:
+// #[loggable]
+// pub fn f<T>(&mut self, p: T) -> type<T> {
+//     body
+// }
+// // Macro-expansion Result:
+// pub fn f<T>(&mut self, p: T) -> type<T> {
+//     let _logger = if logging_enabled() {
+//         logger("f<T>");
+//     } else {
+//         idle_logger();
+//     }
+//     body
+//     // idle_logger does nothing during destruction.
+// }
+
+
