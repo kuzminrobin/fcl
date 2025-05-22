@@ -39,18 +39,26 @@ pub struct CallGraph {
     caching_model: Option<Link>,    // TODO: -> caching_model_node
 
     // An instance that gets notified about changes in the call graph.
-    coderun_notifiable: Box<dyn CoderunNotifiable>,
+    coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>,
+    // coderun_notifiable: &'a mut dyn CoderunNotifiable
+    
+    // coderun_notifiable: &(dyn CoderunNotifiable + 'static)
+    // coderun_notifiable: Box<dyn CoderunNotifiable>,
 }
 
 impl CallGraph {
-    pub fn new(coderun_notifiable: Box<dyn CoderunNotifiable>) -> Self {
+    
+    pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
+    // pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>>) -> Self {
+    // pub fn new(coderun_notifiable: &'a mut dyn CoderunNotifiable) -> Self {
+    // pub fn new(coderun_notifiable: Box<dyn CoderunNotifiable>) -> Self {
         let pseudo_node = 
             Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(""))));
         Self {
             current: pseudo_node.clone(),
             call_stack: vec![pseudo_node],
             caching_model: None,
-            coderun_notifiable,
+            coderun_notifiable, // TODO: Consider `thread_specific_notifyable`.
         }
     }
 
@@ -105,7 +113,7 @@ impl CallGraph {
                     // Log the previous_child.repeat_count, if non-zero.
                     let previous_child_repeat_count = previous_child.borrow().repeat_count;
                     if previous_child_repeat_count != 0 {
-                        self.coderun_notifiable.notify_repeat_count(
+                        self.coderun_notifiable.borrow_mut().notify_repeat_count(
                             self.call_depth(),  // The node is not yet on the call stack.
                             // self.call_depth() + 1,  // TODO: Explain `+ 1`.
                             &previous_child_name,
@@ -133,7 +141,7 @@ impl CallGraph {
 
         // If not caching, log the call:
         if !self.caching_is_active() {
-            self.coderun_notifiable
+            self.coderun_notifiable.borrow_mut()
                 .notify_call(
                     self.call_depth() - 1, // `- 1`: // The node is already on the call stack.
                     &name);
@@ -160,7 +168,7 @@ impl CallGraph {
             if let Some(last_child) = returning_sibling.borrow().children.last()
                 && last_child.borrow().repeat_count != 0
             {
-                self.coderun_notifiable.notify_repeat_count(
+                self.coderun_notifiable.borrow_mut().notify_repeat_count(
                     call_depth, // While the returning node is still on the call stack, its call depth reflects the last_child's call_depth.
                     // call_depth + 1, // returning_sibling's call_depth + 1 == last_child's call_depth.
                     &last_child.borrow().name,
@@ -170,7 +178,7 @@ impl CallGraph {
             // Log the return of the returning_sibling:
             let name = self.current.borrow().name.clone();
             let has_nested_calls = !self.current.borrow().children.is_empty();
-            self.coderun_notifiable
+            self.coderun_notifiable.borrow_mut()
                 .notify_return(
                     call_depth - 1, // `- 1`: // The node is still on the call stack.
                     &name, has_nested_calls);
@@ -216,7 +224,7 @@ impl CallGraph {
                         //         Log the previous_sibling's repeat count, if non-zero,
                         let previous_sibling_repeat_count = previous_sibling.borrow().repeat_count;
                         if previous_sibling_repeat_count != 0 {
-                            self.coderun_notifiable.notify_repeat_count(
+                            self.coderun_notifiable.borrow_mut().notify_repeat_count(
                                 returning_func_call_depth, // Same call depth for the returning and previous siblings.
                                 &previous_sibling.borrow().name,
                                 previous_sibling_repeat_count,
@@ -279,7 +287,7 @@ impl CallGraph {
         let func_children = &current_node.children;
 
         // The call:
-        self.coderun_notifiable.notify_call(call_depth, name);
+        self.coderun_notifiable.borrow_mut().notify_call(call_depth, name);
 
         // Traverse children recursively:
         for child in func_children {
@@ -288,11 +296,11 @@ impl CallGraph {
 
         // The return:
         let has_nested_calls = !func_children.is_empty();
-        self.coderun_notifiable
+        self.coderun_notifiable.borrow_mut()
             .notify_return(call_depth, name, has_nested_calls);
 
         // The repeat count:
-        self.coderun_notifiable
+        self.coderun_notifiable.borrow_mut()
             .notify_repeat_count(call_depth, name, current_node.repeat_count);
     }
 }

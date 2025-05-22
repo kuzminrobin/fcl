@@ -1,39 +1,38 @@
 # TODO:
-* Save on GitHub.
 * Multithreaded  
   See a [note](https://docs.rs/proc-macro2/latest/proc_macro2/#thread-safety) (proc_macro2: Most types in this crate are `!Sync` because the underlying compiler types make use of thread-local memory).  
-  Consider a similar note for "fcl" if applicable.
+  Consider a similar note for "fcl" if applicable.  
+  * Write the Mutithreaded code.
+  * Try `#[loggable]`.
+  * Design what should be.
+    * Mutexed Writer.
+  Have in mind:
   * Thread indent prefix.
   * [Thread log color]
+  * Probably single-threaded (faster) and multi-threaded fcl.
 * ---
+* Document the `NOTE: Curious trick`.  
+  What's the diff between `Rc::clone(&rc)` and `rc.clone()`? The latter works when casting `Rc<dyn SuperTrait>` to `Rc<dyn Trait>`?  
+  ```rs
+  trait MyTraitA {}
+  trait MyTraitB {}
+  trait SuperTrait: MyTraitA + MyTraitB {}
+  struct S;
+  impl SuperTrait for S;
+  let sup: Rc<dyn SuperTrait> = Rc::new(S::new());
+  let rca: Rc<dyn MyTraitA> = sup.clone(); // `Rc::clone(&sup)` fails.
+  let rcb: Rc<dyn MyTraitB> = sup.clone(); // `Rc::clone(&sup)` fails.
+  ```
+* Logging the parameters and return values.
 * Test the logging by logging oneself.  
   Or try logging oneself and see how it works.
   Preliminary result: Causes sophisticated circular dependencies.  
-  Possible workaround: Create a copy with different name and use the copy to log the original.
-* (User practice?) Enable logging globally for everything.
-* User practice, change to:
-```
-| +-g (repeats 29 time(s).)
-| | +-f
-
-  f() {} // f() repeats 9 time(s).
-  g() { // g() repeats 29 time(s).
-    f() {}
-  } // g().
-```
-* caching_model -> caching_model_node
-* Testing
-  * Output 
-  * enable/disable.
-* Gloobal `#[loggable]`. Log all.
-* Test with the existing projects.
+  Possible workaround: Create a copy with different name and use the copy to log the original.  
+  Also: Test with the existing projects.
   * Update the instructions, how to enable func call logging in your project.
-* Output outpaces the cached logging.
-* Alternative Logging (Practice for Reader)
-  * `infra.set_call_indent_step(&"+-"); // "+-" in "| | +-f() {"`
-  * `infra.set_indent_step(&"| "); // "| " in "| | +-f() {"`
-* Sharing on GitHub
-* `#[loggable] impl ..`
+* (User practice?) Enable logging globally for everything.  
+  Gloobal `#![loggable]`. Log all. Also:  
+  `#[loggable] impl ..`
   * Example:  
     ```rust
     #[loggable]
@@ -50,6 +49,21 @@
     `#[loggable] impl ..`: 100% of associated functions are loggable (log all).  
     Manual `#[loggable] fn ..`: for <=50% loggable (log some, "white list").  
     `#[loggable] impl ..`, manual `#[nonloggable] fn`: for >50% loggable (log all except some, "black list").
+* User practice, change to:
+```
+| +-g (repeats 29 time(s).)
+| | +-f
+
+  f() {} // f() repeats 9 time(s).
+  g() { // g() repeats 29 time(s).
+    f() {}
+  } // g().
+```
+* caching_model -> caching_model_node
+* Testing
+  * Output 
+  * enable/disable.
+* Output outpaces the cached logging.
 * [Peeking](https://docs.rs/syn/latest/syn/parse/struct.ParseBuffer.html#method.peek) ([details](https://docs.rs/syn/latest/syn/token/index.html#other-operations)).
 * Report Compiler Error in proc macros.
 * [`CallLoggger` -> `FuncLogger`]
@@ -77,7 +91,11 @@
 * toolchain stable
 * Rename according to Rust (from C++-like). E.g. `Decorator` -> `Decorate`
 * Documenting
+  * .md
+  * Book 
 * Video
+  * YT
+  * SRUG talk.
 
 # Prerequisites
 This project has been developped based on the following knowledge.
