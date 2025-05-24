@@ -1,34 +1,54 @@
 // call_log_infra
 
 use call_graph::CallGraph;
-use fcl_decorators::CodeLikeDecorator;
-use std::{cell::RefCell, rc::Rc};
 // use fcl_decorators::TreeLikeDecorator;
-use fcl_traits::{
-    CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable,
-    ThreadSpecifics,
+use fcl_decorators::{CodeLikeDecorator, ThreadAwareWriter, ThreadAwareWriterType};
+use parking_lot::ReentrantMutex;
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, LazyLock},
 };
+// use fcl_decorators::TreeLikeDecorator;
+use fcl_traits::{CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 
 pub struct CallLogInfra {
     is_on: Vec<bool>, // Disabled by default (if empty). TODO: Consider renaming to `logging_is_on`.
     // code_run_decorator: Rc<RefCell<dyn CodeRunDecorator>>,
     thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
+    flusher: Rc<RefCell<dyn CoderunNotifiable>>,
     call_graph: CallGraph,
 }
 
+// impl Flushable for CallLogInfra {
+//     fn flush(&mut self) {
+        
+//     }
+// }
+
 impl CallLogInfra {
+    pub fn init_flushable(&mut self/*, thread_spec_notifyable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>> */) {
+        self.flusher.borrow_mut().set_flushable(&self.call_graph);
+        // let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable;    //.clone(); // `Rc::clone(&thread_spec_notifyable)` fails. // NOTE: Curious trick (TODO: Document it).
+        // coderun_notifiable.borrow_mut().set_flushable(&self.call_graph);
+    }
+
     pub fn new(thread_spec_notifyable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>>) -> Self {
         // pub fn new(code_run_notifyable: Rc<RefCell<dyn CoderunNotifiable + CodeRunDecorator>>) -> Self {
-        let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone(); // Rc::clone(&thread_spec_notifyable); // TODO: Make sure that his trick works. // NOTE: Curious trick.
+        let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone(); // `Rc::clone(&thread_spec_notifyable)` fails. // NOTE: Curious trick (TODO: Document it).
         let thread_specifics: Rc<RefCell<dyn ThreadSpecifics>> = thread_spec_notifyable;
-        Self {
+        // TODO: return just `Self { ... }`
+        let instance = Self {
             is_on: Vec::with_capacity(4),
             // code_run_decorator: Rc::clone(&code_run_notifyable),
             thread_specifics,
-            call_graph: CallGraph::new(coderun_notifiable),
+            flusher: coderun_notifiable.clone(),
+            call_graph: CallGraph::new(coderun_notifiable.clone()),
             // call_graph: CallGraph::new(Rc::clone(&coderun_notifiable)),
             // call_graph: CallGraph::new(Rc::clone(&thread_spec_notifyable)),
-        }
+        };
+        // coderun_notifiable.borrow_mut().set_flushable(&instance.call_graph);
+        instance
     }
     pub fn push_is_on(&mut self, is_on: bool) {
         self.is_on.push(is_on)
@@ -58,13 +78,24 @@ impl CallLogInfra {
     }
 }
 
-thread_local! {
-    // pub static CALL_LOG_DECORATOR: RefCell<dyn CoderunThreadSpecificNotifyable>
-    pub static CALL_LOG_INFRA: RefCell<CallLogInfra> = {
-        // let notifyable_decorator = Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)));
-        // RefCell::new(CallLogInfra::new(Rc::clone(&<notifyable_decorator as Rc<RefCell<dyn CoderunNotifiable>>>)))
+static mut THREAD_AWARE_WRITER: LazyLock<ThreadAwareWriterType>
+        /* : Arc<Mutex<ThreadAwareWriter>>*/ = LazyLock::new(||
+        Arc::new(ReentrantMutex::new(RefCell::new(ThreadAwareWriter::new(None))))
+    );
 
-        // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(TreeLikeDecorator::new(None, None, None, None)))));
-        RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)))))
+thread_local! {
+    pub static CALL_LOG_INFRA: RefCell<CallLogInfra> = {
+        let thread_aware_writer;
+        unsafe {
+            thread_aware_writer = (*THREAD_AWARE_WRITER).clone();
+        };
+
+        // let infra = RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(TreeLikeDecorator::new(thread_aware_writer/* , None*/, None, None, None)))));
+        let decorator = Rc::new(RefCell::new(CodeLikeDecorator::new(thread_aware_writer/* , None*/, None)));
+        let infra = RefCell::new(CallLogInfra::new(decorator.clone()));
+        // let infra = RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(CodeLikeDecorator::new(thread_aware_writer/* , None*/, None)))));
+        
+        // infra.borrow_mut().init_flushable(decorator);
+        infra
     };
 }

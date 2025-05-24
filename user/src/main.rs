@@ -10,7 +10,7 @@ use std::thread;
 use std::time::Duration;
 
 use fcl::call_log_infra::CALL_LOG_INFRA;
-use fcl::{CallLogger, ClosureLogger, closure_logger};
+use fcl::{FunctionLogger, ClosureLogger, closure_logger};
 use fcl_proc_macros::{call_logger, loggable};
 
 // TODO:
@@ -57,10 +57,10 @@ fn calls() {
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
     //     if infra.borrow_mut().is_on() {
-    //         _l = Some(CallLogger::new("main"))
+    //         _l = Some(FunctionLogger::new("main"))
     //     }
     // });
-    // // let _l = CallLogger::new("main");
+    // // let _l = FunctionLogger::new("main");
 
     for _ in 0..10 {
         f();
@@ -149,19 +149,20 @@ fn calls() {
 }
 
 // #[loggable]
-fn thread_func() {
+fn _thread_func() {
+    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().init_flushable());
+    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_thread_indent(
+        &"                                  "));
     CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
-    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_thread_indent(&"                                  "));
-
 
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
     //     if infra.borrow_mut().is_on() {
-    //         _l = Some(CallLogger::new("main"))
+    //         _l = Some(FunctionLogger::new("main"))
     //     }
     // });
-    // // let _l = CallLogger::new("main");
+    // // let _l = FunctionLogger::new("main");
 
     // println!("thread_func() starts");
 
@@ -171,7 +172,7 @@ fn thread_func() {
         // let mut _logger = None;
         // CALL_LOG_INFRA.with(|infra| {
         //     if infra.borrow_mut().is_on() {
-        //         _logger = Some(CallLogger::new("f2"))
+        //         _logger = Some(FunctionLogger::new("f2"))
         //     }
         // });
     }
@@ -269,11 +270,16 @@ fn thread_func() {
 fn main() {
     // TODO: -> macro, or simplify otherwise.
     // set_is_on(true);
+    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().init_flushable());
     CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
 
-    let thread_handle = thread::spawn(thread_func);
+    // let result = thread::Builder::new().name("T1".into()).spawn(_thread_func);
+    // // let thread_handle = thread::spawn(_thread_func);
+
     calls();
-    let _ = thread_handle.join();
+
+    // let _ = result.unwrap().join();
+    // // let _ = thread_handle.join();
 }
 
 // CodeLikeDecorator:

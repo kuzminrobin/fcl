@@ -12,7 +12,14 @@ pub enum CalleeName {   // TODO: Consider -> CalleeID
     Closure(ClosureInfo),
 }
 
-// TODO: Consider removing the default behavior.
+pub trait Flushable {
+    fn flush(&mut self);
+}
+
+// pub trait Flusher {
+//     fn register_flushable(&mut self, flushable: &dyn Flushable);
+// }
+
 pub trait CoderunNotifiable {
     // Non-cached call happened:
     fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
@@ -21,7 +28,8 @@ pub trait CoderunNotifiable {
     // Repeat count has stopped being cached:
     fn notify_repeat_count(&mut self, _call_depth: usize, _name: &CalleeName, _count: usize) {}
 
-    // fn set_thread_indent(&mut self, thread_indent: &'static str);
+    // fn get_flusher(&self) -> &mut dyn Flusher;
+    fn set_flushable(&mut self, flushable: &dyn Flushable);
 }
 
 pub trait ThreadSpecifics {
@@ -36,6 +44,7 @@ pub trait CoderunThreadSpecificNotifyable: CoderunNotifiable + ThreadSpecifics {
 //     };
 // }
 
+// Consider removing, is used internally only, not called from outside of the implementor.
 pub trait CodeRunDecorator {    // TODO: CodeRunDecorator -> CoderunDecorator, code_run -> coderun
     fn get_indent_string(&self, call_depth: usize) -> String;
     // fn get_callee_name_string(name: &CalleeName) -> String {
