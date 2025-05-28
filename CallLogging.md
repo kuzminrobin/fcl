@@ -1,5 +1,69 @@
 # TODO:
-* Multithreaded  
+* Multithreaded implementation.  
+  Latest:  
+  * Writer.  
+    Commit: thread_arbiter  
+    * In a single-threaded case the decorator gets `Option<Box<dyn Write>>`. If `None` then uses `stdout()`.
+      Otherwise uses `Box<dyn Write>` (file, socket, etc.) directly.
+    * In a multithreaded case 
+      * the decorator gets a ThreadSharedWriterAdapter (as an `Option<Box<dyn Write>>`) that 
+        * has Arc<[RefCell<]ThreadSharedWriter[>]>, non mutex-protected, since mutex-protection happens earlier,
+        * and forwards the calls from adapter to ThreadSharedWriter.  
+      * There is a global, one for all the threads, `ThreadSharedWriter` that gets `Option<Box<dyn Write>>` (if `None` then uses stdout()). <!-- TODO: Consider WriterAccessThreadAribiter (Aribter of the access to the writer by different threads) -->
+        * It is accessible through Arc<[RefCell<]ThreadSharedWriter[>]>, 
+        * It is NOT mutex-protected, since mutex-protection happens earlier.
+  * Flush need detection.  
+    TODO: Rename `CallLogger` to `FunctionLogger`.  
+    The FunctionLogger/ClosureLogger has a thread-local pointer to `CallLogger` trait
+    `Box<dyn CallLogger>`. <!-- TODO: Consider FlushableCallLogger { log_call(), log_ret(), flush() } -->. 
+    * Single-threaded.  
+      Behind the `CallLogger` trait there is a thread-local infra. The `flush()` is never called (has a default impl that does nothing).
+    * Multithreaded.  
+      Behind the `CallLogger` trait there is a thread-local per-thread `CallLoggerAdapter`
+      that has `Arc<>` to a global single-for-all-threads `Mutex<dyn CallLogger>` behind which (`dyn CallLogger`) there is a global single-for-all-threads `CallLoggerArbiter`.  
+      The `CallLoggerArbiter` 
+      * has a `HashMap<thead_id, Ptr<dyn CallLogger>>` that is filled in upon `register_call_logger()`.  
+        Upon thread creation some thread-local instance (infra?) in its constructor calls the `register_call_logger()` (if `CallLoggerArbiter` is not `None`)
+        and in its Dtor calls `unregister_call_logger()` (`CallLoggerArbiter` is memorized or not `None`).
+      * It also has `last_write_thread`.  
+        If the thread context has switched (`last_write_thread` != `thread::current().id()`)
+        then the `CallLoggerArbiter` invokes the `flush()` for the `last_write_thread` (`HashMap[last_write_thread].flush()`)
+        after which it transfers the calls to the new thread's call logger `HashMap[thread::current().id()].call..()`.
+
+  Outdated:  
+  For multithreaded cases, 
+    * Single Writer (ThreadSharedWriter, impl Write for ThreadSharedWriter) for all decorators (Arc<[RefCell<]..[>]>), non mutex-protected, since mutex-protection happens earlier. Uses stdout() by default.
+    * If decorators get None instead of Some(Arc<[RefCell<]ThreadSharedWriter[>]>) then the decorators use stdout().
+  * Single mutex protected thread arbiter (Arc<Mutex<ThreadArbiter>>)
+  * Per-thread thread agent, having a clone of Arc<Mutex<ThreadArbiter>>.
+
+  Commit.LifetimeDeadend  
+  * repeat_count{ overall, flushed } 
+  * flush \n in CodeLikeDecorator if line_end_pending
+  * Protect with a new mutex the threading invariants in CallGraph. Such that the flushing does not happen in the middle of `traverse_tree()` for example.
+  <!-- `ThreadAwareWriter: last_output_thread_id and flushables -> last_flushable: Option<*mut dyn Flushable>`
+  `register_flushable` -->
+  ---
+  ```
+  Mutex-protected writer. Has {
+    writer: <Common trait for stdout, stderr, file, socket, pipe>
+    previous_thread_id: Option<ThreadID>,
+    decorator_instance_by_thread_id: Map/Dictionary of thread_id to &instance
+    output_is_being_flushed: bool
+  }
+  All the threads do (smth like) mutex.lock().write({thread_id, log_output: &str}).
+  That write() then does the following:
+  if previous_thread_id.is_some() 
+      && thread_id != previous_thread_id.unwrap() { // Thread context has switched from previous_thread_id to thread_id
+    // Flush the cache of the previous_thread_id
+    decorator_instance_by_thread_id(previous_thread_id).flush_cache();
+    previous_thread_id = thread_id;
+  }
+  // Output the log_output.
+  ```
+
+
+  Earlier:
   See a [note](https://docs.rs/proc-macro2/latest/proc_macro2/#thread-safety) (proc_macro2: Most types in this crate are `!Sync` because the underlying compiler types make use of thread-local memory).  
   Consider a similar note for "fcl" if applicable.  
   * Write the Mutithreaded code.
@@ -11,25 +75,6 @@
   * [Thread log color]
   * Probably single-threaded (faster) and multi-threaded fcl.
 * ---
-* Document the `NOTE: Curious trick`.  
-  What's the diff between `Rc::clone(&rc)` and `rc.clone()`? The latter works when casting `Rc<dyn SuperTrait>` to `Rc<dyn Trait>`?  
-  ```rs
-  trait MyTraitA {}
-  trait MyTraitB {}
-  trait SuperTrait: MyTraitA + MyTraitB {}
-  struct S;
-  impl SuperTrait for S;
-  let sup: Rc<dyn SuperTrait> = Rc::new(S::new());
-  let rca: Rc<dyn MyTraitA> = sup.clone(); // `Rc::clone(&sup)` fails.
-  let rcb: Rc<dyn MyTraitB> = sup.clone(); // `Rc::clone(&sup)` fails.
-  ```
-* Logging the parameters and return values.
-* Test the logging by logging oneself.  
-  Or try logging oneself and see how it works.
-  Preliminary result: Causes sophisticated circular dependencies.  
-  Possible workaround: Create a copy with different name and use the copy to log the original.  
-  Also: Test with the existing projects.
-  * Update the instructions, how to enable func call logging in your project.
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
   `#[loggable] impl ..`
@@ -49,30 +94,55 @@
     `#[loggable] impl ..`: 100% of associated functions are loggable (log all).  
     Manual `#[loggable] fn ..`: for <=50% loggable (log some, "white list").  
     `#[loggable] impl ..`, manual `#[nonloggable] fn`: for >50% loggable (log all except some, "black list").
-* User practice, change to:
-```
-| +-g (repeats 29 time(s).)
-| | +-f
+* Logging the parameters and return values.
+* Test
+  * Testing
+    * Log to string and compare.
+    * Basics (from user/main.rs).
+    * Output 
+    * enable/disable.
+  * Test the logging by logging oneself.  
+    Or try logging oneself and see how it works.
+    Preliminary result: Causes sophisticated circular dependencies.  
+    Possible workaround: Create a copy with different name and use the copy to log the original.  
+    Also: Test with the existing projects.
+    * Update the instructions, how to enable func call logging in your project.
+* Overall clean-up.
+  * Refactor long functions.
+  * Move privates down, publics up (in file).
+* ---
+* User practice: HTML-decorator (code-like, tree-like), XML-decorator.
+* Consider removing all the occurrences of `unwrap()`.
+* {Reader Practice: ?} Logging the async funcs.
+* Document the `NOTE: Curious trick`.  
+  What's the diff between `Rc::clone(&rc)` and `rc.clone()`? The latter works when casting `Rc<dyn SuperTrait>` to `Rc<dyn Trait>`?  
+  ```rs
+  trait MyTraitA {}
+  trait MyTraitB {}
+  trait SuperTrait: MyTraitA + MyTraitB {}
+  struct S;
+  impl SuperTrait for S;
+  let sup: Rc<dyn SuperTrait> = Rc::new(S::new());
+  let rca: Rc<dyn MyTraitA> = sup.clone(); // `Rc::clone(&sup)` fails.
+  let rcb: Rc<dyn MyTraitB> = sup.clone(); // `Rc::clone(&sup)` fails.
+  ```
+* Optional. User practice, change to:
+  ```
+  | +-g (repeats 29 time(s).)
+  | | +-f
 
-  f() {} // f() repeats 9 time(s).
-  g() { // g() repeats 29 time(s).
-    f() {}
-  } // g().
-```
-* caching_model -> caching_model_node
-* Testing
-  * Output 
-  * enable/disable.
+    f() {} // f() repeats 9 time(s).
+    g() { // g() repeats 29 time(s).
+      f() {}
+    } // g().
+  ```
+* [Graph clearing]
 * Output outpaces the cached logging.
-* [Peeking](https://docs.rs/syn/latest/syn/parse/struct.ParseBuffer.html#method.peek) ([details](https://docs.rs/syn/latest/syn/token/index.html#other-operations)).
-* Report Compiler Error in proc macros.
-* [`CallLoggger` -> `FuncLogger`]
 * `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
   `#[loggable(MyPureTrait::pure_method)]`.  
   Undesirable.
 * Move the thread_local use deeper into the call. Such that a {Call|Closure}Logger is created and that's all.
 * `rc.cone()` -> `Rc::clone(&rc)`
-* Call nested function a local function.
 * Stricter Terminology where possible.
   ```C++
   parent() { // caller of siblings (enclosing for siblings)
@@ -96,6 +166,9 @@
 * Video
   * YT
   * SRUG talk.
+* [Peeking](https://docs.rs/syn/latest/syn/parse/struct.ParseBuffer.html#method.peek) ([details](https://docs.rs/syn/latest/syn/token/index.html#other-operations)).
+* [Report Compiler Error in proc macros]
+
 
 # Prerequisites
 This project has been developped based on the following knowledge.
