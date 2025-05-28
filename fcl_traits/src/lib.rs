@@ -21,7 +21,7 @@ pub trait CoderunNotifiable {
     // Repeat count has stopped being cached:
     fn notify_repeat_count(&mut self, _call_depth: usize, _name: &CalleeName, _count: usize) {}
 
-    // fn set_thread_indent(&mut self, thread_indent: &'static str);
+    fn notify_flush(&mut self) {}
 }
 
 pub trait ThreadSpecifics {

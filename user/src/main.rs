@@ -67,7 +67,7 @@ fn calls() {
     }
     g();
     f();
-    for _ in 0..30 {
+    for _ in 0..7 {
         g();
     }
 
@@ -193,7 +193,7 @@ fn thread_func() {
 
     g();
     f();
-    for _ in 0..30 {
+    for _ in 0..5 {
         g();
     }
 
@@ -282,9 +282,13 @@ fn main() {
     THREAD_LOGGER.with(|logger| logger.borrow_mut().set_is_on(true)); // Turn logging on.
     // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
 
-    let thread_handle = thread::spawn(thread_func);
+    let result = thread::Builder::new().name("T1".into()).spawn(thread_func);
     calls();
-    let _ = thread_handle.join();
+    let _ = result.unwrap().join();
+    // let _ = thread_handle.join();
+    // let thread_handle = thread::spawn(thread_func);
+    // calls();
+    // let _ = thread_handle.join();
 }
 
 // CodeLikeDecorator:

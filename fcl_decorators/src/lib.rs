@@ -101,6 +101,12 @@ impl CodeRunDecorator for CodeLikeDecorator {
 
 
 impl CoderunNotifiable for CodeLikeDecorator {
+    fn notify_flush(&mut self) {
+        if self.line_end_pending {
+            decorator_write!(self, "\n"); // '\n' after "parent() {" before another thread output.
+            self.line_end_pending = false;
+        }
+    }
     fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
@@ -115,7 +121,7 @@ impl CoderunNotifiable for CodeLikeDecorator {
         self.line_end_pending = true; // '\n' pending. Won't be printed if there will be no nested calls (immediate "}\n").
     }
     fn notify_return(&mut self, call_depth: usize, name: &CalleeName, has_nested_calls: bool) {
-        if !has_nested_calls {
+        if !has_nested_calls && self.line_end_pending {
             decorator_write!(self, "}}\n"); // "}\n"
         } else {
             decorator_write!(
