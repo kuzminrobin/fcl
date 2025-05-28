@@ -17,9 +17,9 @@ macro_rules! closure_logger {
     }
 }
 
-pub struct CallLogger;  // TODO: -> FunctionLogger (as opposed to ClosureLogger)
+pub struct FunctionLogger;  // TODO: -> FunctionLogger (as opposed to ClosureLogger)
 
-impl CallLogger {
+impl FunctionLogger {
     pub fn new(func_name: &'static str) -> Self {
         CALL_LOG_INFRA.with(|infra| {
             infra
@@ -30,7 +30,7 @@ impl CallLogger {
     }
 }
 
-impl Drop for CallLogger {
+impl Drop for FunctionLogger {
     fn drop(&mut self) {
         CALL_LOG_INFRA.with(|infra| infra.borrow_mut().log_ret());
     }

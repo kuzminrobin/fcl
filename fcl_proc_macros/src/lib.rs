@@ -3,9 +3,9 @@ use quote::quote;
 use syn::{parse::Parse, parse_macro_input, spanned::Spanned, ExprClosure, ExprPath, ImplItemFn, ItemFn, Token};
 
 // TODO: Consider moving to closure_logger and making it also a decl macro.
-// Creates the `CallLogger` instance.
+// Creates the `FunctionLogger` instance.
 #[proc_macro]
-pub fn call_logger(name: TokenStream) -> TokenStream {  // TODO: -> function_logger
+pub fn function_logger(name: TokenStream) -> TokenStream {  // TODO: -> function_logger
     // Assert that the name is exactly one id (probably fully qualified like `MyStruct::method`). TODO: As opposed to what?
     let ts: proc_macro2::TokenStream = name.into();
     let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
@@ -17,7 +17,7 @@ pub fn call_logger(name: TokenStream) -> TokenStream {  // TODO: -> function_log
         let mut _logger = None;
         CALL_LOG_INFRA.with(|infra| {
             if infra.borrow_mut().is_on() {
-                _logger = Some(CallLogger::new(#func_name))
+                _logger = Some(FunctionLogger::new(#func_name))
             }
         })
     }
@@ -71,7 +71,7 @@ pub fn loggable(_attr_args: TokenStream, _attributed_item: TokenStream) -> Token
     //     // Failed to parse as a callable (function //, associated function, closure,
     //     quote! {
     //         fn failed () {
-    //             //call_logger!(failed); // The `CallLogger` instance.
+    //             //function_logger!(failed); // The `FunctionLogger` instance.
     //         }
     //     }
     //     .into()
@@ -168,13 +168,13 @@ fn quote_as_itemfn(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
     let output = quote! {
         #(#attrs)*
         #vis #signature {
-            call_logger!(#func_name #generics); // The `CallLogger` instance. // TODO: Consider: `#func_name #generics` -> `#func_name#generics` (remove space)
+            function_logger!(#func_name #generics); // The `FunctionLogger` instance. // TODO: Consider: `#func_name #generics` -> `#func_name#generics` (remove space)
             #block
         }
         // $( #[$meta] )*
         // $vis fn $name ( $( $arg_name : $arg_ty ),* ) $( -> $ret_ty )? {
-        //     call_logger!($name); // The `CallLogger` instance.
-        //     // TODO: Consider `call_logger!("$name");` // Quoted arg.
+        //     function_logger!($name); // The `FunctionLogger` instance.
+        //     // TODO: Consider `function_logger!("$name");` // Quoted arg.
         //     $($tt)*
         // }
     };
@@ -206,7 +206,7 @@ fn quote_as_implitemfn(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenS
     let output = quote! {
         #(#attrs)*
         #vis #defaultness #signature {
-            call_logger!(#func_name); // The `CallLogger` instance. TODO: What about `#generics`?
+            function_logger!(#func_name); // The `FunctionLogger` instance. TODO: What about `#generics`?
             #block
         }
     };
@@ -258,8 +258,8 @@ fn quote_as_closure(closure: ExprClosure, _attr_args: &Option<AttrArgs>) -> Toke
         #lifetimes #constness #movability #asyncness #capture 
         #or1_token #inputs #or2_token #output 
         {
-            // call_logger!(closure); 
-            closure_logger!(#start_line, #start_col, #end_line, #end_col); // The `CallLogger` instance. 
+            // function_logger!(closure); 
+            closure_logger!(#start_line, #start_col, #end_line, #end_col); // The `FunctionLogger` instance. 
             // Closure has no name. The name will be replaced with "enclosing()::closure_line_col()". // TODO: Update this naming comment.
             // TODO: Is `#generics` applicable to closures?
 

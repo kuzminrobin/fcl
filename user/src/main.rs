@@ -1,4 +1,4 @@
-// use fcl_proc_macros::{call_logger, loggable};
+// use fcl_proc_macros::{function_logger, loggable};
 // #[loggable]
 // fn f() {}
 
@@ -10,8 +10,8 @@ use std::thread;
 use std::time::Duration;
 
 use fcl::call_log_infra::CALL_LOG_INFRA;
-use fcl::{CallLogger, ClosureLogger, closure_logger};
-use fcl_proc_macros::{call_logger, loggable};
+use fcl::{FunctionLogger, ClosureLogger, closure_logger};
+use fcl_proc_macros::{function_logger, loggable};
 
 // TODO:
 // Macro
@@ -57,10 +57,10 @@ fn calls() {
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
     //     if infra.borrow_mut().is_on() {
-    //         _l = Some(CallLogger::new("main"))
+    //         _l = Some(FunctionLogger::new("main"))
     //     }
     // });
-    // // let _l = CallLogger::new("main");
+    // // let _l = FunctionLogger::new("main");
 
     for _ in 0..10 {
         f();
@@ -158,10 +158,10 @@ fn thread_func() {
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
     //     if infra.borrow_mut().is_on() {
-    //         _l = Some(CallLogger::new("main"))
+    //         _l = Some(FunctionLogger::new("main"))
     //     }
     // });
-    // // let _l = CallLogger::new("main");
+    // // let _l = FunctionLogger::new("main");
 
     // println!("thread_func() starts");
 
@@ -171,7 +171,7 @@ fn thread_func() {
         // let mut _logger = None;
         // CALL_LOG_INFRA.with(|infra| {
         //     if infra.borrow_mut().is_on() {
-        //         _logger = Some(CallLogger::new("f2"))
+        //         _logger = Some(FunctionLogger::new("f2"))
         //     }
         // });
     }
