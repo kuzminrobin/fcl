@@ -49,3 +49,15 @@ pub trait CodeRunDecorator {    // TODO: CodeRunDecorator -> CoderunDecorator, c
     // }
 }
 
+pub trait CallLogger {
+    fn push_is_on(&mut self, is_on: bool);
+    fn pop_is_on(&mut self);
+    fn is_on(&self) -> bool;
+    fn set_is_on(&mut self, is_on: bool);
+
+    fn set_thread_indent(&mut self, thread_indent: &'static str);
+
+    fn log_call(&mut self, name: &CalleeName);
+    fn log_ret(&mut self);
+    fn flush(&mut self) {}
+}

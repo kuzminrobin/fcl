@@ -16,10 +16,10 @@
         * It is NOT mutex-protected, since mutex-protection happens earlier.
   * Flush need detection.  
     TODO: Rename `CallLogger` to `FunctionLogger`.  
-    The FunctionLogger/ClosureLogger has a thread-local pointer to `CallLogger` trait
+    The FunctionLogger/ClosureLogger uses `THREAD_LOGGER` - a thread-local pointer to `CallLogger` trait
     `Box<dyn CallLogger>`. <!-- TODO: Consider FlushableCallLogger { log_call(), log_ret(), flush() } -->. 
     * Single-threaded.  
-      Behind the `CallLogger` trait there is a thread-local infra. The `flush()` is never called (has a default impl that does nothing).
+      Behind the `CallLogger` trait there is a thread-local infra. The `flush()` is never called (but still has an impl for multithreaded case).
     * Multithreaded.  
       Behind the `CallLogger` trait there is a thread-local per-thread `CallLoggerAdapter`
       that has `Arc<>` to a global single-for-all-threads `Mutex<dyn CallLogger>` behind which (`dyn CallLogger`) there is a global single-for-all-threads `CallLoggerArbiter`.  

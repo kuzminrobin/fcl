@@ -8,7 +8,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 // use fcl_decorators::TreeLikeDecorator;
-use fcl_traits::{CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics};
+use fcl_traits::{CallLogger, CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 
 use crate::writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter};
 
@@ -33,33 +33,42 @@ impl CallLogInfra {
             // call_graph: CallGraph::new(Rc::clone(&thread_spec_notifyable)),
         }
     }
-    pub fn push_is_on(&mut self, is_on: bool) {
+}
+
+impl CallLogger for CallLogInfra {
+    fn push_is_on(&mut self, is_on: bool) {
         self.is_on.push(is_on)
     }
-    pub fn pop_is_on(&mut self) {
+    fn pop_is_on(&mut self) {
         self.is_on.pop();
     }
-    pub fn is_on(&self) -> bool {
+    fn is_on(&self) -> bool {
         *self.is_on.last().unwrap_or(&false)
     }
-    pub fn set_is_on(&mut self, is_on: bool) {
+    fn set_is_on(&mut self, is_on: bool) {
         self.is_on.pop();
         self.is_on.push(is_on);
     }
 
-    pub fn set_thread_indent(&mut self, thread_indent: &'static str) {
+    fn set_thread_indent(&mut self, thread_indent: &'static str) {
         self.thread_specifics
             .borrow_mut()
             .set_thread_indent(thread_indent);
     }
 
-    pub fn log_call(&mut self, name: &CalleeName) {
+    fn log_call(&mut self, name: &CalleeName) {
         self.call_graph.add_call(name);
     }
-    pub fn log_ret(&mut self) {
+    fn log_ret(&mut self) {
         self.call_graph.add_ret();
     }
+
+    // TODO: Make this impl conditional, for multithreaded case only.
+    fn flush(&mut self) {
+        todo!()
+    }
 }
+
 
 // TODO: Test with file, socket writer as an arg to `ThreadSharedWriter::new()`.
 static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> =
@@ -69,17 +78,24 @@ thread_local! {
     // pub static WRITER_ADAPTER: RefCell<WriterAdapter> =
     //     RefCell::new(WriterAdapter::new(unsafe { (*THREAD_SHARED_WRITER).clone() }));
 
-    // pub static CALL_LOG_DECORATOR: RefCell<dyn CoderunThreadSpecificNotifyable>
-    pub static CALL_LOG_INFRA: RefCell<CallLogInfra> = {
-        // let notifyable_decorator = Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)));
-        // RefCell::new(CallLogInfra::new(Rc::clone(&<notifyable_decorator as Rc<RefCell<dyn CoderunNotifiable>>>)))
-
-
-        RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(
+    pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = {
+        RefCell::new(Box::new(CallLogInfra::new(Rc::new(RefCell::new(
             CodeLikeDecorator::new(
                 Some(Box::new(WriterAdapter::new(unsafe { (*THREAD_SHARED_WRITER).clone() }))), 
-                None)))))
-        // // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(TreeLikeDecorator::new(None, None, None, None)))));
-        // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)))))
+                None))))))
     };
+
+    // pub static CALL_LOG_INFRA: RefCell<CallLogInfra> = {
+    // // pub static CALL_LOG_DECORATOR: RefCell<dyn CoderunThreadSpecificNotifyable>
+    //     // let notifyable_decorator = Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)));
+    //     // RefCell::new(CallLogInfra::new(Rc::clone(&<notifyable_decorator as Rc<RefCell<dyn CoderunNotifiable>>>)))
+
+
+    //     RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(
+    //         CodeLikeDecorator::new(
+    //             Some(Box::new(WriterAdapter::new(unsafe { (*THREAD_SHARED_WRITER).clone() }))), 
+    //             None)))))
+    //     // // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(TreeLikeDecorator::new(None, None, None, None)))));
+    //     // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)))))
+    // };
 }

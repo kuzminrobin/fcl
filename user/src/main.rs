@@ -9,8 +9,9 @@
 use std::thread;
 use std::time::Duration;
 
-use fcl::call_log_infra::CALL_LOG_INFRA;
-use fcl::{FunctionLogger, ClosureLogger, closure_logger};
+use fcl::call_log_infra::THREAD_LOGGER;
+// use fcl::call_log_infra::CALL_LOG_INFRA;
+use fcl::{ClosureLogger, FunctionLogger, closure_logger};
 use fcl_proc_macros::{function_logger, loggable};
 
 // TODO:
@@ -52,7 +53,6 @@ pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64
 
 #[loggable]
 fn calls() {
-
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
@@ -84,10 +84,10 @@ fn calls() {
                 .map(
                     // main()::closure()::closure() {}
                     #[loggable]
-                    |v| !v
+                    |v| !v,
                 )
                 .unwrap()
-        }
+        },
     );
     // assert_eq!(Some(false), _b);
 
@@ -109,7 +109,7 @@ fn calls() {
     }
     {
         #[loggable]
-        pub fn gen_func<T, U>() {}  // TODO: No generics logged.
+        pub fn gen_func<T, U>() {} // TODO: No generics logged.
         gen_func::<bool, i32>();
     }
 
@@ -131,7 +131,7 @@ fn calls() {
         impl MyTrait for MyStrNonOverride {
             // Uses the default implementation.
         }
-        MyStruct.trait_method();         // Calls MyStruct::trait_method() override.
+        MyStruct.trait_method(); // Calls MyStruct::trait_method() override.
         MyStrNonOverride.trait_method(); // Calls MyTrait ::trait_method() default.
     }
     {
@@ -150,9 +150,19 @@ fn calls() {
 
 // #[loggable]
 fn thread_func() {
-    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
-    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_thread_indent(&"                                  "));
+    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_is_on(true)); // Turn logging on.
+    // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
 
+    THREAD_LOGGER.with(|logger| {
+        logger
+            .borrow_mut()
+            .set_thread_indent(&"                                  ")
+    });
+    // CALL_LOG_INFRA.with(|infra| {
+    //     infra
+    //         .borrow_mut()
+    //         .set_thread_indent(&"                                  ")
+    // });
 
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
@@ -201,10 +211,10 @@ fn thread_func() {
                 .map(
                     // main()::closure()::closure() {}
                     #[loggable]
-                    |v| !v
+                    |v| !v,
                 )
                 .unwrap()
-        }
+        },
     );
     // assert_eq!(Some(false), _b);
 
@@ -226,7 +236,7 @@ fn thread_func() {
     }
     {
         #[loggable]
-        pub fn gen_func<T, U>() {}  // TODO: No generics logged.
+        pub fn gen_func<T, U>() {} // TODO: No generics logged.
         gen_func::<bool, i32>();
     }
 
@@ -248,7 +258,7 @@ fn thread_func() {
         impl MyTrait for MyStrNonOverride {
             // Uses the default implementation.
         }
-        MyStruct.trait_method();         // Calls MyStruct::trait_method() override.
+        MyStruct.trait_method(); // Calls MyStruct::trait_method() override.
         MyStrNonOverride.trait_method(); // Calls MyTrait ::trait_method() default.
     }
     {
@@ -269,7 +279,8 @@ fn thread_func() {
 fn main() {
     // TODO: -> macro, or simplify otherwise.
     // set_is_on(true);
-    CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
+    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_is_on(true)); // Turn logging on.
+    // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
 
     let thread_handle = thread::spawn(thread_func);
     calls();
@@ -277,7 +288,7 @@ fn main() {
 }
 
 // CodeLikeDecorator:
-// main() {                              
+// main() {
 //   f() {}
 //   // f() repeats 9 time(s).
 //   g() {

@@ -13,13 +13,19 @@ pub fn function_logger(name: TokenStream) -> TokenStream {  // TODO: -> function
     // * let func_name: ? = syn::parse(name);
     // * let func_name = syn::parse_macro_input!(name as String);
     quote! {
-        use fcl::call_log_infra::CALL_LOG_INFRA;    // TODO: Consider moving to top of the file as a searate macro call.
+        use fcl::call_log_infra::THREAD_LOGGER; // TODO: Consider moving to top of the file as a searate macro call.
+        // use fcl::call_log_infra::CALL_LOG_INFRA;    // TODO: Consider moving to top of the file as a searate macro call.
         let mut _logger = None;
-        CALL_LOG_INFRA.with(|infra| {
-            if infra.borrow_mut().is_on() {
+        THREAD_LOGGER.with(|logger| {
+            if logger.borrow_mut().is_on() {
                 _logger = Some(FunctionLogger::new(#func_name))
             }
-        })
+        });
+        // CALL_LOG_INFRA.with(|infra| {
+        //     if infra.borrow_mut().is_on() {
+        //         _logger = Some(FunctionLogger::new(#func_name))
+        //     }
+        // })
     }
     .into()
 }
