@@ -1,16 +1,18 @@
 # TODO:
 * Multithreaded implementation.  
+  To do: 
+  * static `ThreadSharedWriter`, 
   Latest:  
   * Writer.  
     Commit: thread_arbiter  
     * In a single-threaded case the decorator gets `Option<Box<dyn Write>>`. If `None` then uses `stdout()`.
       Otherwise uses `Box<dyn Write>` (file, socket, etc.) directly.
     * In a multithreaded case 
-      * the decorator gets a ThreadSharedWriterAdapter (as an `Option<Box<dyn Write>>`) that 
-        * has Arc<[RefCell<]ThreadSharedWriter[>]>, non mutex-protected, since mutex-protection happens earlier,
-        * and forwards the calls from adapter to ThreadSharedWriter.  
+      * the decorator gets a thread-local `ThreadSharedWriterAdapter` <!-- TODO: Consider WriterAdapter --> (as an `Option<Box<dyn Write>>`) that 
+        * has `Arc<[RefCell<]ThreadSharedWriter[>]>`, non mutex-protected, since mutex-protection happens earlier,
+        * and (`Adapter`) forwards the calls from decorator to `ThreadSharedWriter`.  
       * There is a global, one for all the threads, `ThreadSharedWriter` that gets `Option<Box<dyn Write>>` (if `None` then uses stdout()). <!-- TODO: Consider WriterAccessThreadAribiter (Aribter of the access to the writer by different threads) -->
-        * It is accessible through Arc<[RefCell<]ThreadSharedWriter[>]>, 
+        * It is accessible by the adapters through `Arc<[RefCell<]ThreadSharedWriter[>]>`, 
         * It is NOT mutex-protected, since mutex-protection happens earlier.
   * Flush need detection.  
     TODO: Rename `CallLogger` to `FunctionLogger`.  

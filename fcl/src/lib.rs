@@ -1,4 +1,5 @@
 pub mod call_log_infra;
+pub mod writer;
 
 use call_log_infra::CALL_LOG_INFRA;
 use fcl_traits::{CalleeName, ClosureInfo};
