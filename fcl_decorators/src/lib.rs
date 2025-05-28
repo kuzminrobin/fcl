@@ -10,7 +10,7 @@
 // */
 use std::io::{Write, stdout};
 
-use fcl_traits::{CalleeName, CodeRunDecorator, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics};
+use fcl_traits::{CalleeName, CodeRunDecorator, CoderunNotifiable, CoderunThreadSpecificNotifyable, RepeatCountCategory, ThreadSpecifics};
 
 // use fcl_traits::{CalleeName, CoderunNotifiable};
 
@@ -134,14 +134,15 @@ impl CoderunNotifiable for CodeLikeDecorator {
         }
         self.line_end_pending = false;
     }
-    fn notify_repeat_count(&mut self, call_depth: usize, name: &CalleeName, count: usize) {
+    fn notify_repeat_count(&mut self, call_depth: usize, name: &CalleeName, count: RepeatCountCategory) {
+    // fn notify_repeat_count(&mut self, call_depth: usize, name: &CalleeName, count: usize) {
         decorator_write!(
             self,
             "{}{}// {}() repeats {} time(s).\n", // "<thread_indent><indent>// sibling() repeats 8 time(s).\n"
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
             CommonDecorator::get_callee_name_string(name),
-            count
+            count.to_string()
         );
     }
 }
@@ -220,14 +221,15 @@ impl CoderunNotifiable for TreeLikeDecorator {
 
     // NOTE: Reusing the default behavior of `notify_return()` that does nothing.
 
-    fn notify_repeat_count(&mut self, call_depth: usize, name: &CalleeName, count: usize) {
+    fn notify_repeat_count(&mut self, call_depth: usize, name: &CalleeName, count: RepeatCountCategory) {
+    // fn notify_repeat_count(&mut self, call_depth: usize, name: &CalleeName, count: usize) {
         decorator_write!(
             self,
             "{}{}{} repeats {} time(s).\n", // "<indent> sibling repeats 8 time(s).\n"
             self.get_indent_string(call_depth),
             self.indent_step_noncall,
             CommonDecorator::get_callee_name_string(name),
-            count
+            count.to_string()
         );
     }
 }

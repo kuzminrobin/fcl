@@ -1,22 +1,25 @@
 use std::{cell::RefCell, rc::Rc};
 
-use fcl_traits::{CalleeName, CoderunNotifiable};    
+use fcl_traits::{CalleeName, CoderunNotifiable, RepeatCount};    
 // TODO: Stop dependency on fcl (extract CalleeName, CoderunNotifiable to non-fcl-related file/package)
 
 type Link = Rc<RefCell<CallNode>>;
-type RepeatCountType = usize;
 
 struct CallNode {
     name: CalleeName,
     children: Vec<Link>,
-    repeat_count: RepeatCountType,
+    repeat_count: RepeatCount,
+    // repeat_count: RepeatCountType,
+    has_returned: bool
 }
 impl CallNode {
     pub fn new(name: &CalleeName /*&'static str*/) -> Self {
         Self {
             name: name.clone(),
             children: Vec::new(),
-            repeat_count: 0,
+            repeat_count: RepeatCount::new(),
+            // repeat_count: 0,
+            has_returned: false
         }
     }
 }
@@ -51,7 +54,7 @@ pub struct CallGraph {
     // (strictly speaking is not required).
     // The node that represents the currently running function.
     // The nested calls are added as children to this node.
-    current: Link,
+    current: Link,  // TODO: -> current_node
 
     // The last node that is not being cached and is used as a model for caching the subsequent sibling(s).
     // The node referred to by caching_model_node is never removed
@@ -89,7 +92,6 @@ impl CallGraph {
     }
 
     pub fn flush(&mut self) {
-        self.coderun_notifiable.borrow_mut().notify_flush();
         // // println!("<CallGraph as Flushable>::flush()")
 
         // If caching is active:
@@ -100,13 +102,16 @@ impl CallGraph {
             // Log the caching_model_node's repeat count, if non-zero,
             // Log the subtree of the caching_model_node's next sibling.
             // Stop caching. `caching_model_node = None`.
-            let caching_model_node_repeat_count = caching_model_node.borrow().repeat_count;
-            if caching_model_node_repeat_count != 0 {
+            if !caching_model_node.borrow().repeat_count.non_flushed_is_empty() {
+            // let caching_model_node_repeat_count = caching_model_node.borrow().repeat_count;
+            // if caching_model_node_repeat_count != 0 {
                 self.coderun_notifiable.borrow_mut().notify_repeat_count(
                     self.caching_info.call_depth,
                     &caching_model_node.borrow().name,
-                    caching_model_node_repeat_count,
+                    caching_model_node.borrow().repeat_count.non_flushed()
+                    // caching_model_node_repeat_count,
                 );
+                caching_model_node.borrow_mut().repeat_count.mark_flushed();
             }
             // Log the subtree of the (subsequent) cached sibling:
             if let Some(cached_sibling) = self.caching_info.next_sibling.take() {
@@ -122,15 +127,19 @@ impl CallGraph {
             // The latest sibling can have a non-zero non-flushed repeat count.
             // The `self.current` points to the parent or pseudo.
             if let Some(latest_sibling) = self.current.borrow().children.last() 
-                && latest_sibling.borrow().repeat_count != 0
+                && !latest_sibling.borrow().repeat_count.non_flushed_is_empty()
+                // && latest_sibling.borrow().repeat_count != 0
             {
                 self.coderun_notifiable.borrow_mut().notify_repeat_count(
                     self.caching_info.call_depth,
                     &latest_sibling.borrow().name,
-                    latest_sibling.borrow().repeat_count,
+                    latest_sibling.borrow().repeat_count.non_flushed()
+                    // latest_sibling.borrow().repeat_count,
                 );
+                latest_sibling.borrow_mut().repeat_count.mark_flushed();
             }
         }
+        self.coderun_notifiable.borrow_mut().notify_flush();
     }
 
     // TODO: child -> sibling
@@ -190,14 +199,17 @@ impl CallGraph {
                 } else {
                     // Previous child has different name. Its repeat_count stops being cached.
                     // Log the previous_child.repeat_count, if non-zero.
-                    let previous_child_repeat_count = previous_child.borrow().repeat_count;
-                    if previous_child_repeat_count != 0 {
+                    if !previous_child.borrow().repeat_count.non_flushed_is_empty() {
+                    // let previous_child_repeat_count = previous_child.borrow().repeat_count.non_flushed();
+                    // if previous_child_repeat_count != 0 {
                         self.coderun_notifiable.borrow_mut().notify_repeat_count(
                             self.call_depth(),  // The node is not yet on the call stack.
                             // self.call_depth() + 1,  // TODO: Explain `+ 1`.
                             &previous_child_name,
-                            previous_child_repeat_count,
+                            previous_child.borrow().repeat_count.non_flushed()
+                            // previous_child_repeat_count,
                         );
+                        previous_child.borrow_mut().repeat_count.mark_flushed();
                     } // else nothing.
                 }
             } // else nothing.
@@ -243,14 +255,16 @@ impl CallGraph {
             // Log the repeat count, if non-zero, of the last_child, if present:
             let returning_sibling = self.call_stack.last().unwrap();
             if let Some(last_child) = returning_sibling.borrow().children.last()
-                && last_child.borrow().repeat_count != 0
+                && !last_child.borrow().repeat_count.non_flushed_is_empty()
+                // && last_child.borrow().repeat_count.non_flushed() != 0
             {
                 self.coderun_notifiable.borrow_mut().notify_repeat_count(
                     call_depth, // While the returning node is still on the call stack, its call depth reflects the last_child's call_depth.
                     // call_depth + 1, // returning_sibling's call_depth + 1 == last_child's call_depth.
                     &last_child.borrow().name,
-                    last_child.borrow().repeat_count,
+                    last_child.borrow().repeat_count.non_flushed(),
                 );
+                last_child.borrow_mut().repeat_count.mark_flushed();
             }
             // Log the return of the returning_sibling:
             let name = self.current.borrow().name.clone();
@@ -260,12 +274,15 @@ impl CallGraph {
                     call_depth - 1, // `- 1`: // The node is still on the call stack.
                     &name, has_nested_calls);
 
+            self.current.borrow_mut().has_returned = true;
+
             // Handle the return in the call graph:
             self.call_stack.pop();
             self.current = self.call_stack.last().unwrap().clone();
         } else {
             // Otherwise (caching is active) {
             let returning_func = self.call_stack.pop().unwrap();
+            returning_func.borrow_mut().has_returned = true;
             let parent_or_pseudo = self.call_stack.last().unwrap();
             let returning_func_call_depth = self.call_depth();  // The returning func is not on the call stack.
             self.current = parent_or_pseudo.clone();
@@ -279,9 +296,11 @@ impl CallGraph {
                     parent_or_pseudo.borrow().children[previous_sibling_index].clone();
                 if Self::trees_are_equal(&previous_sibling, &returning_func) {
                     //     the previous sibling's repeat count is incremented
-                    if previous_sibling.borrow_mut().repeat_count < RepeatCountType::MAX {
-                        previous_sibling.borrow_mut().repeat_count += 1
-                    }
+                    previous_sibling.borrow_mut().repeat_count.inc();
+                    // if previous_sibling.borrow_mut().repeat_count < RepeatCountType::MAX {
+                    //     previous_sibling.borrow_mut().repeat_count += 1
+                    // }
+
                     //     and the currently returning function's call subtree is removed from the call graph.
                     parent_or_pseudo.borrow_mut().children.pop();
                     //     If the previous sibling is the caching_model then caching is over,
@@ -307,13 +326,16 @@ impl CallGraph {
                         == previous_sibling.as_ptr() {
                     // if self.caching_model.as_ref().unwrap().as_ptr() == previous_sibling.as_ptr() {
                         //         Log the previous_sibling's repeat count, if non-zero,
-                        let previous_sibling_repeat_count = previous_sibling.borrow().repeat_count;
-                        if previous_sibling_repeat_count != 0 {
+                        if !previous_sibling.borrow().repeat_count.non_flushed_is_empty() {
+                        // let previous_sibling_repeat_count = previous_sibling.borrow().repeat_count.non_flushed();
+                        // if previous_sibling_repeat_count != 0 {
                             self.coderun_notifiable.borrow_mut().notify_repeat_count(
                                 returning_func_call_depth, // Same call depth for the returning and previous siblings.
                                 &previous_sibling.borrow().name,
-                                previous_sibling_repeat_count,
+                                previous_sibling.borrow().repeat_count.non_flushed()
+                                // previous_sibling_repeat_count,
                             );
+                            previous_sibling.borrow_mut().repeat_count.mark_flushed();
                         }
                         //         Log the subtree of the returning_sibling.
                         self.traverse_tree(&returning_func, returning_func_call_depth);
@@ -362,6 +384,9 @@ impl CallGraph {
                 return false;
             }
         }
+        if a.repeat_count != b.repeat_count {
+            return false
+        }
 
         true
     }
@@ -369,7 +394,7 @@ impl CallGraph {
     /// Traverses the call tree recursively and calls the notification callbacks,
     /// thus notifying that the subtree has stopped being cached.
     fn traverse_tree(&mut self, current_node: &Link, call_depth: usize) {
-        let current_node = current_node.borrow();
+        let mut current_node = current_node.borrow_mut();
         let name = &current_node.name;
         let func_children = &current_node.children;
 
@@ -382,14 +407,19 @@ impl CallGraph {
         }
 
         // The return:
-        let has_nested_calls = !func_children.is_empty();
-        self.coderun_notifiable.borrow_mut()
-            .notify_return(call_depth, name, has_nested_calls);
-
-        // The repeat count:
-        if current_node.repeat_count != 0 {
+        if current_node.has_returned {
+            let has_nested_calls = !func_children.is_empty();
             self.coderun_notifiable.borrow_mut()
-                .notify_repeat_count(call_depth, name, current_node.repeat_count);
+                .notify_return(call_depth, name, has_nested_calls);
+
+            // The repeat count:
+            if !current_node.repeat_count.non_flushed_is_empty() {
+            // if current_node.repeat_count != 0 {
+                self.coderun_notifiable.borrow_mut()
+                    .notify_repeat_count(call_depth, name, current_node.repeat_count.non_flushed());
+                    // .notify_repeat_count(call_depth, name, current_node.repeat_count);
+                current_node.repeat_count.mark_flushed();
+            }
         }
     }
 }
