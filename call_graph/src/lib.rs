@@ -294,7 +294,11 @@ impl CallGraph {
                 let previous_sibling_index = parent_or_pseudo.borrow().children.len() - 2;
                 let previous_sibling =
                     parent_or_pseudo.borrow().children[previous_sibling_index].clone();
-                if Self::trees_are_equal(&previous_sibling, &returning_func) {
+                if Self::trees_are_equal(
+                    &previous_sibling, 
+                    &returning_func, 
+                    false) // Do not compare repeat count for previous_sibling and returning_func, but compare for the nested calls.
+                {
                     //     the previous sibling's repeat count is incremented
                     previous_sibling.borrow_mut().repeat_count.inc();
                     // if previous_sibling.borrow_mut().repeat_count < RepeatCountType::MAX {
@@ -369,7 +373,7 @@ impl CallGraph {
         // self.caching_model.is_some()
     }
 
-    fn trees_are_equal(a: &Link, b: &Link) -> bool {
+    fn trees_are_equal(a: &Link, b: &Link, compare_root_rep_count: bool) -> bool {
         let a = a.borrow();
         let b = b.borrow();
         if a.name != b.name {
@@ -380,11 +384,11 @@ impl CallGraph {
             return false;
         }
         for index in 0..a.children.len() {
-            if !Self::trees_are_equal(&a.children[index], &b.children[index]) {
+            if !Self::trees_are_equal(&a.children[index], &b.children[index], true) {
                 return false;
             }
         }
-        if a.repeat_count != b.repeat_count {
+        if compare_root_rep_count && a.repeat_count != b.repeat_count {
             return false
         }
 
