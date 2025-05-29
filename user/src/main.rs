@@ -12,7 +12,7 @@ use std::time::Duration;
 use fcl::call_log_infra::THREAD_LOGGER;
 // use fcl::call_log_infra::CALL_LOG_INFRA;
 use fcl::{ClosureLogger, FunctionLogger, closure_logger};
-use fcl_proc_macros::{function_logger, loggable};
+use fcl_proc_macros::loggable;
 
 // TODO:
 // Macro

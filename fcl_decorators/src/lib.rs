@@ -24,7 +24,8 @@ impl CommonDecorator {
     }
     fn get_callee_name_string(name: &CalleeName) -> String {
         match name {
-            CalleeName::Function(slice) => String::from(*slice),
+            CalleeName::Function(name) => name.clone(),
+            // CalleeName::Function(slice) => String::from(*slice),
             CalleeName::Closure(info) => String::from(format!(
                 CLOSURE_NAME_FORMAT!(),
                 info.start_line, info.start_column, info.end_line, info.end_column

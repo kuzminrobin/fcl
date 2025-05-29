@@ -1,5 +1,5 @@
 ReadMe.md
-Practicing Rust by Developing the Function Call Logger
+Practicing Rust by Developing a Function Call Logger
 
 During the init the CallLogData registers the following callbacks with the CallGraph:
 * log_call(name: &str, call_depth: usize) // "<indent * call_depth>f() {"

@@ -1,11 +1,16 @@
 # TODO:
 * Clean-up:
-  * Remove commented code.
   * Consider all TODOs.
-* Clean-up single-threaded and multithreaded
-  * Make separate macros
-  * Make separate examples and/or tests.
-* ---
+    * Stricter Terminology where possible (parent, sibling, child).
+      ```C++
+      parent() { // caller of siblings (enclosing for siblings)
+        sibling() {  // caller of children (enclosing for children), callee of parent (nested for parent)
+            child() {} // callee of sibling (nested for sibling)
+            child() {}
+        }
+        sibling() {}
+      }
+      ```
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
   `#[loggable] impl ..`
@@ -25,7 +30,12 @@
     `#[loggable] impl ..`: 100% of associated functions are loggable (log all).  
     Manual `#[loggable] fn ..`: for <=50% loggable (log some, "white list").  
     `#[loggable] impl ..`, manual `#[nonloggable] fn`: for >50% loggable (log all except some, "black list").
+* ---
 * Logging the parameters and return values.
+* User practice: HTML-decorator (code-like, tree-like), XML-decorator.
+* Structure-up single-threaded and multithreaded
+  * Make separate macros
+  * Make separate examples and/or tests.
 * Test
   * Testing
     * Log to string and compare.
@@ -42,9 +52,10 @@
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
+* Clean-up:
+  * Remove commented code.
 * Finalize the user's use
   * All the globals and thread_locals to separate macros.
-* User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Consider removing all the occurrences of `unwrap()`.
 * {Reader Practice: ?} Logging the async funcs.
 * Document the `NOTE: Curious trick`.  
@@ -59,10 +70,13 @@
   let rca: Rc<dyn MyTraitA> = sup.clone(); // `Rc::clone(&sup)` fails.
   let rcb: Rc<dyn MyTraitB> = sup.clone(); // `Rc::clone(&sup)` fails.
   ```
+  * `rc.cone()` -> `Rc::clone(&rc)`. Works not always, see the curious trick. Document it.
 * Optional. User practice, change to:
   ```
   | +-g (repeats 29 time(s).)
   | | +-f
+
+  // Or
 
     f() {} // f() repeats 9 time(s).
     g() { // g() repeats 29 time(s).
@@ -70,29 +84,18 @@
     } // g().
   ```
 * [Graph clearing]
-* Output outpaces the cached logging.
+* Output outpaces the cached logging. Ideally intercept the output and flush before, otherwise document that.
 * `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
   `#[loggable(MyPureTrait::pure_method)]`.  
-  Undesirable.
-* Move the thread_local use deeper into the call. Such that a {Call|Closure}Logger is created and that's all.
-* `rc.cone()` -> `Rc::clone(&rc)`
-* Stricter Terminology where possible.
-  ```C++
-  parent() { // caller of siblings (enclosing for siblings)
-    sibling() {  // caller of children (enclosing for children), callee of parent (nested for parent)
-        child() {} // callee of sibling (nested for sibling)
-        child() {}
-    }
-    sibling() {}
-  }
-  ```
+  Undesirable. Either work-around or document it.
+* Consider moving the thread_local use deeper into the call. Such that a {Call|Closure}Logger is created unconditionally.
 * Macro
   * [Decl Macro](https://veykril.github.io/tlborm/decl-macros/building-blocks/parsing.html#function)
   * Attr Proc-Macro.
 * `generic_func < T, U >() {}` remove spaces.
 * `MyStruct :: new() {}` remove spaces.
 * toolchain stable
-* Rename according to Rust (from C++-like). E.g. `Decorator` -> `Decorate`
+* Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`
 * Documenting
   * .md
   * Book 
@@ -609,6 +612,57 @@ fn f(x: i32, y: i32, flag: bool) -> usize {
         // };
         // let name_ref = name.get_ref();
 ```
+## Logging the Generic Parameters
+* (User practice?) Logging the generic params. Instead of `f<T>()`, log `f<char>()`, `f<int>()`, `f<MyStruct>()`, i.e. for 
+  ```rs
+  #[loggable]
+  fn f<T>() { /*Body*/ }
+  ```
+  expand NOT to 
+  ```rs
+  fn f<T>() {
+    let _logger = FunctionLogger("f<T>");
+    { /*Body*/ }
+  }
+  ```
+  but to
+  ```rs
+  fn f<T>() {
+    let name = String::from("f<") + to_string<T>.name + ">"; // Or `to_string!(T)`
+    let _logger = FunctionLogger(&name);
+    { /*Body*/ }
+  }
+
+  struct to_string<T>;
+  struct to_string<char> {
+    const name: "char"
+  }
+  struct to_string<u8> {
+    name: "u8"
+  }
+  ...
+
+  // Or
+  decl_macro! to_string {
+    ($t::ty) => stringify!($t)
+    // (char) => "char",
+    // (u8) => "u8",
+    // ...
+  }
+  ```
+  Solution: 
+  ```rs
+    use std::any::type_name;
+
+    fn f<T, U>() {
+        let type_str = format!("<{}, {}>", type_name::<T>(), type_name::<U>());
+        println!("{}", type_str);
+    }
+    f::<char, bool>();  // <char, bool>
+    f::<u32, f64>();    // <u32, f64>
+    struct MyStruct<T, U> { t: T, u: U }
+    f::<MyStruct<f32, bool>, char>();   // <user::main::MyStruct<f32, bool>, char>    
+  ```
 
 ## Done
 * Closure. For a more qualified closure name `"f()::closure<..>())"` the enclosing function's name can be taken from the call stack.

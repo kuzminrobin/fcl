@@ -1,3 +1,11 @@
+
+
+// macro_rules! type_to_string {
+//     ($t:ty) => { stringify!($t) }
+// }
+// type_to_string!(char);
+// type_to_string!(ClosureInfo);
+
 #[derive(PartialEq, Clone)]
 pub struct ClosureInfo {
     pub start_line: usize,
@@ -6,9 +14,12 @@ pub struct ClosureInfo {
     pub end_column: usize,
 }
 
+
+
 #[derive(PartialEq, Clone)]
 pub enum CalleeName {   // TODO: Consider -> CalleeID
-    Function(&'static str),
+    Function(String),
+    // Function(&'static str),
     Closure(ClosureInfo),
 }
 

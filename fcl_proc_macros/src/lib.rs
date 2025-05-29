@@ -139,6 +139,8 @@ fn quote_as_itemfn(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
         // signature.ident.to_string()  //clone() 
     };
     let generics = signature.generics.clone();
+    let generics_params_iter = generics.type_params();
+    let empty_generic_params = generics.params.is_empty();
 
     // let func_name = if let Some(attr_args) = attr_args { 
     //     let path = attr_args.name.clone();
@@ -168,7 +170,27 @@ fn quote_as_itemfn(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
     let output = quote! {
         #(#attrs)*
         #vis #signature {
-            function_logger!(#func_name #generics); // The `FunctionLogger` instance. // TODO: Consider: `#func_name #generics` -> `#func_name#generics` (remove space)
+            let mut generic_func_name = String::with_capacity(64);
+            generic_func_name.push_str(stringify!(#func_name));
+            if !#empty_generic_params {
+                generic_func_name.push_str("<");
+                let param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+                for type_iter in param_vec {
+                    generic_func_name.push_str(type_iter);
+                    generic_func_name.push_str(",");
+                }
+                generic_func_name.push_str(">");
+            }
+            
+            let mut _logger = None;
+            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+                if logger.borrow_mut().is_on() {
+                    _logger = Some(FunctionLogger::new(&generic_func_name))
+                    // _logger = Some(FunctionLogger::new(#func_name))
+                }
+            }); 
+
+            // function_logger!(#func_name #generics); // The `FunctionLogger` instance. // TODO: Consider: `#func_name #generics` -> `#func_name#generics` (remove space)
             #block
         }
         // $( #[$meta] )*

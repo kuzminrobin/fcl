@@ -223,12 +223,12 @@ thread_local! {
                     if let Ok(mut guard) = (*CALL_LOGGER_ARBITER).lock() {
                         guard.add_thread_logger(Box::new(
                             CallLogInfra::new(Rc::new(RefCell::new(
-                                fcl_decorators::TreeLikeDecorator::new(
-                                    Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                                    None, None, None))))))
-                                // fcl_decorators::CodeLikeDecorator::new(
+                                // fcl_decorators::TreeLikeDecorator::new(
                                 //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                                //     None))))))
+                                //     None, None, None))))))
+                                fcl_decorators::CodeLikeDecorator::new(
+                                    Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                                    None))))))
                     } else {
                         panic!("Unexpected mutex lock failure")
                     }

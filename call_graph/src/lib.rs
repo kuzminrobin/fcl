@@ -67,7 +67,8 @@ impl CallGraph {
     
     pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
         let pseudo_node = 
-            Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(""))));
+            Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(String::new()))));
+            // Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(""))));
         Self {
             current: pseudo_node.clone(),
             call_stack: vec![pseudo_node],

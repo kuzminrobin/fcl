@@ -29,11 +29,13 @@ pub struct FunctionLogger {
 }
 
 impl FunctionLogger {
-    pub fn new(func_name: &'static str) -> Self {
+    pub fn new(func_name: &str) -> Self {
+    // pub fn new(func_name: &'static str) -> Self {
         THREAD_LOGGER.with(|logger| {
             logger
                 .borrow_mut()
-                .log_call(&CalleeName::Function(func_name))
+                .log_call(&CalleeName::Function(String::from(func_name)))
+                // .log_call(&CalleeName::Function(func_name))
         });
         Self { _dropper: CalleeLogger }
     }
