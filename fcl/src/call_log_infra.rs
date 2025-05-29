@@ -1,7 +1,9 @@
 // call_log_infra
 
 use call_graph::CallGraph;
-use fcl_decorators::CodeLikeDecorator;
+use fcl_traits::{
+    CallLogger, CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics,
+};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -9,32 +11,24 @@ use std::{
     sync::{Arc, LazyLock, Mutex, MutexGuard},
     thread,
 };
-// use fcl_decorators::TreeLikeDecorator;
-use fcl_traits::{
-    CallLogger, CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics,
-};
 
 use crate::writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter};
 
 pub struct CallLogInfra {
-    is_on: Vec<bool>, // Disabled by default (if empty). TODO: Consider renaming to `logging_is_on`.
-    // code_run_decorator: Rc<RefCell<dyn CodeRunDecorator>>,
+    is_on: Vec<bool>, // Disabled by default (if empty). TODO: Consider renaming to `logging_is_on`. // TODO: Test.
     thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
     call_graph: CallGraph,
 }
 
 impl CallLogInfra {
     pub fn new(thread_spec_notifyable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>>) -> Self {
-        // pub fn new(code_run_notifyable: Rc<RefCell<dyn CoderunNotifiable + CodeRunDecorator>>) -> Self {
-        let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone(); // Rc::clone(&thread_spec_notifyable); // TODO: Make sure that his trick works. // NOTE: Curious trick.
+        // NOTE: Curious trick. // TODO: Document it.
+        let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone(); 
         let thread_specifics: Rc<RefCell<dyn ThreadSpecifics>> = thread_spec_notifyable;
         Self {
             is_on: Vec::with_capacity(4),
-            // code_run_decorator: Rc::clone(&code_run_notifyable),
             thread_specifics,
             call_graph: CallGraph::new(coderun_notifiable),
-            // call_graph: CallGraph::new(Rc::clone(&coderun_notifiable)),
-            // call_graph: CallGraph::new(Rc::clone(&thread_spec_notifyable)),
         }
     }
 }
@@ -85,7 +79,7 @@ impl CallLoggerArbiter {
             last_output_thread: None,
         }
     }
-    pub fn add(&mut self, thread_logger: Box<dyn CallLogger>) {
+    pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
         if self
             .thread_loggers
             .insert(thread::current().id(), thread_logger)
@@ -97,16 +91,11 @@ impl CallLoggerArbiter {
             );
         }
     }
-    // TODO: remove -> {remove_thread_logger?}
-    pub fn remove(&mut self /*, thread_logger: Box<dyn CallLogger>*/) {
+    pub fn remove_thread_logger(&mut self) {
         let current_thread_id = thread::current().id();
-        self.get_logger(current_thread_id).flush(); // Flush the possible repeat count.
+        self.get_thread_logger(current_thread_id).flush(); // Flush the possible trailing repeat count.
 
-        if self
-            .thread_loggers
-            .remove(&current_thread_id)
-            .is_none()
-        {
+        if self.thread_loggers.remove(&current_thread_id).is_none() {
             debug_assert!(
                 false,
                 "Internal error suspected: Unregistering non-registered thread"
@@ -116,7 +105,7 @@ impl CallLoggerArbiter {
             self.last_output_thread = None; // Prevent subsequent flushing of the terminated thread.
         }
     }
-    fn get_logger(&mut self, thread_id: thread::ThreadId) -> &mut Box<dyn CallLogger> {
+    fn get_thread_logger(&mut self, thread_id: thread::ThreadId) -> &mut Box<dyn CallLogger> {
         if let Some(logger) = self.thread_loggers.get_mut(&thread_id) {
             return logger;
         } else {
@@ -127,17 +116,17 @@ impl CallLoggerArbiter {
         if let Some(last_output_thread) = self.last_output_thread
             && thread::current().id() != last_output_thread
         {
-            self.get_logger(last_output_thread).flush()
+            self.get_thread_logger(last_output_thread).flush()
         }
     }
 }
 
 impl CallLogger for CallLoggerArbiter {
     fn push_is_on(&mut self, is_on: bool) {
-        self.get_logger(thread::current().id()).push_is_on(is_on)
+        self.get_thread_logger(thread::current().id()).push_is_on(is_on)
     }
     fn pop_is_on(&mut self) {
-        self.get_logger(thread::current().id()).pop_is_on()
+        self.get_thread_logger(thread::current().id()).pop_is_on()
     }
     fn is_on(&self) -> bool {
         if let Some(logger) = self.thread_loggers.get(&thread::current().id()) {
@@ -147,11 +136,11 @@ impl CallLogger for CallLoggerArbiter {
         }
     }
     fn set_is_on(&mut self, is_on: bool) {
-        self.get_logger(thread::current().id()).set_is_on(is_on)
+        self.get_thread_logger(thread::current().id()).set_is_on(is_on)
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
-        self.get_logger(thread::current().id())
+        self.get_thread_logger(thread::current().id())
             .set_thread_indent(thread_indent)
     }
 
@@ -159,17 +148,17 @@ impl CallLogger for CallLoggerArbiter {
         self.flush_earlier_thread_output();
 
         let current_thread_id = thread::current().id();
-        self.get_logger(current_thread_id).log_call(name);
+        self.get_thread_logger(current_thread_id).log_call(name);
         self.last_output_thread = Some(current_thread_id);
     }
     fn log_ret(&mut self) {
         self.flush_earlier_thread_output();
 
         let current_thread_id = thread::current().id();
-        self.get_logger(current_thread_id).log_ret();
+        self.get_thread_logger(current_thread_id).log_ret();
         self.last_output_thread = Some(current_thread_id);
     }
-    // fn flush(&mut self) {}
+    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
 
 struct CallLoggerAdapter {
@@ -189,7 +178,7 @@ impl CallLoggerAdapter {
 }
 impl Drop for CallLoggerAdapter {
     fn drop(&mut self) {
-        self.get_arbiter().remove();
+        self.get_arbiter().remove_thread_logger();
     }
 }
 impl CallLogger for CallLoggerAdapter {
@@ -208,7 +197,6 @@ impl CallLogger for CallLoggerAdapter {
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
         self.get_arbiter()
-            // self.get_logger(thread::current().id())
             .set_thread_indent(thread_indent)
     }
 
@@ -218,7 +206,7 @@ impl CallLogger for CallLoggerAdapter {
     fn log_ret(&mut self) {
         self.get_arbiter().log_ret()
     }
-    // fn flush(&mut self) {}
+    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
 
 // TODO: Test with file, socket writer as an arg to `ThreadSharedWriter::new()`.
@@ -228,19 +216,19 @@ static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> =
     LazyLock::new(|| Arc::new(Mutex::new(CallLoggerArbiter::new())));
 
 thread_local! {
-    // pub static WRITER_ADAPTER: RefCell<WriterAdapter> =
-    //     RefCell::new(WriterAdapter::new(unsafe { (*THREAD_SHARED_WRITER).clone() }));
-
     pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = {
         RefCell::new(Box::new(CallLoggerAdapter::new(
             {
                 unsafe {
                     if let Ok(mut guard) = (*CALL_LOGGER_ARBITER).lock() {
-                        guard.add(Box::new(
+                        guard.add_thread_logger(Box::new(
                             CallLogInfra::new(Rc::new(RefCell::new(
-                                CodeLikeDecorator::new(
+                                fcl_decorators::TreeLikeDecorator::new(
                                     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                                    None))))))
+                                    None, None, None))))))
+                                // fcl_decorators::CodeLikeDecorator::new(
+                                //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                                //     None))))))
                     } else {
                         panic!("Unexpected mutex lock failure")
                     }
@@ -251,24 +239,5 @@ thread_local! {
                 }
                 call_logger_arbiter
             })))
-            // CALL_LOGGER_ARBITER.
-            // CallLogInfra::new(Rc::new(RefCell::new(
-            // CodeLikeDecorator::new(
-            //     Some(Box::new(WriterAdapter::new(unsafe { (*THREAD_SHARED_WRITER).clone() }))),
-            //     None))))))
     };
-
-    // pub static CALL_LOG_INFRA: RefCell<CallLogInfra> = {
-    // // pub static CALL_LOG_DECORATOR: RefCell<dyn CoderunThreadSpecificNotifyable>
-    //     // let notifyable_decorator = Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)));
-    //     // RefCell::new(CallLogInfra::new(Rc::clone(&<notifyable_decorator as Rc<RefCell<dyn CoderunNotifiable>>>)))
-
-
-    //     RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(
-    //         CodeLikeDecorator::new(
-    //             Some(Box::new(WriterAdapter::new(unsafe { (*THREAD_SHARED_WRITER).clone() }))),
-    //             None)))))
-    //     // // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(TreeLikeDecorator::new(None, None, None, None)))));
-    //     // RefCell::new(CallLogInfra::new(Rc::new(RefCell::new(CodeLikeDecorator::new(None, None)))))
-    // };
 }

@@ -5,7 +5,7 @@ use syn::{parse::Parse, parse_macro_input, spanned::Spanned, ExprClosure, ExprPa
 // TODO: Consider moving to closure_logger and making it also a decl macro.
 // Creates the `FunctionLogger` instance.
 #[proc_macro]
-pub fn function_logger(name: TokenStream) -> TokenStream {  // TODO: -> function_logger
+pub fn function_logger(name: TokenStream) -> TokenStream {
     // Assert that the name is exactly one id (probably fully qualified like `MyStruct::method`). TODO: As opposed to what?
     let ts: proc_macro2::TokenStream = name.into();
     let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
@@ -14,18 +14,12 @@ pub fn function_logger(name: TokenStream) -> TokenStream {  // TODO: -> function
     // * let func_name = syn::parse_macro_input!(name as String);
     quote! {
         use fcl::call_log_infra::THREAD_LOGGER; // TODO: Consider moving to top of the file as a searate macro call.
-        // use fcl::call_log_infra::CALL_LOG_INFRA;    // TODO: Consider moving to top of the file as a searate macro call.
         let mut _logger = None;
         THREAD_LOGGER.with(|logger| {
             if logger.borrow_mut().is_on() {
                 _logger = Some(FunctionLogger::new(#func_name))
             }
         });
-        // CALL_LOG_INFRA.with(|infra| {
-        //     if infra.borrow_mut().is_on() {
-        //         _logger = Some(FunctionLogger::new(#func_name))
-        //     }
-        // })
     }
     .into()
 }
@@ -212,7 +206,7 @@ fn quote_as_implitemfn(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenS
     let output = quote! {
         #(#attrs)*
         #vis #defaultness #signature {
-            function_logger!(#func_name); // The `FunctionLogger` instance. TODO: What about `#generics`?
+            function_logger!(#func_name); // The `FunctionLogger` instance. TODO: What about `#generics`? Forgotten!
             #block
         }
     };
@@ -260,14 +254,14 @@ fn quote_as_closure(closure: ExprClosure, _attr_args: &Option<AttrArgs>) -> Toke
 
     let output = quote! {
         #(#attrs)*
-        // #[rustfmt::skip]
         #lifetimes #constness #movability #asyncness #capture 
         #or1_token #inputs #or2_token #output 
         {
-            // function_logger!(closure); 
-            closure_logger!(#start_line, #start_col, #end_line, #end_col); // The `FunctionLogger` instance. 
-            // Closure has no name. The name will be replaced with "enclosing()::closure_line_col()". // TODO: Update this naming comment.
-            // TODO: Is `#generics` applicable to closures?
+            // The `ClosureLogger` instance:
+            closure_logger!(#start_line, #start_col, #end_line, #end_col);
+            // TODO: Is `#generics` applicable to closures? Inspect the `closure` above 
+            // to see if `#generics` are supported (regardless of 
+            // whether they are applicable to closures).
 
             // println!("start: {{ {}, {} }}.", #start_line, #start_col);
             // println!("end: {{ {}, {} }}.", #end_line, #end_col);

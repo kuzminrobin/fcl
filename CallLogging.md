@@ -1,81 +1,10 @@
 # TODO:
-* Multithreaded implementation.  
-  To do: 
-  * static `ThreadSharedWriter`, 
-  Latest:  
-  * Writer.  
-    Commit: thread_arbiter  
-    * In a single-threaded case the decorator gets `Option<Box<dyn Write>>`. If `None` then uses `stdout()`.
-      Otherwise uses `Box<dyn Write>` (file, socket, etc.) directly.
-    * In a multithreaded case 
-      * the decorator gets a thread-local `ThreadSharedWriterAdapter` <!-- TODO: Consider WriterAdapter --> (as an `Option<Box<dyn Write>>`) that 
-        * has `Arc<[RefCell<]ThreadSharedWriter[>]>`, non mutex-protected, since mutex-protection happens earlier,
-        * and (`Adapter`) forwards the calls from decorator to `ThreadSharedWriter`.  
-      * There is a global, one for all the threads, `ThreadSharedWriter` that gets `Option<Box<dyn Write>>` (if `None` then uses stdout()). <!-- TODO: Consider WriterAccessThreadAribiter (Aribter of the access to the writer by different threads) -->
-        * It is accessible by the adapters through `Arc<[RefCell<]ThreadSharedWriter[>]>`, 
-        * It is NOT mutex-protected, since mutex-protection happens earlier.
-  * Flush need detection.  
-    TODO: Rename `CallLogger` to `FunctionLogger`.  
-    The FunctionLogger/ClosureLogger uses `THREAD_LOGGER` - a thread-local pointer to `CallLogger` trait
-    `Box<dyn CallLogger>`. <!-- TODO: Consider FlushableCallLogger { log_call(), log_ret(), flush() } -->. 
-    * Single-threaded.  
-      Behind the `CallLogger` trait there is a thread-local infra. The `flush()` is never called (but still has an impl for multithreaded case).
-    * Multithreaded.  
-      Behind the `CallLogger` trait there is a thread-local per-thread `CallLoggerAdapter`
-      that has `Arc<>` to a global single-for-all-threads `Mutex<dyn CallLogger>` behind which (`dyn CallLogger`) there is a global single-for-all-threads `CallLoggerArbiter`.  
-      The `CallLoggerArbiter` 
-      * has a `HashMap<thead_id, Ptr<dyn CallLogger>>` that is filled in upon `register_call_logger()`.  
-        Upon thread creation some thread-local instance (infra?) in its constructor calls the `register_call_logger()` (if `CallLoggerArbiter` is not `None`)
-        and in its Dtor calls `unregister_call_logger()` (`CallLoggerArbiter` is memorized or not `None`).
-      * It also has `last_write_thread`.  
-        If the thread context has switched (`last_write_thread` != `thread::current().id()`)
-        then the `CallLoggerArbiter` invokes the `flush()` for the `last_write_thread` (`HashMap[last_write_thread].flush()`)
-        after which it transfers the calls to the new thread's call logger `HashMap[thread::current().id()].call..()`.
-
-  Outdated:  
-  For multithreaded cases, 
-    * Single Writer (ThreadSharedWriter, impl Write for ThreadSharedWriter) for all decorators (Arc<[RefCell<]..[>]>), non mutex-protected, since mutex-protection happens earlier. Uses stdout() by default.
-    * If decorators get None instead of Some(Arc<[RefCell<]ThreadSharedWriter[>]>) then the decorators use stdout().
-  * Single mutex protected thread arbiter (Arc<Mutex<ThreadArbiter>>)
-  * Per-thread thread agent, having a clone of Arc<Mutex<ThreadArbiter>>.
-
-  Commit.LifetimeDeadend  
-  * repeat_count{ overall, flushed } 
-  * flush \n in CodeLikeDecorator if line_end_pending
-  * Protect with a new mutex the threading invariants in CallGraph. Such that the flushing does not happen in the middle of `traverse_tree()` for example.
-  <!-- `ThreadAwareWriter: last_output_thread_id and flushables -> last_flushable: Option<*mut dyn Flushable>`
-  `register_flushable` -->
-  ---
-  ```
-  Mutex-protected writer. Has {
-    writer: <Common trait for stdout, stderr, file, socket, pipe>
-    previous_thread_id: Option<ThreadID>,
-    decorator_instance_by_thread_id: Map/Dictionary of thread_id to &instance
-    output_is_being_flushed: bool
-  }
-  All the threads do (smth like) mutex.lock().write({thread_id, log_output: &str}).
-  That write() then does the following:
-  if previous_thread_id.is_some() 
-      && thread_id != previous_thread_id.unwrap() { // Thread context has switched from previous_thread_id to thread_id
-    // Flush the cache of the previous_thread_id
-    decorator_instance_by_thread_id(previous_thread_id).flush_cache();
-    previous_thread_id = thread_id;
-  }
-  // Output the log_output.
-  ```
-
-
-  Earlier:
-  See a [note](https://docs.rs/proc-macro2/latest/proc_macro2/#thread-safety) (proc_macro2: Most types in this crate are `!Sync` because the underlying compiler types make use of thread-local memory).  
-  Consider a similar note for "fcl" if applicable.  
-  * Write the Mutithreaded code.
-  * Try `#[loggable]`.
-  * Design what should be.
-    * Mutexed Writer.
-  Have in mind:
-  * Thread indent prefix.
-  * [Thread log color]
-  * Probably single-threaded (faster) and multi-threaded fcl.
+* Clean-up:
+  * Remove commented code.
+  * Consider all TODOs.
+* Clean-up single-threaded and multithreaded
+  * Make separate macros
+  * Make separate examples and/or tests.
 * ---
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
@@ -110,9 +39,11 @@
     Also: Test with the existing projects.
     * Update the instructions, how to enable func call logging in your project.
 * Overall clean-up.
-  * Refactor long functions.
+  * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
+* Finalize the user's use
+  * All the globals and thread_locals to separate macros.
 * User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Consider removing all the occurrences of `unwrap()`.
 * {Reader Practice: ?} Logging the async funcs.
@@ -650,6 +581,34 @@ fn f(x: i32, y: i32, flag: bool) -> usize {
   ```
   After the fix the `#[rustfmt::skip]` is not needed. The optional trailing comma is consumed normally (at least if the closure is the last argument of a function ;-).
 
+## Closure Naming
+```rs
+    // Call Graph:
+    pub fn add_call(&mut self, name: &CalleeName) {
+        // // Generate a name for a closure ("enclosing()::closure" or "?()::closure"):
+        // let name = if func_name == "" {
+        //     // Called function is a closure.
+        //     // Get parent's name if present, otherwise "?":
+        //     let parent_name = if self.call_stack.len() <= 1 {
+        //         // pseudo (or nothing, which must never happen :)
+        //         NameEither::Function(&"?")
+        //     } else {
+        //         self.call_stack.last().unwrap().borrow().name.clone()
+        //         // match &self.call_stack.last().unwrap().borrow().name {
+        //         //     // "enclosing"
+        //         //     NameEither::StaticSlice(slice) => slice, // Traditional parent ;). "enclosing"
+        //         //     NameEither::StdString(str) => &str, // Parent is also a closure. "enclosing()::closure"
+        //         // }
+        //     };
+        //     NameEither::Closure(
+        //         String::from(format!(CLOSURE_NAME_FORMAT!(), parent_name.get_ref()))   // "enclosing()::closure" or "enclosing()::closure()::closure()"
+        //     )
+        // } else {
+        //     // Called function is a non-closure.
+        //     NameEither::Function(func_name) // Leave as is. "enclosing"
+        // };
+        // let name_ref = name.get_ref();
+```
 
 ## Done
 * Closure. For a more qualified closure name `"f()::closure<..>())"` the enclosing function's name can be taken from the call stack.
@@ -680,5 +639,81 @@ fn f(x: i32, y: i32, flag: bool) -> usize {
 * `#[loggable(name="MyStruct::new")]`. Assoc funcs prefix `MyStruct::`.
 * Not applicable (Happens before mangling). Demangling
 * Outputing to stream (stdout, stderr, file, socket/pipe, [`mcsp::channel`]).
+* Multithreaded implementation.  
+  To do: 
+  * static `ThreadSharedWriter`, 
+  Latest:  
+  * Writer.  
+    Commit: thread_arbiter  
+    * In a single-threaded case the decorator gets `Option<Box<dyn Write>>`. If `None` then uses `stdout()`.
+      Otherwise uses `Box<dyn Write>` (file, socket, etc.) directly.
+    * In a multithreaded case 
+      * the decorator gets a thread-local `ThreadSharedWriterAdapter` <!-- TODO: Consider WriterAdapter --> (as an `Option<Box<dyn Write>>`) that 
+        * has `Arc<[RefCell<]ThreadSharedWriter[>]>`, non mutex-protected, since mutex-protection happens earlier,
+        * and (`Adapter`) forwards the calls from decorator to `ThreadSharedWriter`.  
+      * There is a global, one for all the threads, `ThreadSharedWriter` that gets `Option<Box<dyn Write>>` (if `None` then uses stdout()). <!-- TODO: Consider WriterAccessThreadAribiter (Aribter of the access to the writer by different threads) -->
+        * It is accessible by the adapters through `Arc<[RefCell<]ThreadSharedWriter[>]>`, 
+        * It is NOT mutex-protected, since mutex-protection happens earlier.
+  * Flush need detection.  
+    TODO: Rename `CallLogger` to `FunctionLogger`.  
+    The FunctionLogger/ClosureLogger uses `THREAD_LOGGER` - a thread-local pointer to `CallLogger` trait
+    `Box<dyn CallLogger>`. <!-- TODO: Consider FlushableCallLogger { log_call(), log_ret(), flush() } -->. 
+    * Single-threaded.  
+      Behind the `CallLogger` trait there is a thread-local infra. The `flush()` is never called (but still has an impl for multithreaded case).
+    * Multithreaded.  
+      Behind the `CallLogger` trait there is a thread-local per-thread `CallLoggerAdapter`
+      that has `Arc<>` to a global single-for-all-threads `Mutex<dyn CallLogger>` behind which (`dyn CallLogger`) there is a global single-for-all-threads `CallLoggerArbiter`.  
+      The `CallLoggerArbiter` 
+      * has a `HashMap<thead_id, Ptr<dyn CallLogger>>` that is filled in upon `register_call_logger()`.  
+        Upon thread creation some thread-local instance (infra?) in its constructor calls the `register_call_logger()` (if `CallLoggerArbiter` is not `None`)
+        and in its Dtor calls `unregister_call_logger()` (`CallLoggerArbiter` is memorized or not `None`).
+      * It also has `last_write_thread`.  
+        If the thread context has switched (`last_write_thread` != `thread::current().id()`)
+        then the `CallLoggerArbiter` invokes the `flush()` for the `last_write_thread` (`HashMap[last_write_thread].flush()`)
+        after which it transfers the calls to the new thread's call logger `HashMap[thread::current().id()].call..()`.
 
+  Outdated:  
+  For multithreaded cases, 
+    * Single Writer (ThreadSharedWriter, impl Write for ThreadSharedWriter) for all decorators (Arc<[RefCell<]..[>]>), non mutex-protected, since mutex-protection happens earlier. Uses stdout() by default.
+    * If decorators get None instead of Some(Arc<[RefCell<]ThreadSharedWriter[>]>) then the decorators use stdout().
+  * Single mutex protected thread arbiter (Arc<Mutex<ThreadArbiter>>)
+  * Per-thread thread agent, having a clone of Arc<Mutex<ThreadArbiter>>.
+
+  Commit.LifetimeDeadend  
+  * repeat_count{ overall, flushed } 
+  * flush \n in CodeLikeDecorator if line_end_pending
+  * Protect with a new mutex the threading invariants in CallGraph. Such that the flushing does not happen in the middle of `traverse_tree()` for example.
+  <!-- `ThreadAwareWriter: last_output_thread_id and flushables -> last_flushable: Option<*mut dyn Flushable>`
+  `register_flushable` -->
+  ---
+  ```
+  Mutex-protected writer. Has {
+    writer: <Common trait for stdout, stderr, file, socket, pipe>
+    previous_thread_id: Option<ThreadID>,
+    decorator_instance_by_thread_id: Map/Dictionary of thread_id to &instance
+    output_is_being_flushed: bool
+  }
+  All the threads do (smth like) mutex.lock().write({thread_id, log_output: &str}).
+  That write() then does the following:
+  if previous_thread_id.is_some() 
+      && thread_id != previous_thread_id.unwrap() { // Thread context has switched from previous_thread_id to thread_id
+    // Flush the cache of the previous_thread_id
+    decorator_instance_by_thread_id(previous_thread_id).flush_cache();
+    previous_thread_id = thread_id;
+  }
+  // Output the log_output.
+  ```
+
+
+  Earlier:
+  See a [note](https://docs.rs/proc-macro2/latest/proc_macro2/#thread-safety) (proc_macro2: Most types in this crate are `!Sync` because the underlying compiler types make use of thread-local memory).  
+  Consider a similar note for "fcl" if applicable.  
+  * Write the Mutithreaded code.
+  * Try `#[loggable]`.
+  * Design what should be.
+    * Mutexed Writer.
+  Have in mind:
+  * Thread indent prefix.
+  * [Thread log color]
+  * Probably single-threaded (faster) and multi-threaded fcl.
 

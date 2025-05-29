@@ -432,3 +432,58 @@ fn main() {
 //   MyTrait :: trait_method() {}
 //   MyPureTrait :: pure_method() {}
 // } // calls().
+
+// +-calls
+// | +-f
+//                                   +-f2
+//                                     f2 repeats 9 time(s).
+//                                   +-g
+//                                   | +-f
+// | +-f
+//                                   +-f
+// | +-f
+//                                   +-g
+//                                   | +-f
+// | +-f
+//                                   +-g
+// | +-f
+//                                   | +-f
+// | +-f
+//                                   +-g
+//                                   | +-f
+// | +-f
+//                                   +-g
+//                                   | +-f
+// | +-f
+//                                   +-g
+//                                   | +-f
+// | +-f
+//                                   +-_h
+//                                   | +-_i < T, U >
+//                                   | | +-j
+// | +-f
+//                                   +-closure{206,9:217,9}
+//                                   | +-closure{213,21:214,26}
+// | +-g
+// | | +-f
+//                                   +-MyStruct :: new
+//                                   +-MyStruct :: method < T, U >
+// | +-f
+//                                   +-gen_func < T, U >
+//                                   +-MyStruct :: trait_method
+//                                   +-MyTrait :: trait_method
+//                                   +-MyPureTrait :: pure_method
+// | +-g
+// | | +-f
+// |   g repeats 6 time(s).
+// | +-_h
+// | | +-_i < T, U >
+// | | | +-j
+// | +-closure{79,9:90,9}
+// | | +-closure{86,21:87,26}
+// | +-MyStruct :: new
+// | +-MyStruct :: method < T, U >
+// | +-gen_func < T, U >
+// | +-MyStruct :: trait_method
+// | +-MyTrait :: trait_method
+// | +-MyPureTrait :: pure_method

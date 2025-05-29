@@ -12,12 +12,17 @@ pub enum CalleeName {   // TODO: Consider -> CalleeID
     Closure(ClosureInfo),
 }
 
+/// Function call repeat count data type.
 type RepeatCountType = usize;
+/// The maximum value (saturation value) for the function call repeat count data type.
+/// The function can be called in a loop endlessly, such that the function call repeat count can potentially overflow.
+/// The algorithm increments that count to the maximum (saturation) value and then stops incrementing.
+const REPEAT_COUNT_MAX: RepeatCountType = RepeatCountType::MAX;
 
 pub enum RepeatCountCategory {
-    Exact(RepeatCountType),     // Repeats 6 time(s). // None is RepeatCountType::MAX.
-    AtLeast(RepeatCountType),   // Repeats 6+ time(s). // The `overall` is RepeatCountType::MAX.
-    Unknown // Repeats ? time(s). // Both are RepeatCountType::MAX.
+    Exact(RepeatCountType),     // Repeats 6 time(s). // None is REPEAT_COUNT_MAX.
+    AtLeast(RepeatCountType),   // Repeats 6+ time(s). // The `overall` is REPEAT_COUNT_MAX.
+    Unknown // Repeats ? time(s). // Both are REPEAT_COUNT_MAX.
 }
 impl RepeatCountCategory {
     pub fn to_string(&self) -> String {
@@ -28,6 +33,10 @@ impl RepeatCountCategory {
         }
     }
 }
+
+/// The function call repeat count. Consists of the two parts.
+/// * Actual repeat count. Stops incrementing upon reaching `REPEAT_COUNT_MAX` (saturates).
+/// * The flushed part of the actual repeat count. Value less than or equal to the actual repeat count.
 #[derive(PartialEq)]
 pub struct RepeatCount {
     overall: RepeatCountType,
@@ -38,19 +47,19 @@ impl RepeatCount {
         Self { overall: 0, flushed: 0 }
     }
     pub fn non_flushed(&self) -> RepeatCountCategory {
-        if self.overall < RepeatCountType::MAX {
+        if self.overall < REPEAT_COUNT_MAX {
             return RepeatCountCategory::Exact(self.overall - self.flushed)
-        } else if self.flushed < RepeatCountType::MAX {
+        } else if self.flushed < REPEAT_COUNT_MAX {
             return RepeatCountCategory::AtLeast(self.overall - self.flushed)
         }
         RepeatCountCategory::Unknown
     }
     pub fn non_flushed_is_empty(&self) -> bool {
         // Equal but not both are saturated:
-        self.overall == self.flushed && self.flushed < RepeatCountType::MAX
+        self.overall == self.flushed && self.flushed < REPEAT_COUNT_MAX
     }
     pub fn inc(&mut self) {
-        if self.overall < RepeatCountType::MAX {
+        if self.overall < REPEAT_COUNT_MAX {
             self.overall += 1
         }
     }
@@ -58,42 +67,35 @@ impl RepeatCount {
         self.flushed = self.overall
     }
 }
-// TODO: Consider removing the default behavior.
+
+/// Trait to be implemented by the instances that need to be notified about the code run events 
+/// (such as function or closure calls, returns, etc.).
 pub trait CoderunNotifiable {
-    // Non-cached call happened:
+    /// Non-cached call happened.
     fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
-    // Non-cached return happened:
+    /// Non-cached return happened.
     fn notify_return(&mut self, _call_depth: usize, _name: &CalleeName, _has_nested_calls: bool) {}
-    // Repeat count has stopped being cached:
+    /// Repeat count has stopped being cached.
     fn notify_repeat_count(&mut self, _call_depth: usize, _name: &CalleeName, _count: RepeatCountCategory) {}
     // fn notify_repeat_count(&mut self, _call_depth: usize, _name: &CalleeName, _count: usize) {}
 
+    /// Flush needed (any output cached by this trait implementor needs to be flushed).
     fn notify_flush(&mut self) {}
 }
 
+/// Trait to be implemented by the instances that handle any thread specifics.
 pub trait ThreadSpecifics {
+    /// Sets the thread code run output indentation. E.g. if there are 2 threads, 
+    /// one thread's output can be logged in the left half of the console,
+    /// and the other thread's output can be logged in the right half, 
+    /// or _indented_ by half of the console width.
     fn set_thread_indent(&mut self, thread_indent: &'static str);
 }
 
 pub trait CoderunThreadSpecificNotifyable: CoderunNotifiable + ThreadSpecifics {}
 
-// macro_rules! CLOSURE_NAME_FORMAT {
-//     () => {
-//         "closure{{{},{}:{},{}}}" // "closure{112,9:116,34}"
-//     };
-// }
-
 pub trait CodeRunDecorator {    // TODO: CodeRunDecorator -> CoderunDecorator, code_run -> coderun
     fn get_indent_string(&self, call_depth: usize) -> String;
-    // fn get_callee_name_string(name: &CalleeName) -> String {
-    //     match name {
-    //         CalleeName::Function(slice) => String::from(*slice),
-    //         CalleeName::Closure(info) => String::from(format!(
-    //             CLOSURE_NAME_FORMAT!(),
-    //             info.start_line, info.start_column, info.end_line, info.end_column
-    //         )),
-    //     }
-    // }
 }
 
 pub trait CallLogger {
