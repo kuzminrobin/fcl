@@ -17,9 +17,8 @@ pub struct ClosureInfo {
 
 
 #[derive(PartialEq, Clone)]
-pub enum CalleeName {   // TODO: Consider -> CalleeID
+pub enum CalleeName {
     Function(String),
-    // Function(&'static str),
     Closure(ClosureInfo),
 }
 
@@ -105,15 +104,15 @@ pub trait ThreadSpecifics {
 
 pub trait CoderunThreadSpecificNotifyable: CoderunNotifiable + ThreadSpecifics {}
 
-pub trait CodeRunDecorator {    // TODO: CodeRunDecorator -> CoderunDecorator, code_run -> coderun
+pub trait CoderunDecorator {
     fn get_indent_string(&self, call_depth: usize) -> String;
 }
 
 pub trait CallLogger {
-    fn push_is_on(&mut self, is_on: bool);
-    fn pop_is_on(&mut self);
-    fn is_on(&self) -> bool;
-    fn set_is_on(&mut self, is_on: bool);
+    fn push_logging_is_on(&mut self, is_on: bool);
+    fn pop_logging_is_on(&mut self);
+    fn logging_is_on(&self) -> bool;
+    fn set_logging_is_on(&mut self, is_on: bool);
 
     fn set_thread_indent(&mut self, thread_indent: &'static str);
 

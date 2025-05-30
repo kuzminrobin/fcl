@@ -1,7 +1,7 @@
 use std::io::{Write, stdout};
 
 use fcl_traits::{
-    CalleeName, CodeRunDecorator, CoderunNotifiable, CoderunThreadSpecificNotifyable,
+    CalleeName, CoderunDecorator, CoderunNotifiable, CoderunThreadSpecificNotifyable,
     RepeatCountCategory, ThreadSpecifics,
 };
 
@@ -25,7 +25,6 @@ impl CommonDecorator {
     fn get_callee_name_string(name: &CalleeName) -> String {
         match name {
             CalleeName::Function(name) => name.clone(),
-            // CalleeName::Function(slice) => String::from(*slice),
             CalleeName::Closure(info) => String::from(format!(
                 CLOSURE_NAME_FORMAT!(),
                 info.start_line, info.start_column, info.end_line, info.end_column
@@ -62,13 +61,13 @@ impl CodeLikeDecorator {
     ) -> Self {
         Self {
             common: CommonDecorator::new(writer),
-            indent_step: indent_step.unwrap_or(&"  "),  // TODO: Test.
+            indent_step: indent_step.unwrap_or(&"  "),  // TODO: Test "    ", "\t".
             line_end_pending: false,
         }
     }
 }
 
-impl CodeRunDecorator for CodeLikeDecorator {
+impl CoderunDecorator for CodeLikeDecorator {
     fn get_indent_string(&self, call_depth: usize) -> String {
         let mut indent_string = String::with_capacity(8);
         for _ in 0..call_depth {
@@ -175,7 +174,7 @@ impl TreeLikeDecorator {
     }
 }
 
-impl CodeRunDecorator for TreeLikeDecorator {
+impl CoderunDecorator for TreeLikeDecorator {
     fn get_indent_string(&self, call_depth: usize) -> String {
         let mut indent_string = String::with_capacity(8);
         for _ in 0..call_depth {

@@ -15,7 +15,7 @@ use std::{
 use crate::writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter};
 
 pub struct CallLogInfra {
-    is_on: Vec<bool>, // Disabled by default (if empty). TODO: Consider renaming to `logging_is_on`. // TODO: Test.
+    logging_is_on: Vec<bool>, // Disabled by default (if empty). // TODO: Test.
     thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
     call_graph: CallGraph,
 }
@@ -26,7 +26,7 @@ impl CallLogInfra {
         let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone(); 
         let thread_specifics: Rc<RefCell<dyn ThreadSpecifics>> = thread_spec_notifyable;
         Self {
-            is_on: Vec::with_capacity(4),
+            logging_is_on: Vec::with_capacity(4),
             thread_specifics,
             call_graph: CallGraph::new(coderun_notifiable),
         }
@@ -34,18 +34,18 @@ impl CallLogInfra {
 }
 
 impl CallLogger for CallLogInfra {
-    fn push_is_on(&mut self, is_on: bool) {
-        self.is_on.push(is_on)
+    fn push_logging_is_on(&mut self, is_on: bool) {
+        self.logging_is_on.push(is_on)
     }
-    fn pop_is_on(&mut self) {
-        self.is_on.pop();
+    fn pop_logging_is_on(&mut self) {
+        self.logging_is_on.pop();
     }
-    fn is_on(&self) -> bool {
-        *self.is_on.last().unwrap_or(&false)
+    fn logging_is_on(&self) -> bool {
+        *self.logging_is_on.last().unwrap_or(&false)
     }
-    fn set_is_on(&mut self, is_on: bool) {
-        self.is_on.pop();
-        self.is_on.push(is_on);
+    fn set_logging_is_on(&mut self, is_on: bool) {
+        self.logging_is_on.pop();
+        self.logging_is_on.push(is_on);
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
@@ -61,7 +61,7 @@ impl CallLogger for CallLogInfra {
         self.call_graph.add_ret();
     }
 
-    // TODO: Make this impl conditional, for multithreaded case only.
+    // TODO: Consider making this impl conditional, for multithreaded case only.
     fn flush(&mut self) {
         self.call_graph.flush()
     }
@@ -122,21 +122,21 @@ impl CallLoggerArbiter {
 }
 
 impl CallLogger for CallLoggerArbiter {
-    fn push_is_on(&mut self, is_on: bool) {
-        self.get_thread_logger(thread::current().id()).push_is_on(is_on)
+    fn push_logging_is_on(&mut self, is_on: bool) {
+        self.get_thread_logger(thread::current().id()).push_logging_is_on(is_on)
     }
-    fn pop_is_on(&mut self) {
-        self.get_thread_logger(thread::current().id()).pop_is_on()
+    fn pop_logging_is_on(&mut self) {
+        self.get_thread_logger(thread::current().id()).pop_logging_is_on()
     }
-    fn is_on(&self) -> bool {
+    fn logging_is_on(&self) -> bool {
         if let Some(logger) = self.thread_loggers.get(&thread::current().id()) {
-            return logger.is_on();
+            return logger.logging_is_on();
         } else {
             panic!("Internal error: Logging by unregistered thread");
         }
     }
-    fn set_is_on(&mut self, is_on: bool) {
-        self.get_thread_logger(thread::current().id()).set_is_on(is_on)
+    fn set_logging_is_on(&mut self, is_on: bool) {
+        self.get_thread_logger(thread::current().id()).set_logging_is_on(is_on)
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
@@ -182,17 +182,17 @@ impl Drop for CallLoggerAdapter {
     }
 }
 impl CallLogger for CallLoggerAdapter {
-    fn push_is_on(&mut self, is_on: bool) {
-        self.get_arbiter().push_is_on(is_on);
+    fn push_logging_is_on(&mut self, is_on: bool) {
+        self.get_arbiter().push_logging_is_on(is_on);
     }
-    fn pop_is_on(&mut self) {
-        self.get_arbiter().pop_is_on();
+    fn pop_logging_is_on(&mut self) {
+        self.get_arbiter().pop_logging_is_on();
     }
-    fn is_on(&self) -> bool {
-        self.get_arbiter().is_on()
+    fn logging_is_on(&self) -> bool {
+        self.get_arbiter().logging_is_on()
     }
-    fn set_is_on(&mut self, is_on: bool) {
-        self.get_arbiter().set_is_on(is_on)
+    fn set_logging_is_on(&mut self, is_on: bool) {
+        self.get_arbiter().set_logging_is_on(is_on)
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
@@ -209,7 +209,7 @@ impl CallLogger for CallLoggerAdapter {
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
 
-// TODO: Test with file, socket writer as an arg to `ThreadSharedWriter::new()`.
+// TODO: Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
 static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> =
     LazyLock::new(|| Arc::new(RefCell::new(ThreadSharedWriter::new(None))));
 static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> =

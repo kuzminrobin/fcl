@@ -1,16 +1,11 @@
 # TODO:
 * Clean-up:
   * Consider all TODOs.
-    * Stricter Terminology where possible (parent, sibling, child).
-      ```C++
-      parent() { // caller of siblings (enclosing for siblings)
-        sibling() {  // caller of children (enclosing for children), callee of parent (nested for parent)
-            child() {} // callee of sibling (nested for sibling)
-            child() {}
-        }
-        sibling() {}
-      }
-      ```
+  // TODO: Stop call_graph crate dependency on fcl (extract CalleeName, CoderunNotifiable to non-fcl-related file/package)
+  // Option: Move {CalleeName, CoderunNotifiable, RepeatCount} and CallGraph to Code[run]Commons crate
+  // (to be reused for (dynamic handling) code profiling, code coverage, (static handling) translation from language to language).
+
+* Good compiler error reporting in case of proc_macro error.  
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
   `#[loggable] impl ..`

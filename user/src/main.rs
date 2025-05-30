@@ -10,18 +10,10 @@ use std::thread;
 use std::time::Duration;
 
 use fcl::call_log_infra::THREAD_LOGGER;
-// use fcl::call_log_infra::CALL_LOG_INFRA;
 use fcl::{ClosureLogger, FunctionLogger, closure_logger};
 use fcl_proc_macros::loggable;
 
-// TODO:
-// Macro
-//  Simple
-//  proc_macro_attr
-// Testing.
-
 #[loggable]
-// #[rustfmt::skip]
 fn f() {
     thread::sleep(Duration::from_millis(1));
 }
@@ -56,7 +48,7 @@ fn calls() {
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
-    //     if infra.borrow_mut().is_on() {
+    //     if infra.borrow_mut().logging_is_on() {
     //         _l = Some(FunctionLogger::new("main"))
     //     }
     // });
@@ -109,7 +101,7 @@ fn calls() {
     }
     {
         #[loggable]
-        pub fn gen_func<T, U>() {} // TODO: No generics logged.
+        pub fn gen_func<T, U>() {}
         gen_func::<bool, i32>();
     }
 
@@ -141,7 +133,13 @@ fn calls() {
         }
         struct MyStruct;
         impl MyPureTrait for MyStruct {
-            #[loggable(<MyStruct as MyPureTrait>::pure_method)] // TODO: Wrong result: `MyPureTrait :: pure_method() {}`. Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
+            #[loggable(<MyStruct as MyPureTrait>::pure_method)]
+            // #[loggable(MyStruct::as::MyPureTrait::pure_method)]
+            // #[loggable((MyStruct as MyPureTrait)::pure_method)]
+            // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
+            // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
+            // Consider `#[loggable((MyStruct as MyPureTrait)::pure_method)]`. Doesn't work. Results in `pure_method`.
+            // Consider `#[loggable(MyStruct::as::MyPureTrait::pure_method)]`. Doesn't work. Results in `pure_method`.
             fn pure_method(&self) {}
         }
         MyStruct.pure_method();
@@ -150,7 +148,7 @@ fn calls() {
 
 // #[loggable]
 fn thread_func() {
-    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_is_on(true)); // Turn logging on.
+    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
     // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
 
     THREAD_LOGGER.with(|logger| {
@@ -167,7 +165,7 @@ fn thread_func() {
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
-    //     if infra.borrow_mut().is_on() {
+    //     if infra.borrow_mut().logging_is_on() {
     //         _l = Some(FunctionLogger::new("main"))
     //     }
     // });
@@ -180,7 +178,7 @@ fn thread_func() {
         // use fcl::call_log_infra::CALL_LOG_INFRA;
         // let mut _logger = None;
         // CALL_LOG_INFRA.with(|infra| {
-        //     if infra.borrow_mut().is_on() {
+        //     if infra.borrow_mut().logging_is_on() {
         //         _logger = Some(FunctionLogger::new("f2"))
         //     }
         // });
@@ -236,7 +234,7 @@ fn thread_func() {
     }
     {
         #[loggable]
-        pub fn gen_func<T, U>() {} // TODO: No generics logged.
+        pub fn gen_func<T, U>() {}
         gen_func::<bool, i32>();
     }
 
@@ -268,7 +266,9 @@ fn thread_func() {
         }
         struct MyStruct;
         impl MyPureTrait for MyStruct {
-            #[loggable(<MyStruct as MyPureTrait>::pure_method)] // TODO: Wrong result: `MyPureTrait :: pure_method() {}`. Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
+            #[loggable(<MyStruct as MyPureTrait>::pure_method)]
+            // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
+            // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
             fn pure_method(&self) {}
         }
         MyStruct.pure_method();
@@ -279,16 +279,11 @@ fn thread_func() {
 fn main() {
     // TODO: -> macro, or simplify otherwise.
     // set_is_on(true);
-    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_is_on(true)); // Turn logging on.
-    // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
+    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
 
-    let result = thread::Builder::new().name("T1".into()).spawn(thread_func);
-    calls();
+    let result = thread::Builder::new().name("T1".into()).spawn(thread_func); // T1 thread.
+    calls(); // main() thread.
     let _ = result.unwrap().join();
-    // let _ = thread_handle.join();
-    // let thread_handle = thread::spawn(thread_func);
-    // calls();
-    // let _ = thread_handle.join();
 }
 
 // CodeLikeDecorator:

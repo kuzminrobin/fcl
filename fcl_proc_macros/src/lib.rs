@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse::Parse, parse_macro_input, spanned::Spanned, ExprClosure, ExprPath, ImplItemFn, ItemFn, Token};
 
+// TODO: Likely out-of-date since doesn't handle generics properly.
 // TODO: Consider moving to closure_logger and making it also a decl macro.
 // Creates the `FunctionLogger` instance.
 #[proc_macro]
@@ -13,10 +14,9 @@ pub fn function_logger(name: TokenStream) -> TokenStream {
     // * let func_name: ? = syn::parse(name);
     // * let func_name = syn::parse_macro_input!(name as String);
     quote! {
-        use fcl::call_log_infra::THREAD_LOGGER; // TODO: Consider moving to top of the file as a searate macro call.
         let mut _logger = None;
-        THREAD_LOGGER.with(|logger| {
-            if logger.borrow_mut().is_on() {
+        fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+            if logger.borrow_mut().logging_is_on() {
                 _logger = Some(FunctionLogger::new(#func_name))
             }
         });
@@ -24,37 +24,28 @@ pub fn function_logger(name: TokenStream) -> TokenStream {
     .into()
 }
 
-// TODO: _attr_args -> attr_args, _attributed_item -> attributed_item
 #[proc_macro_attribute]
-pub fn loggable(_attr_args: TokenStream, _attributed_item: TokenStream) -> TokenStream {
+pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenStream {
     // println!("{}", _attr_args);
-    let attr_args = parse_attr_args(&_attr_args);
+    let attr_args = parse_attr_args(&attr_args);
 
     // TODO: 
-    // * Both assoc functions (ImplItemFn) and free-standing functions (ItemFn) are parsed the same way (by the one tried first).
+    // * Both assoc functions (ImplItemFn) and free-standing functions (ItemFn) are currently parsed the same way (by the one tried first).
     // * Both have generics (in my code missing for ImplItemFn).
     // Resolve:
     // * Either add generics to ImplItemFn,
     // * or figure out the differnece exactly and use the correct one in each case.
-    if let Ok(func) = syn::parse::<ItemFn>(_attributed_item.clone()) {
+    if let Ok(func) = syn::parse::<ItemFn>(attributed_item.clone()) {
         // A free-standing function.
-        quote_as_itemfn(func, &attr_args)
-    } else if let Ok(assoc_func) = syn::parse::<ImplItemFn>(_attributed_item.clone()) {
-        quote_as_implitemfn(assoc_func, &attr_args)
+        quote_as_function(func, &attr_args)
+    } else if let Ok(assoc_func) = syn::parse::<ImplItemFn>(attributed_item.clone()) {
+        quote_as_associated_function(assoc_func, &attr_args)
     } else { 
-    // // TODO: Make sure that both assoc functions and free-standing functions are not parsed the same way.
-    // // WARNING: The order between `parse::<ImplItemFn>` and `parse::<ItemFn>` matters!
-    // if let Ok(assoc_func) = syn::parse::<ImplItemFn>(_attributed_item.clone()) {
-    //     quote_as_implitemfn(assoc_func, &attr_args)
-    // } else if let Ok(func) = syn::parse::<ItemFn>(_attributed_item.clone()) {
-    //     // A free-standing function.
-    //     quote_as_itemfn(func, &attr_args)
-    // } else { 
         // Handling closure differently because of an optional trailing comma, 
         // when closure is the last argument of a function.
         // This handling may erroneously consume comma if closure is NOT the last argument (TODO: Test).
-        let closure_w_opt_comma = parse_macro_input!(_attributed_item as ExprClosureWOptComma);
-        // TODO: What about parsing failure? (not a closure)
+        let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma);
+        // TODO: What about parsing failure? (not a closure) Consider TODO below.
         let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
         result
 
@@ -76,18 +67,6 @@ pub fn loggable(_attr_args: TokenStream, _attributed_item: TokenStream) -> Token
     //     }
     //     .into()
     }
-
-    // struct _AssocFunMethod { // Also includes TraitMethod
-    //     // meta: (?)*
-    //     // vis: Option<?>
-    //     // name: String??
-    //     // generics: ?
-    //     // self: {enum|String|?}?       // &, &mut, self, ?
-    //     // params: Vec<(String, Option<?>)>
-    //     // params_optional_trailing_comma: bool,
-    //     // ret_type: ?
-    //     // body: ?
-    // }
 }
 
 /*
@@ -96,14 +75,10 @@ pub fn loggable(_attr_args: TokenStream, _attributed_item: TokenStream) -> Token
 pub fn closure_logger(name: TokenStream) -> TokenStream {
     let ts: proc_macro2::TokenStream = name.into();
     let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
-    // TODO: Consider
-    // * let func_name: ? = syn::parse(name);
-    // * let func_name = syn::parse_macro_input!(name as String);
     quote! {
-        use fcl::call_log_infra::CALL_LOG_INFRA;    // TODO: Consider moving to top of the file as a searate macro call.
         let mut _l = None;
-        CALL_LOG_INFRA.with(|infra| {
-            if infra.borrow_mut().is_on() {
+        fcl::call_log_infra::CALL_LOG_INFRA.with(|infra| {
+            if infra.borrow_mut().logging_is_on() {
                 _l = Some(ClosureLogger::new(#func_name))
             }
         })
@@ -113,60 +88,25 @@ pub fn closure_logger(name: TokenStream) -> TokenStream {
 
 */
 
-// TODO: -> quote_as_function
-fn quote_as_itemfn(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
+fn quote_as_function(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
     let attrs = func.attrs;
     let vis = func.vis;
     let signature = func.sig;
     let func_name = if let Some(attr_args) = attr_args { 
         // "MyTrait::my_func". 
-        // TODO: Review if this block is still applicable for `quote_as_itemfn()`. 
-        // In other words, considere leaving such a block 
-        // for `quote_as_implitemfn()` only.
         let path = attr_args.name.path.clone();
-        // let path = attr_args.name.to_token_stream();
-        // let path = attr_args.name.clone();
-
-        // let my_ident = quote::format_ident!("My{}{}", path.segments.first().unwrap(), "IsCool");
-
         let ret = quote! { #path }; // .clone()
-        // println!("fffffffffff {ret}");
         ret
     } else {
         // "my_func"
         let id = signature.ident.clone();
         quote! { #id }
-        // signature.ident.to_string()  //clone() 
     };
     let generics = signature.generics.clone();
     let generics_params_iter = generics.type_params();
     let empty_generic_params = generics.params.is_empty();
 
-    // let func_name = if let Some(attr_args) = attr_args { 
-    //     let path = attr_args.name.clone();
-    //     quote! { #path }// .clone()
-    // } else { 
-    //     let id = signature.ident.clone();
-    //     quote! { #id }
-    //     // signature.ident.to_string()  //clone() 
-    // };    
-    // let func_name = if let Some(attr_args) = attr_args { 
-    //     attr_args.name.clone()
-    // } else { 
-    //     signature.ident.clone()
-    //     // signature.ident.to_string()  //clone() 
-    // };    
-
-    // let func_name = if let Some(attr_args) = attr_args { 
-    //     attr_args.name.clone()
-    // } else { 
-    //     signature.ident.to_string()  //clone() 
-    //     // signature.ident.clone()
-    // };    
-
-    // let func_name = signature.ident.clone();
-
-    let block = func.block; // TODO: Consider `block` -> `body`.
+    let body = func.block;
     let output = quote! {
         #(#attrs)*
         #vis #signature {
@@ -184,27 +124,25 @@ fn quote_as_itemfn(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
             
             let mut _logger = None;
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                if logger.borrow_mut().is_on() {
+                if logger.borrow_mut().logging_is_on() {
                     _logger = Some(FunctionLogger::new(&generic_func_name))
                     // _logger = Some(FunctionLogger::new(#func_name))
                 }
             }); 
 
-            // function_logger!(#func_name #generics); // The `FunctionLogger` instance. // TODO: Consider: `#func_name #generics` -> `#func_name#generics` (remove space)
-            #block
+            // function_logger!(#func_name #generics); // The `FunctionLogger` instance.
+            #body
         }
         // $( #[$meta] )*
         // $vis fn $name ( $( $arg_name : $arg_ty ),* ) $( -> $ret_ty )? {
         //     function_logger!($name); // The `FunctionLogger` instance.
-        //     // TODO: Consider `function_logger!("$name");` // Quoted arg.
         //     $($tt)*
         // }
     };
     output.into()
 }
 
-// TODO: -> quote_as_assoc_function
-fn quote_as_implitemfn(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
+fn quote_as_associated_function(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
     let attrs = func.attrs;
     let vis = func.vis;
     let defaultness = func.defaultness;
@@ -212,24 +150,19 @@ fn quote_as_implitemfn(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenS
     let func_name = if let Some(attr_args) = attr_args { 
         // "MyTrait::my_func"
         let path = attr_args.name.path.clone();
-        // let path = attr_args.name.to_token_stream();
-        // let path = attr_args.name.clone();
-        let ret = quote! { #path }; // .clone()
-        // println!("iiiiiiiiiiiii {ret}");
+        let ret = quote! { #path };
         ret
     } else { 
         // "my_func"
         let id = signature.ident.clone();
         quote! { #id }
-        // signature.ident.to_string()  //clone() 
     };    
-    // let func_name = signature.ident.clone();
-    let block = func.block; // TODO: Consider block -> body.
+    let body = func.block;
     let output = quote! {
         #(#attrs)*
         #vis #defaultness #signature {
             function_logger!(#func_name); // The `FunctionLogger` instance. TODO: What about `#generics`? Forgotten!
-            #block
+            #body
         }
     };
     output.into()
@@ -237,20 +170,6 @@ fn quote_as_implitemfn(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenS
 
 
 fn quote_as_closure(closure: ExprClosure, _attr_args: &Option<AttrArgs>) -> TokenStream {
-    // TODO: _attr_args
-// fn quote_as_closure(closure: ExprClosureComma) -> TokenStream {    
-    // pub attrs        : Vec<Attribute>,
-    // pub lifetimes    : Option<BoundLifetimes>,
-    // pub constness    : Option<Const>,
-    // pub movability   : Option<Static>,
-    // pub asyncness    : Option<Async>,
-    // pub capture      : Option<Move>,
-    // pub or1_token    : Or,
-    // pub inputs       : Punctuated<Pat, Comma>,
-    // pub or2_token    : Or,
-    // pub output       : ReturnType,
-    // pub body         : Box<Expr>,
-
     let (start_line, start_col) = {
         let proc_macro2::LineColumn{ line, column } = 
             proc_macro2::Span::call_site().start();
@@ -281,12 +200,6 @@ fn quote_as_closure(closure: ExprClosure, _attr_args: &Option<AttrArgs>) -> Toke
         {
             // The `ClosureLogger` instance:
             closure_logger!(#start_line, #start_col, #end_line, #end_col);
-            // TODO: Is `#generics` applicable to closures? Inspect the `closure` above 
-            // to see if `#generics` are supported (regardless of 
-            // whether they are applicable to closures).
-
-            // println!("start: {{ {}, {} }}.", #start_line, #start_col);
-            // println!("end: {{ {}, {} }}.", #end_line, #end_col);
             #body              
         }
     };
@@ -309,12 +222,11 @@ impl Parse for ExprClosureWOptComma {
 }
 
 struct AttrArgs {
-    name: ExprPath //Ident // String
+    name: ExprPath
 }
 
 fn parse_attr_args(attr_args: &TokenStream) -> Option<AttrArgs> {
     if !attr_args.is_empty() {
-        
         if let Ok(id) = syn::parse::<ExprPath>(attr_args.clone()) {
         // if let Ok(id) = syn::parse::<Ident>(attr_args.clone()) {
             // if let Ok(literal) = syn::parse::<ExprLit>(attr_args.clone()) {
