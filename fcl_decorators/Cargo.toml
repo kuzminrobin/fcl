@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 fcl_traits = { path = "../fcl_traits" }
+code_commons = { path = "../code_commons" }

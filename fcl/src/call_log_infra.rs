@@ -1,9 +1,5 @@
-// call_log_infra
-
-use call_graph::CallGraph;
-use fcl_traits::{
-    CallLogger, CalleeName, CoderunNotifiable, CoderunThreadSpecificNotifyable, ThreadSpecifics,
-};
+use code_commons::{CallGraph, CalleeName, CoderunNotifiable};
+use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -23,7 +19,7 @@ pub struct CallLogInfra {
 impl CallLogInfra {
     pub fn new(thread_spec_notifyable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>>) -> Self {
         // NOTE: Curious trick. // TODO: Document it.
-        let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone(); 
+        let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone();
         let thread_specifics: Rc<RefCell<dyn ThreadSpecifics>> = thread_spec_notifyable;
         Self {
             logging_is_on: Vec::with_capacity(4),
@@ -123,10 +119,12 @@ impl CallLoggerArbiter {
 
 impl CallLogger for CallLoggerArbiter {
     fn push_logging_is_on(&mut self, is_on: bool) {
-        self.get_thread_logger(thread::current().id()).push_logging_is_on(is_on)
+        self.get_thread_logger(thread::current().id())
+            .push_logging_is_on(is_on)
     }
     fn pop_logging_is_on(&mut self) {
-        self.get_thread_logger(thread::current().id()).pop_logging_is_on()
+        self.get_thread_logger(thread::current().id())
+            .pop_logging_is_on()
     }
     fn logging_is_on(&self) -> bool {
         if let Some(logger) = self.thread_loggers.get(&thread::current().id()) {
@@ -136,7 +134,8 @@ impl CallLogger for CallLoggerArbiter {
         }
     }
     fn set_logging_is_on(&mut self, is_on: bool) {
-        self.get_thread_logger(thread::current().id()).set_logging_is_on(is_on)
+        self.get_thread_logger(thread::current().id())
+            .set_logging_is_on(is_on)
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
@@ -196,8 +195,7 @@ impl CallLogger for CallLoggerAdapter {
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
-        self.get_arbiter()
-            .set_thread_indent(thread_indent)
+        self.get_arbiter().set_thread_indent(thread_indent)
     }
 
     fn log_call(&mut self, name: &CalleeName) {

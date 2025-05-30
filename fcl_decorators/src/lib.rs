@@ -1,9 +1,7 @@
 use std::io::{Write, stdout};
 
-use fcl_traits::{
-    CalleeName, CoderunDecorator, CoderunNotifiable, CoderunThreadSpecificNotifyable,
-    RepeatCountCategory, ThreadSpecifics,
-};
+use code_commons::{CalleeName, CoderunNotifiable, RepeatCountCategory};
+use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 
 macro_rules! CLOSURE_NAME_FORMAT {
     () => {
@@ -55,13 +53,10 @@ pub struct CodeLikeDecorator {
 }
 
 impl CodeLikeDecorator {
-    pub fn new(
-        writer: Option<Box<dyn Write>>,
-        indent_step: Option<&'static str>,
-    ) -> Self {
+    pub fn new(writer: Option<Box<dyn Write>>, indent_step: Option<&'static str>) -> Self {
         Self {
             common: CommonDecorator::new(writer),
-            indent_step: indent_step.unwrap_or(&"  "),  // TODO: Test "    ", "\t".
+            indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".
             line_end_pending: false,
         }
     }

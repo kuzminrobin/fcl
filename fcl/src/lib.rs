@@ -2,7 +2,7 @@ pub mod call_log_infra;
 pub mod writer;
 
 use call_log_infra::THREAD_LOGGER;
-use fcl_traits::{CalleeName, ClosureInfo};
+use code_commons::{CalleeName, ClosureInfo};
 
 #[macro_export]
 macro_rules! closure_logger {

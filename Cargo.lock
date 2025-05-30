@@ -3,17 +3,14 @@
 version = 4
 
 [[package]]
-name = "call_graph"
+name = "code_commons"
 version = "0.1.0"
-dependencies = [
- "fcl_traits",
-]
 
 [[package]]
 name = "fcl"
 version = "0.1.0"
 dependencies = [
- "call_graph",
+ "code_commons",
  "fcl_decorators",
  "fcl_proc_macros",
  "fcl_traits",
@@ -23,6 +20,7 @@ dependencies = [
 name = "fcl_decorators"
 version = "0.1.0"
 dependencies = [
+ "code_commons",
  "fcl_traits",
 ]
 
@@ -38,6 +36,9 @@ dependencies = [
 [[package]]
 name = "fcl_traits"
 version = "0.1.0"
+dependencies = [
+ "code_commons",
+]
 
 [[package]]
 name = "proc-macro2"

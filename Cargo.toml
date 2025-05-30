@@ -2,7 +2,7 @@
 [workspace]
 resolver = "3"
 
-members = [ "call_graph",
+members = [ "code_commons",
     "fcl", "fcl_decorators",                  # Rust code.
     "fcl_proc_macros", "fcl_traits",      # Proc macros. Compiled before the actual compilation of other crates. 
     "user",                 # Bin crate to run/test the fcl.

@@ -6,5 +6,5 @@ edition = "2024"
 [dependencies]
 fcl_traits = { path = "../fcl_traits" }
 fcl_decorators = { path = "../fcl_decorators" }
-call_graph = { path = "../call_graph" }
+code_commons = { path = "../code_commons" }
 fcl_proc_macros = { path = "../fcl_proc_macros" }

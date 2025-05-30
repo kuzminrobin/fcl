@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use fcl_traits::{CalleeName, CoderunNotifiable, RepeatCount};    
+use crate::{CalleeName, CoderunNotifiable, RepeatCount};    
 // TODO: Stop dependency on fcl (extract CalleeName, CoderunNotifiable to non-fcl-related file/package)
 // Option: Move {CalleeName, CoderunNotifiable, RepeatCount} and CallGraph to Code[run]Commons crate
 // (to be reused for (dynamic handling) code profiling, code coverage, (static handling) translation from language to language).
