@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, spanned::Spanned, ExprClosure, ExprPath, ImplItemFn, ItemFn, Token};
+use syn::{parse::Parse, parse_macro_input, parse_quote, spanned::Spanned, Attribute, ExprClosure, ExprPath, ImplItemFn, ItemFn, ItemImpl, Token};
 
 // TODO: Likely out-of-date since doesn't handle generics properly.
 // TODO: Consider moving to closure_logger and making it also a decl macro.
@@ -26,21 +26,40 @@ pub fn function_logger(name: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenStream {
-    // println!("{}", _attr_args);
-    let attr_args = parse_attr_args(&attr_args);
+    let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
+/* 
+    #[proc_macro_attribute]
+    pub fn my_attr(args: TokenStream, input: TokenStream) -> TokenStream {
+        let args = parse_macro_input!(args as MyAttrArgs);
+*/    
+    // let attr_args = parse_attr_args(&attr_args);
 
     // TODO: 
-    // * Both assoc functions (ImplItemFn) and free-standing functions (ItemFn) are currently parsed the same way (by the one tried first).
+    // * Both assoc functions (ImplItemFn) and free-standing functions (ItemFn) are currently parsed 
+    //   the same way (by the one tried first).
     // * Both have generics (in my code missing for ImplItemFn).
     // Resolve:
     // * Either add generics to ImplItemFn,
     // * or figure out the differnece exactly and use the correct one in each case.
-    if let Ok(func) = syn::parse::<ItemFn>(attributed_item.clone()) {
+    if let Ok(impl_block) = syn::parse::<ItemImpl>(attributed_item.clone()) {
+        quote_as_impl(impl_block, &attr_args)
+    } else if let Ok(func) = syn::parse::<ItemFn>(attributed_item.clone()) {
         // A free-standing function.
         quote_as_function(func, &attr_args)
     } else if let Ok(assoc_func) = syn::parse::<ImplItemFn>(attributed_item.clone()) {
         quote_as_associated_function(assoc_func, &attr_args)
-    } else { 
+
+    // TODO: Review the closure parsing below such that after the closure 
+    // if nothing is parsed/recognized successfully then just forward the input to the output.
+    // E.g. if `#[loggable] impl` has non-function items (that get recursively marked as `#[loggable]`), 
+    // then those items just need to be forwarded from input to output (with `#[loggable]` removed).
+    // } else if let Ok(closure) = syn::parse::<ExprClosure>(&_attributed_item) {
+    //     let result = quote_as_closure(closure);
+    //     // TODO: Optional trailing comma after the closure.
+    //     // syn::parse::<Option<Token![,]>>(_attributed_item);
+    //
+    //     result
+    } else {
         // Handling closure differently because of an optional trailing comma, 
         // when closure is the last argument of a function.
         // This handling may erroneously consume comma if closure is NOT the last argument (TODO: Test).
@@ -49,12 +68,7 @@ pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenSt
         let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
         result
 
-    // } else if let Ok(closure) = syn::parse::<ExprClosure>(&_attributed_item) {
-    //     let result = quote_as_closure(closure);
-    //     // TODO: Optional trailing comma after the closure.
-    //     // syn::parse::<Option<Token![,]>>(_attributed_item);
-    //
-    //     result
+
 
     
     // } else {
@@ -88,20 +102,74 @@ pub fn closure_logger(name: TokenStream) -> TokenStream {
 
 */
 
-fn quote_as_function(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
+fn quote_as_impl(impl_block: ItemImpl, _attr_args: &AttrArgs) -> TokenStream {
+    let ItemImpl {
+        attrs,
+        defaultness,
+        unsafety,
+        impl_token,
+        generics,
+        trait_,
+        self_ty,
+        items,
+        .. // brace_token,
+    } = impl_block;
+    let loggable_attr: Attribute = parse_quote! {
+        #[loggable(prefix=#self_ty)]
+    };
+
+    let mut output = quote! {
+        #(#attrs)*
+        #defaultness
+        #unsafety
+        #impl_token
+        #generics
+    };
+    // #trait_
+    if let Some((exclamation, path, for_token)) = trait_ {
+        output = quote!{
+            #output
+            #exclamation #path #for_token
+        };
+    }
+    output = quote!{
+        #output
+        #self_ty
+        // #brace_token
+        {
+            #(#loggable_attr #items)*
+            // #(#items)*
+        }
+    };
+
+    output.into()
+}
+
+fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -> TokenStream {
     let attrs = func.attrs;
     let vis = func.vis;
     let signature = func.sig;
-    let func_name = if let Some(attr_args) = attr_args { 
-        // "MyTrait::my_func". 
-        let path = attr_args.name.path.clone();
-        let ret = quote! { #path }; // .clone()
-        ret
-    } else {
-        // "my_func"
-        let id = signature.ident.clone();
-        quote! { #id }
+    let func_name = match attr_args {
+        AttrArgs::Name { path, .. } => quote!{ #path },
+        AttrArgs::Prefix { path, .. } => {
+            let id = signature.ident.clone();
+            quote!{ #path::#id }
+        }
+        AttrArgs::None => {
+            let id = signature.ident.clone();
+            quote!{ #id }
+        }
     };
+    // let func_name = if let Some(attr_args) = attr_args { 
+    //     // "MyTrait::my_func". 
+    //     let path = attr_args.name.path.clone();
+    //     let ret = quote! { #path }; // .clone()
+    //     ret
+    // } else {
+    //     // "my_func"
+    //     let id = signature.ident.clone();
+    //     quote! { #id }
+    // };
     let generics = signature.generics.clone();
     let generics_params_iter = generics.type_params();
     let empty_generic_params = generics.params.is_empty();
@@ -142,21 +210,33 @@ fn quote_as_function(func: ItemFn, attr_args: &Option<AttrArgs>) -> TokenStream 
     output.into()
 }
 
-fn quote_as_associated_function(func: ImplItemFn, attr_args: &Option<AttrArgs>) -> TokenStream {
+fn quote_as_associated_function(func: ImplItemFn, attr_args: &AttrArgs) -> TokenStream {
     let attrs = func.attrs;
     let vis = func.vis;
     let defaultness = func.defaultness;
     let signature = func.sig;
-    let func_name = if let Some(attr_args) = attr_args { 
-        // "MyTrait::my_func"
-        let path = attr_args.name.path.clone();
-        let ret = quote! { #path };
-        ret
-    } else { 
-        // "my_func"
-        let id = signature.ident.clone();
-        quote! { #id }
-    };    
+    // TODO: Dedup func_name for quote_as_associated_function() and quote_as_function().
+    let func_name = match attr_args {
+        AttrArgs::Name { path, .. } => quote!{ #path },
+        AttrArgs::Prefix { path, .. } => {
+            let id = signature.ident.clone();
+            quote!{ #path::#id }
+        }
+        AttrArgs::None => {
+            let id = signature.ident.clone();
+            quote!{ #id }
+        }
+    };
+    // let func_name = if let Some(attr_args) = attr_args { 
+    //     // "MyTrait::my_func"
+    //     let path = attr_args.name.path.clone();
+    //     let ret = quote! { #path };
+    //     ret
+    // } else { 
+    //     // "my_func"
+    //     let id = signature.ident.clone();
+    //     quote! { #id }
+    // };    
     let body = func.block;
     let output = quote! {
         #(#attrs)*
@@ -169,7 +249,7 @@ fn quote_as_associated_function(func: ImplItemFn, attr_args: &Option<AttrArgs>) 
 }
 
 
-fn quote_as_closure(closure: ExprClosure, _attr_args: &Option<AttrArgs>) -> TokenStream {
+fn quote_as_closure(closure: ExprClosure, _attr_args: &AttrArgs) -> TokenStream {
     let (start_line, start_col) = {
         let proc_macro2::LineColumn{ line, column } = 
             proc_macro2::Span::call_site().start();
@@ -221,23 +301,97 @@ impl Parse for ExprClosureWOptComma {
     }
 }
 
-struct AttrArgs {
-    name: ExprPath
+mod kw {
+    syn::custom_keyword!(name);
+    syn::custom_keyword!(prefix);
 }
 
-fn parse_attr_args(attr_args: &TokenStream) -> Option<AttrArgs> {
-    if !attr_args.is_empty() {
-        if let Ok(id) = syn::parse::<ExprPath>(attr_args.clone()) {
-        // if let Ok(id) = syn::parse::<Ident>(attr_args.clone()) {
-            // if let Ok(literal) = syn::parse::<ExprLit>(attr_args.clone()) {
-                // if let Lit::Str(str) = id.lit {
-                    return Some(AttrArgs {
-                        name: id
-                        // name: str.value()
-                    })
-                // }
-            }
-    }
+enum AttrArgs {
+    // TODO: Dedup or remove `eq_token` and `path`.
+    Name{
+        _name_token: kw::name,
+        _eq_token: Token![=],
+        path: ExprPath
+    },
+    Prefix{
+        _prefix_token: kw::prefix,
+        _eq_token: Token![=],
+        path: ExprPath
+    },
     None
 }
+
+impl Parse for AttrArgs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            return Ok(AttrArgs::None)
+        }
+        let lookahead = input.lookahead1();
+        if lookahead.peek(kw::name) {
+            Ok(AttrArgs::Name {
+                _name_token: input.parse::<kw::name>()?,
+                _eq_token: input.parse()?,
+                path: input.parse()?,
+            })
+        } else if lookahead.peek(kw::prefix) {
+            Ok(AttrArgs::Prefix {
+                _prefix_token: input.parse::<kw::prefix>()?,
+                _eq_token: input.parse()?,
+                path: input.parse()?,
+            })
+        } else {
+            Err(lookahead.error())
+        }
+    }
+}
+
+// struct ArgExpr {
+//     name_or_prefix: Ident,
+//     eq: Token![=],
+//     path: ExprPath,
+// }
+// impl Parse for ArgExpr {
+//     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+//         Ok(Self {
+//             name_or_prefix: input.parse()?,
+//             eq: input.parse()?,
+//             path: input.parse()?,
+//             // closure: input.parse()?,
+//             // _optional_comma: input.parse()?
+//         })
+        
+//     }
+// }
+
+// struct AttrArgs {
+//     name: ExprPath
+// }
+
+// fn parse_attr_args(attr_args: &TokenStream) -> Option<syn::Result<AttrArgs>> {
+//     if !attr_args.is_empty() {
+//         return Some(syn::parse::<AttrArgs>(attr_args.clone()))
+//         // match syn::parse::<AttrArgs>(attr_args.clone()) {
+//         //     Ok(attr_args) => return Some(attr_args),
+//         //     Err(_err) => {
+//         //         // TODO: Log the attr arg error appropriately.
+//         //         return None
+//         //     }
+//         // }
+        
+//         // if let Ok(ArgExpr { name_or_prefix, path, .. } ) = syn::parse::<ArgExpr>(attr_args.clone()) {
+//         // }
+
+//         // if let Ok(id) = syn::parse::<ExprPath>(attr_args.clone()) {
+//         // // if let Ok(id) = syn::parse::<Ident>(attr_args.clone()) {
+//         //     // if let Ok(literal) = syn::parse::<ExprLit>(attr_args.clone()) {
+//         //         // if let Lit::Str(str) = id.lit {
+//         //             return Some(AttrArgs {
+//         //                 name: id
+//         //                 // name: str.value()
+//         //             })
+//         //         // }
+//         //     }
+//     }
+//     None
+// }
 

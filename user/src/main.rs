@@ -86,11 +86,11 @@ fn calls() {
     {
         struct MyStruct;
         impl MyStruct {
-            #[loggable(MyStruct::new)]
+            #[loggable(name=MyStruct::new)]
             fn new() -> Self {
                 Self
             }
-            #[loggable(MyStruct::method)]
+            #[loggable(name=MyStruct::method)]
             fn method<T, U>(&self) -> bool {
                 thread::sleep(Duration::from_millis(1));
                 false
@@ -107,14 +107,14 @@ fn calls() {
 
     {
         trait MyTrait {
-            #[loggable(MyTrait::trait_method)]
+            #[loggable(name=MyTrait::trait_method)]
             fn trait_method(&self) { // Virtual function.
                 // Default implementation.
             }
         }
         struct MyStruct;
         impl MyTrait for MyStruct {
-            #[loggable(MyStruct::trait_method)]
+            #[loggable(prefix=MyStruct)]
             fn trait_method(&self) { // Virtual function override.
                 // Override of the default.
             }
@@ -133,7 +133,7 @@ fn calls() {
         }
         struct MyStruct;
         impl MyPureTrait for MyStruct {
-            #[loggable(<MyStruct as MyPureTrait>::pure_method)]
+            #[loggable(name=<MyStruct as MyPureTrait>::pure_method)]
             // #[loggable(MyStruct::as::MyPureTrait::pure_method)]
             // #[loggable((MyStruct as MyPureTrait)::pure_method)]
             // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
@@ -202,12 +202,9 @@ fn thread_func() {
     thread::sleep(Duration::from_millis(1));
     let _b = Some(true).map(
         #[loggable]
-        // #[rustfmt::skip]
         move |b| -> bool {
-            /*println!("Lambda"); */
             Some(b)
                 .map(
-                    // main()::closure()::closure() {}
                     #[loggable]
                     |v| !v,
                 )
@@ -219,11 +216,11 @@ fn thread_func() {
     {
         struct MyStruct;
         impl MyStruct {
-            #[loggable(MyStruct::new)]
+            #[loggable(name = MyStruct::new)]
             fn new() -> Self {
                 Self
             }
-            #[loggable(MyStruct::method)]
+            #[loggable(name = MyStruct::method)]
             fn method<T, U>(&self) -> bool {
                 thread::sleep(Duration::from_millis(1));
                 false
@@ -240,14 +237,14 @@ fn thread_func() {
 
     {
         trait MyTrait {
-            #[loggable(MyTrait::trait_method)]
+            #[loggable(name = MyTrait::trait_method)]
             fn trait_method(&self) { // Virtual function.
                 // Default implementation.
             }
         }
         struct MyStruct;
         impl MyTrait for MyStruct {
-            #[loggable(MyStruct::trait_method)]
+            #[loggable(name = MyStruct::trait_method)]
             fn trait_method(&self) { // Virtual function override.
                 // Override of the default.
             }
@@ -266,12 +263,24 @@ fn thread_func() {
         }
         struct MyStruct;
         impl MyPureTrait for MyStruct {
-            #[loggable(<MyStruct as MyPureTrait>::pure_method)]
+            #[loggable(name = <MyStruct as MyPureTrait>::pure_method)]
             // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
             // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
             fn pure_method(&self) {}
         }
         MyStruct.pure_method();
+    }
+    {
+        struct LoggableStruct;
+        #[loggable]
+        impl LoggableStruct {
+            fn assoc_func() {}
+            fn assoc_method(&self) {}
+            fn assoc_funcb<T>() {}
+        }
+        LoggableStruct::assoc_func();
+        LoggableStruct.assoc_method();
+        LoggableStruct::assoc_funcb::<bool>();
     }
     // println!("thread_func() ends");
 }

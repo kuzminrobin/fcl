@@ -1,10 +1,4 @@
 # TODO:
-* Clean-up:
-  * Consider all TODOs.
-  // TODO: Stop call_graph crate dependency on fcl (extract CalleeName, CoderunNotifiable to non-fcl-related file/package)
-  // Option: Move {CalleeName, CoderunNotifiable, RepeatCount} and CallGraph to Code[run]Commons crate
-  // (to be reused for (dynamic handling) code profiling, code coverage, (static handling) translation from language to language).
-
 * Good compiler error reporting in case of proc_macro error.  
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
@@ -47,6 +41,32 @@
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
+* Make `#[loggable]` recursive such as for 
+  ```rs
+  #[loggable]
+  fn f() {
+    fn g() {} // Local function is defined.
+    g(); // Local function is called.
+
+    let closure = || 5; // Closure is defined
+    closure(); // Closure is called.
+  }
+  ```
+  the effect is the same as of
+  ```rs
+  #[loggable]
+  fn f() {
+    #[loggable(prefix=f)] // `prefix` is optional.
+    fn g() {} // Local function is defined.
+    g(); // Local function is called.
+
+    let closure = 
+      #[loggable(prefix=f)] // `prefix` is optional.
+      || 5; // Closure is defined
+    closure(); // Closure is called.
+  }
+  ```
+
 * Clean-up:
   * Remove commented code.
 * Finalize the user's use

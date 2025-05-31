@@ -1,14 +1,4 @@
-
-
-// macro_rules! type_to_string {
-//     ($t:ty) => { stringify!($t) }
-// }
-// type_to_string!(char);
-// type_to_string!(ClosureInfo);
-
 use code_commons::{CalleeName, CoderunNotifiable};
-
-
 /// Trait to be implemented by the instances that handle any thread specifics.
 pub trait ThreadSpecifics {
     /// Sets the thread code run output indentation. E.g. if there are 2 threads, 
