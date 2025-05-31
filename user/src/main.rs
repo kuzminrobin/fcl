@@ -271,16 +271,49 @@ fn thread_func() {
         MyStruct.pure_method();
     }
     {
-        struct LoggableStruct;
+        struct LoggableStruct(bool);
         #[loggable]
         impl LoggableStruct {
+            // type MyType = u8;
             fn assoc_func() {}
             fn assoc_method(&self) {}
             fn assoc_funcb<T>() {}
         }
+        #[loggable]
+        impl Iterator for LoggableStruct {
+            type Item = u8; // Is just forwarded from input to output (despite of `#[loggable(prefix=LoggableStruct)] type Item = ...`).
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.0 {
+                    self.0 = false;
+                    return Some(1)
+                } else {
+                    None
+                }
+            }
+        }
         LoggableStruct::assoc_func();
-        LoggableStruct.assoc_method();
+        LoggableStruct(false).assoc_method();
         LoggableStruct::assoc_funcb::<bool>();
+
+        for _it in LoggableStruct(true) {
+            // Call `next()`.
+        }
+        // let iter = (&LoggableStruct).iter();
+    }
+
+    {
+        #[loggable]
+        fn f<F /*: FnOnce()*/>(fun: F, _b: bool)
+        where
+            F: FnOnce(),
+        {
+            fun()
+        }
+        f(
+            #[loggable]
+            || (),
+            true,
+        );
     }
     // println!("thread_func() ends");
 }

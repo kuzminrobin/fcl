@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, parse_quote, spanned::Spanned, Attribute, ExprClosure, ExprPath, ImplItemFn, ItemFn, ItemImpl, Token};
+use syn::{parse::Parse, parse_macro_input, parse_quote, spanned::Spanned, Attribute, ExprClosure, ExprPath, ImplItemFn, Item, ItemFn, ItemImpl, ItemMod, Token};
 
 // TODO: Likely out-of-date since doesn't handle generics properly.
 // TODO: Consider moving to closure_logger and making it also a decl macro.
@@ -41,7 +41,12 @@ pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenSt
     // Resolve:
     // * Either add generics to ImplItemFn,
     // * or figure out the differnece exactly and use the correct one in each case.
-    if let Ok(impl_block) = syn::parse::<ItemImpl>(attributed_item.clone()) {
+    // TODO:
+    // #[loggable(prefix=Parent)]
+    // impl ...
+    if let Ok(module_block) = syn::parse::<ItemMod>(attributed_item.clone()) {
+        quote_as_module(module_block, &attr_args)
+    } else if let Ok(impl_block) = syn::parse::<ItemImpl>(attributed_item.clone()) {
         quote_as_impl(impl_block, &attr_args)
     } else if let Ok(func) = syn::parse::<ItemFn>(attributed_item.clone()) {
         // A free-standing function.
@@ -51,26 +56,36 @@ pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenSt
 
     // TODO: Review the closure parsing below such that after the closure 
     // if nothing is parsed/recognized successfully then just forward the input to the output.
-    // E.g. if `#[loggable] impl` has non-function items (that get recursively marked as `#[loggable]`), 
+    // E.g. if `#[loggable] impl` has non-function items, e.g. `type ...` (that get recursively marked as `#[loggable]`), 
     // then those items just need to be forwarded from input to output (with `#[loggable]` removed).
+
+    } else if let Ok(closure_w_opt_comma) = 
+        syn::parse::<ExprClosureWOptComma>(attributed_item.clone()) 
+    {
+        let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
+        result
+    } else {
+        // TODO: Compiler error instead of forwarding.
+        attributed_item
+    }
+    // } else {
+    //     // Handling closure differently because of an optional trailing comma, 
+    //     // when closure is the last argument of a function.
+    //     // This handling may erroneously consume comma if closure is NOT the last argument (TODO: Test).
+    //     let closure_w_opt_comma = 
+    //         parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
+    //     // TODO: What about parsing failure? (not a closure) Consider TODO below.
+    //     let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
+    //     result
+    // }    
+
     // } else if let Ok(closure) = syn::parse::<ExprClosure>(&_attributed_item) {
     //     let result = quote_as_closure(closure);
     //     // TODO: Optional trailing comma after the closure.
     //     // syn::parse::<Option<Token![,]>>(_attributed_item);
     //
     //     result
-    } else {
-        // Handling closure differently because of an optional trailing comma, 
-        // when closure is the last argument of a function.
-        // This handling may erroneously consume comma if closure is NOT the last argument (TODO: Test).
-        let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma);
-        // TODO: What about parsing failure? (not a closure) Consider TODO below.
-        let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
-        result
 
-
-
-    
     // } else {
     //     // TODO: Compiler error:
     //     // Failed to parse as a callable (function //, associated function, closure,
@@ -80,7 +95,7 @@ pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenSt
     //         }
     //     }
     //     .into()
-    }
+    // }
 }
 
 /*
@@ -102,6 +117,62 @@ pub fn closure_logger(name: TokenStream) -> TokenStream {
 
 */
 
+#[rustfmt::skip]
+fn quote_as_module(module_block: ItemMod, attr_args: &AttrArgs) -> TokenStream {
+    let ItemMod {
+        attrs, // : Vec<Attribute>,
+        vis, // : Visibility,
+        unsafety, // : Option<Unsafe>,
+        mod_token, // : Mod,
+        ident, // : Ident,
+        content, // : Option<(Brace, Vec<Item>)>,
+        semi, // : Option<Semi>,        
+    } = module_block;
+
+    let mut output = quote! {
+        #(#attrs)* // : Vec<Attribute>,
+        #vis // : Visibility,
+        #unsafety // : Option<Unsafe>,
+        #mod_token // : Mod,
+        #ident // : Ident,
+    };
+
+    if let Some((_, item_vec)) = content {
+        let mut prefix = quote! { #ident };
+        if let AttrArgs::Prefix { path, .. } = attr_args {
+            prefix = quote!{ #path::#prefix };
+        }
+        let loggable_attr: Attribute = parse_quote! {
+            #[fcl_proc_macros::loggable(prefix=#prefix)]
+        };
+
+        let mut content = quote! {};
+        for item in &item_vec {
+            match item {
+                Item::Fn(_) | 
+                Item::Impl(_) | 
+                Item::Mod(_)  => content = quote! { #content #loggable_attr #item },
+                _             => content = quote! { #content                #item },
+            }
+        }
+        output = quote! {
+            #output {
+                #content
+            }
+        }
+        // output = quote! {
+        //     #output {
+        //         #(#loggable_attr #item_vec)*
+        //     }
+        // }
+    }
+    output = quote! {
+        #output
+        #semi
+    };
+    output.into()
+}
+
 fn quote_as_impl(impl_block: ItemImpl, _attr_args: &AttrArgs) -> TokenStream {
     let ItemImpl {
         attrs,
@@ -115,7 +186,7 @@ fn quote_as_impl(impl_block: ItemImpl, _attr_args: &AttrArgs) -> TokenStream {
         .. // brace_token,
     } = impl_block;
     let loggable_attr: Attribute = parse_quote! {
-        #[loggable(prefix=#self_ty)]
+        #[fcl_proc_macros::loggable(prefix=#self_ty)]
     };
 
     let mut output = quote! {
@@ -193,7 +264,7 @@ fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -
             let mut _logger = None;
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
                 if logger.borrow_mut().logging_is_on() {
-                    _logger = Some(FunctionLogger::new(&generic_func_name))
+                    _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
                     // _logger = Some(FunctionLogger::new(#func_name))
                 }
             }); 

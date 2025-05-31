@@ -41,9 +41,16 @@
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
-* Make `#[loggable]` recursive such as for 
+* Reader practice:
   ```rs
   #[loggable]
+  fn f<F: FnOnce()>(fun: F, _b: bool) { // `F: FnOnce()`: Error: associated item constraints are not allowed here.
+  ```
+  The [Struct Generics](https://docs.rs/syn/latest/syn/struct.Generics.html) does not support `: FnOnce()` there,
+  only in `where` clause.
+* Make `#[loggable]` recursive (same for `prefix`) such as for 
+  ```rs
+  #[loggable(prefix=e)]
   fn f() {
     fn g() {} // Local function is defined.
     g(); // Local function is called.
@@ -54,16 +61,16 @@
   ```
   the effect is the same as of
   ```rs
-  #[loggable]
-  fn f() {
-    #[loggable(prefix=f)] // `prefix` is optional.
-    fn g() {} // Local function is defined.
-    g(); // Local function is called.
+  #[loggable(prefix=e)]
+  fn f() { // e::f()
+    #[loggable(prefix=e::f)] // `prefix` is optional.
+    fn g() {} // Local function is defined. `e::f::g()`
+    g(); // Local function is called. `e::f::g()`
 
     let closure = 
-      #[loggable(prefix=f)] // `prefix` is optional.
-      || 5; // Closure is defined
-    closure(); // Closure is called.
+      #[loggable(prefix=e::f)] // `prefix` is optional.
+      || 5; // Closure is defined. `e::f::closure{L,C:l,c}()`
+    closure(); // Closure is called. `e::f::closure{L,C:l,c}()`
   }
   ```
 

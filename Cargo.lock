@@ -82,3 +82,11 @@ dependencies = [
  "fcl",
  "fcl_proc_macros",
 ]
+
+[[package]]
+name = "user_all"
+version = "0.1.0"
+dependencies = [
+ "fcl",
+ "fcl_proc_macros",
+]

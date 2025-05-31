@@ -11,7 +11,7 @@ use std::{
 use crate::writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter};
 
 pub struct CallLogInfra {
-    logging_is_on: Vec<bool>, // Disabled by default (if empty). // TODO: Test.
+    logging_is_on: Vec<bool>, // Enabled by default (if empty). // TODO: Test.
     thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
     call_graph: CallGraph,
 }
@@ -37,7 +37,7 @@ impl CallLogger for CallLogInfra {
         self.logging_is_on.pop();
     }
     fn logging_is_on(&self) -> bool {
-        *self.logging_is_on.last().unwrap_or(&false)
+        *self.logging_is_on.last().unwrap_or(&true)
     }
     fn set_logging_is_on(&mut self, is_on: bool) {
         self.logging_is_on.pop();
