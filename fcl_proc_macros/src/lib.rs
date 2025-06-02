@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, parse_quote, spanned::Spanned, Attribute, ExprClosure, ExprPath, ImplItemFn, Item, ItemFn, ItemImpl, ItemMod, Token};
+use syn::{parse::Parse, parse_macro_input, parse_quote, spanned::Spanned, Attribute, ExprClosure, ExprPath, ImplItem, ImplItemFn, Item, ItemFn, ItemImpl, ItemMod, Token};
 
 // TODO: Likely out-of-date since doesn't handle generics properly.
 // TODO: Consider moving to closure_logger and making it also a decl macro.
@@ -53,21 +53,26 @@ pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenSt
         quote_as_function(func, &attr_args)
     } else if let Ok(assoc_func) = syn::parse::<ImplItemFn>(attributed_item.clone()) {
         quote_as_associated_function(assoc_func, &attr_args)
-
+    } else {
+        let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
+        quote_as_closure(closure_w_opt_comma.closure, &attr_args)
+    }
+    
     // TODO: Review the closure parsing below such that after the closure 
     // if nothing is parsed/recognized successfully then just forward the input to the output.
     // E.g. if `#[loggable] impl` has non-function items, e.g. `type ...` (that get recursively marked as `#[loggable]`), 
     // then those items just need to be forwarded from input to output (with `#[loggable]` removed).
 
-    } else if let Ok(closure_w_opt_comma) = 
-        syn::parse::<ExprClosureWOptComma>(attributed_item.clone()) 
-    {
-        let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
-        result
-    } else {
-        // TODO: Compiler error instead of forwarding.
-        attributed_item
-    }
+    // if let Ok(closure_w_opt_comma) = 
+    //     syn::parse::<ExprClosureWOptComma>(attributed_item.clone()) 
+    // {
+    //     let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
+    //     result
+    // } else {
+    //     // TODO: Compiler error instead of forwarding.
+    //     attributed_item
+    // }
+
     // } else {
     //     // Handling closure differently because of an optional trailing comma, 
     //     // when closure is the last argument of a function.
@@ -173,21 +178,20 @@ fn quote_as_module(module_block: ItemMod, attr_args: &AttrArgs) -> TokenStream {
     output.into()
 }
 
-fn quote_as_impl(impl_block: ItemImpl, _attr_args: &AttrArgs) -> TokenStream {
+#[rustfmt::skip]
+fn quote_as_impl(impl_block: ItemImpl, attr_args: &AttrArgs) -> TokenStream {
     let ItemImpl {
-        attrs,
-        defaultness,
-        unsafety,
-        impl_token,
-        generics,
-        trait_,
-        self_ty,
-        items,
+        attrs,  // [ #[my_attr] #[another_attr] ]
+        defaultness, // [ default ]
+        unsafety, // [ unsafe ]
+        impl_token, // impl
+        generics, // <T, U>
+        trait_, // [ [!] MyPath::MyTrait for ]
+        self_ty, // MyStruct
+                            // { // brace_token,
+        items, // type MyType = u8; fn my_fn() {} fn my_fn2() {}
         .. // brace_token,
     } = impl_block;
-    let loggable_attr: Attribute = parse_quote! {
-        #[fcl_proc_macros::loggable(prefix=#self_ty)]
-    };
 
     let mut output = quote! {
         #(#attrs)*
@@ -206,20 +210,38 @@ fn quote_as_impl(impl_block: ItemImpl, _attr_args: &AttrArgs) -> TokenStream {
     output = quote!{
         #output
         #self_ty
-        // #brace_token
-        {
-            #(#loggable_attr #items)*
-            // #(#items)*
-        }
     };
+    if ! items.is_empty() {
+        let mut prefix = quote! { #self_ty };
+        if let AttrArgs::Prefix { path, .. } = attr_args {
+            prefix = quote!{ #path::#prefix };
+        }
+        let loggable_attr: Attribute = parse_quote! {
+            #[fcl_proc_macros::loggable(prefix=#prefix)]
+        };
 
+        let mut content = quote! {};
+        for item in &items {
+            match item {
+                ImplItem::Fn(_) => content = quote! { #content #loggable_attr #item },
+                _               => content = quote! { #content                #item },
+            }
+        }
+        output = quote! {
+            #output {
+                #content
+            }
+        }
+    }
     output.into()
 }
 
 fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -> TokenStream {
+    // TODO: Use structured bindings.
     let attrs = func.attrs;
     let vis = func.vis;
     let signature = func.sig;
+    // TODO: Handle name and prefix in the same manner for all.
     let func_name = match attr_args {
         AttrArgs::Name { path, .. } => quote!{ #path },
         AttrArgs::Prefix { path, .. } => {
@@ -265,11 +287,10 @@ fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
                 if logger.borrow_mut().logging_is_on() {
                     _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-                    // _logger = Some(FunctionLogger::new(#func_name))
                 }
             }); 
-
-            // function_logger!(#func_name #generics); // The `FunctionLogger` instance.
+            // TODO: Handle body recursively to pass `#[loggable]` to local functions and closures.
+            // Same for ImplItemFn (associated function).
             #body
         }
         // $( #[$meta] )*

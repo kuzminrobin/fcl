@@ -1,4 +1,7 @@
 # TODO:
+* Recursive prefix and recursive `#[loggable]` in functions. 
+  * Handle function body recursively to pass `#[loggable]` to local functions and closures.
+  * Same for `ImplItemFn` (associated function).
 * Good compiler error reporting in case of proc_macro error.  
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
