@@ -237,19 +237,22 @@ fn quote_as_impl(impl_block: ItemImpl, attr_args: &AttrArgs) -> TokenStream {
 }
 
 fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -> TokenStream {
-    // TODO: Use structured bindings.
-    let attrs = func.attrs;
-    let vis = func.vis;
-    let signature = func.sig;
+    let ItemFn {
+        attrs,
+        vis,
+        sig,
+        block
+    } = func;
+
     // TODO: Handle name and prefix in the same manner for all.
     let func_name = match attr_args {
         AttrArgs::Name { path, .. } => quote!{ #path },
         AttrArgs::Prefix { path, .. } => {
-            let id = signature.ident.clone();
+            let id = sig.ident.clone();
             quote!{ #path::#id }
         }
         AttrArgs::None => {
-            let id = signature.ident.clone();
+            let id = sig.ident.clone();
             quote!{ #id }
         }
     };
@@ -263,17 +266,16 @@ fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -
     //     let id = signature.ident.clone();
     //     quote! { #id }
     // };
-    let generics = signature.generics.clone();
+    let generics = sig.generics.clone();
     let generics_params_iter = generics.type_params();
-    let empty_generic_params = generics.params.is_empty();
+    let generic_params_is_empty = generics.params.is_empty();
 
-    let body = func.block;
     let output = quote! {
         #(#attrs)*
-        #vis #signature {
+        #vis #sig {
             let mut generic_func_name = String::with_capacity(64);
             generic_func_name.push_str(stringify!(#func_name));
-            if !#empty_generic_params {
+            if !#generic_params_is_empty {
                 generic_func_name.push_str("<");
                 let param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
                 for type_iter in param_vec {
@@ -291,7 +293,7 @@ fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -
             }); 
             // TODO: Handle body recursively to pass `#[loggable]` to local functions and closures.
             // Same for ImplItemFn (associated function).
-            #body
+            #block
         }
         // $( #[$meta] )*
         // $vis fn $name ( $( $arg_name : $arg_ty ),* ) $( -> $ret_ty )? {

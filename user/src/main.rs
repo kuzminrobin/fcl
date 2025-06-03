@@ -1,7 +1,3 @@
-// use fcl_proc_macros::{function_logger, loggable};
-// #[loggable]
-// fn f() {}
-
 #![feature(c_variadic)]
 #![feature(stmt_expr_attributes)] // Loggable closures.
 #![feature(proc_macro_hygiene)] // Loggable closures.
@@ -10,7 +6,7 @@ use std::thread;
 use std::time::Duration;
 
 use fcl::call_log_infra::THREAD_LOGGER;
-use fcl::{ClosureLogger, FunctionLogger, closure_logger};
+use fcl::{ClosureLogger, closure_logger};
 use fcl_proc_macros::loggable;
 
 #[loggable]
