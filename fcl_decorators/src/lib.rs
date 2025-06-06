@@ -1,13 +1,14 @@
 use std::io::{Write, stdout};
 
-use code_commons::{CalleeName, CoderunNotifiable, RepeatCountCategory};
+use code_commons::{CoderunNotifiable, RepeatCountCategory};
+// use code_commons::{CalleeName, CoderunNotifiable, RepeatCountCategory};
 use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 
-macro_rules! CLOSURE_NAME_FORMAT {
-    () => {
-        "closure{{{},{}:{},{}}}"
-    }; // E.g. "closure{112,9:116,34}"
-}
+// macro_rules! CLOSURE_NAME_FORMAT {
+//     () => {
+//         "closure{{{},{}:{},{}}}"
+//     }; // E.g. "closure{112,9:116,34}"
+// }
 
 struct CommonDecorator {
     writer: Box<dyn Write>,
@@ -20,15 +21,15 @@ impl CommonDecorator {
             thread_indent: &"",
         }
     }
-    fn get_callee_name_string(name: &CalleeName) -> String {
-        match name {
-            CalleeName::Function(name) => name.clone(),
-            CalleeName::Closure(info) => String::from(format!(
-                CLOSURE_NAME_FORMAT!(),
-                info.start_line, info.start_column, info.end_line, info.end_column
-            )),
-        }
-    }
+    // fn get_callee_name_string(name: &CalleeName) -> String {
+    //     match name {
+    //         CalleeName::Function(name) => name.clone(),
+    //         CalleeName::Closure(info) => String::from(format!(
+    //             CLOSURE_NAME_FORMAT!(),
+    //             info.start_line, info.start_column, info.end_line, info.end_column
+    //         )),
+    //     }
+    // }
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
         self.thread_indent = thread_indent;
     }
@@ -79,7 +80,8 @@ impl CoderunNotifiable for CodeLikeDecorator {
             self.line_end_pending = false;
         }
     }
-    fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
+    fn notify_call(&mut self, call_depth: usize, name: &str) {
+    // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
         }
@@ -88,11 +90,13 @@ impl CoderunNotifiable for CodeLikeDecorator {
             "{}{}{}() {{",
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
-            CommonDecorator::get_callee_name_string(name)
+            name
+            // CommonDecorator::get_callee_name_string(name)
         ); // E.g. "<thread_indent><indent>sibling() {"
         self.line_end_pending = true; // '\n' pending. Won't be printed if there will be no nested calls (immediate "}\n").
     }
-    fn notify_return(&mut self, call_depth: usize, name: &CalleeName, has_nested_calls: bool) {
+    fn notify_return(&mut self, call_depth: usize, name: &str, has_nested_calls: bool) {
+    // fn notify_return(&mut self, call_depth: usize, name: &CalleeName, has_nested_calls: bool) {
         if !has_nested_calls && self.line_end_pending {
             decorator_write!(self, "}}\n"); // "}\n"
         } else {
@@ -101,7 +105,8 @@ impl CoderunNotifiable for CodeLikeDecorator {
                 "{}{}}} // {}().\n", // E.g. "<thread_indent><indent>} // sibling().\n".
                 self.common.get_thread_indent(),
                 self.get_indent_string(call_depth),
-                CommonDecorator::get_callee_name_string(name)
+                name
+                // CommonDecorator::get_callee_name_string(name)
             );
         }
         self.line_end_pending = false;
@@ -109,7 +114,8 @@ impl CoderunNotifiable for CodeLikeDecorator {
     fn notify_repeat_count(
         &mut self,
         call_depth: usize,
-        name: &CalleeName,
+        name: &str,
+        // name: &CalleeName,
         count: RepeatCountCategory,
     ) {
         decorator_write!(
@@ -117,7 +123,8 @@ impl CoderunNotifiable for CodeLikeDecorator {
             "{}{}// {}() repeats {} time(s).\n", // E.g. "<thread_indent><indent>// sibling() repeats 8 time(s).\n"
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
-            CommonDecorator::get_callee_name_string(name),
+            name,
+            // CommonDecorator::get_callee_name_string(name),
             count.to_string()
         );
     }
@@ -180,14 +187,16 @@ impl CoderunDecorator for TreeLikeDecorator {
 }
 
 impl CoderunNotifiable for TreeLikeDecorator {
-    fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
+    fn notify_call(&mut self, call_depth: usize, name: &str) {
+    // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         decorator_write!(
             self,
             "{}{}{}{}\n",
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
             self.indent_step_call,
-            CommonDecorator::get_callee_name_string(name)
+            name
+            // CommonDecorator::get_callee_name_string(name)
         ); // E.g."<thread_indent><indent>+-sibling", "| | | | +-sibling"
     }
 
@@ -196,7 +205,8 @@ impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_repeat_count(
         &mut self,
         call_depth: usize,
-        name: &CalleeName,
+        name: &str,
+        // name: &CalleeName,
         count: RepeatCountCategory,
     ) {
         decorator_write!(
@@ -205,7 +215,8 @@ impl CoderunNotifiable for TreeLikeDecorator {
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
             self.indent_step_noncall,
-            CommonDecorator::get_callee_name_string(name),
+            name,
+            // CommonDecorator::get_callee_name_string(name),
             count.to_string()
         );
     }

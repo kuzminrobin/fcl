@@ -1,4 +1,5 @@
-use code_commons::{CallGraph, CalleeName, CoderunNotifiable};
+use code_commons::{CallGraph, CoderunNotifiable};
+// use code_commons::{CallGraph, CalleeName, CoderunNotifiable};
 use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use std::{
     cell::RefCell,
@@ -50,7 +51,8 @@ impl CallLogger for CallLogInfra {
             .set_thread_indent(thread_indent);
     }
 
-    fn log_call(&mut self, name: &CalleeName) {
+    fn log_call(&mut self, name: &str) {
+    // fn log_call(&mut self, name: &CalleeName) {
         self.call_graph.add_call(name);
     }
     fn log_ret(&mut self) {
@@ -143,7 +145,8 @@ impl CallLogger for CallLoggerArbiter {
             .set_thread_indent(thread_indent)
     }
 
-    fn log_call(&mut self, name: &CalleeName) {
+    fn log_call(&mut self, name: &str) {
+    // fn log_call(&mut self, name: &CalleeName) {
         self.flush_earlier_thread_output();
 
         let current_thread_id = thread::current().id();
@@ -198,7 +201,8 @@ impl CallLogger for CallLoggerAdapter {
         self.get_arbiter().set_thread_indent(thread_indent)
     }
 
-    fn log_call(&mut self, name: &CalleeName) {
+    fn log_call(&mut self, name: &str) {
+    // fn log_call(&mut self, name: &CalleeName) {
         self.get_arbiter().log_call(name)
     }
     fn log_ret(&mut self) {

@@ -4,19 +4,19 @@
 mod call_graph;
 pub use call_graph::CallGraph;
 
-#[derive(PartialEq, Clone)]
-pub struct ClosureInfo {
-    pub start_line: usize,
-    pub start_column: usize,
-    pub end_line: usize,
-    pub end_column: usize,
-}
+// #[derive(PartialEq, Clone)]
+// pub struct ClosureInfo {
+//     pub start_line: usize,
+//     pub start_column: usize,
+//     pub end_line: usize,
+//     pub end_column: usize,
+// }
 
-#[derive(PartialEq, Clone)]
-pub enum CalleeName {
-    Function(String),
-    Closure(ClosureInfo),
-}
+// #[derive(PartialEq, Clone)]
+// pub enum CalleeName {
+//     Function(String),
+//     Closure(ClosureInfo),
+// }
 
 /// Function call repeat count data type.
 type RepeatCountType = usize;
@@ -44,14 +44,17 @@ impl RepeatCountCategory {
 /// (such as function or closure calls, returns, etc.).
 pub trait CoderunNotifiable {
     /// Non-cached call happened.
-    fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
+    fn notify_call(&mut self, _call_depth: usize, _name: &str) {}
+    // fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
     /// Non-cached return happened.
-    fn notify_return(&mut self, _call_depth: usize, _name: &CalleeName, _has_nested_calls: bool) {}
+    fn notify_return(&mut self, _call_depth: usize, _name: &str, _has_nested_calls: bool) {}
+    // fn notify_return(&mut self, _call_depth: usize, _name: &CalleeName, _has_nested_calls: bool) {}
     /// Repeat count has stopped being cached.
     fn notify_repeat_count(
         &mut self,
         _call_depth: usize,
-        _name: &CalleeName,
+        _name: &str,
+        // _name: &CalleeName,
         _count: RepeatCountCategory,
     ) {
     }

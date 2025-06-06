@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{CalleeName, CoderunNotifiable, RepeatCount};    
+use crate::{CoderunNotifiable, RepeatCount};    
+//use crate::{CalleeName, CoderunNotifiable, RepeatCount};    
 // TODO: Stop dependency on fcl (extract CalleeName, CoderunNotifiable to non-fcl-related file/package)
 // Option: Move {CalleeName, CoderunNotifiable, RepeatCount} and CallGraph to Code[run]Commons crate
 // (to be reused for (dynamic handling) code profiling, code coverage, (static handling) translation from language to language).
@@ -8,15 +9,18 @@ use crate::{CalleeName, CoderunNotifiable, RepeatCount};
 type Link = Rc<RefCell<CallNode>>;
 
 struct CallNode {
-    name: CalleeName,
+    name: String,
+    // name: CalleeName,
     children: Vec<Link>,
     repeat_count: RepeatCount,
     has_returned: bool
 }
 impl CallNode {
-    pub fn new(name: &CalleeName) -> Self {
+    pub fn new(name: &str) -> Self {
+    // pub fn new(name: &CalleeName) -> Self {
         Self {
-            name: name.clone(),
+            name: name.to_string(),
+            // name: name.clone(),
             children: Vec::new(),
             repeat_count: RepeatCount::new(),
             has_returned: false
@@ -69,7 +73,8 @@ impl CallGraph {
     
     pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
         let pseudo_node = 
-            Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(String::new()))));
+            Rc::new(RefCell::new(CallNode::new(&"")));
+            // Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(String::new()))));
         Self {
             current_node: pseudo_node.clone(),
             call_stack: vec![pseudo_node],
@@ -125,9 +130,11 @@ impl CallGraph {
     //     [previous_sibling() {}
     //      [// Repeats 99 time(s).]]
     //     current_sibling() {    // The call being handled.
-    pub fn add_call(&mut self, name: &CalleeName) {
+    pub fn add_call(&mut self, name: &str) {
+    // pub fn add_call(&mut self, name: &CalleeName) {
         // Create the current_sibling node:
-        let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(&name)));
+        let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(name)));
+        // let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(&name)));
 
         // Try to detect the caching start:
         if !self.caching_is_active() {
@@ -137,7 +144,8 @@ impl CallGraph {
             if let Some(previous_sibling) = children.last() {
                 // If current_sibling.name == previous_sibling.name:
                 let previous_sibling_name = previous_sibling.borrow().name.clone(); // NOTE: Using `&` instead of `.clone()` conflicts with the subsequent `previous_sibling.borrow_mut()`.
-                if previous_sibling_name == *name {
+                if previous_sibling_name == name { // TODO: Double-check. Comparison of String to &str.
+                // if previous_sibling_name == *name {     
                     // Mark that the current_sibling (including its children) starts being cached,
                     // and previous_sibling becomes the caching model (for comapring (upon return) current_sibling with,
                     // and detecting the caching end).

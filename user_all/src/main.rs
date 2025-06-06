@@ -38,7 +38,43 @@ mod root {
         // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
         f();
         g();
+
+        {
+            use crate::*;
+            crate::S.d();  // Expected: S::d()
+            // crate::<S as Tr>.d();  // Expected: S::d()
+            crate::S2.d(); // Expected: Tr::d()
+            crate::S2.e();
+
+            let s = S;
+            let s2 = S2;
+            let a: Vec<&dyn Tr> = vec![ &s, &s2 ];
+            a[0].d();   // Expected: S::d()
+            a[1].d();   // Expected: Tr::d()
+        }
     }
 }
 pub use root::*;
 
+#[fcl_proc_macros::loggable]
+trait Tr {
+    fn d(&self) {} // Tr::d()
+    fn e(&self);
+}
+struct S;
+#[fcl_proc_macros::loggable]
+impl Tr for S {
+    fn d(&self) {   // S::d()
+        // <Self as Tr>::d(self); // NOTE: Causes recursion of S::d() instead of calling Tr::d().
+        // Tr::d(self);    // NOTE: Causes recursion of S::d() instead of calling Tr::d().
+        // self.Tr::d();
+    }  
+    fn e(&self) {}
+}
+struct S2;
+#[fcl_proc_macros::loggable]
+impl Tr for S2 {    // Reuses Tr::d()
+    fn e(&self) {
+        Some(1).map(|val| !val );
+    }
+}

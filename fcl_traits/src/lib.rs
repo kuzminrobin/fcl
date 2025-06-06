@@ -1,4 +1,5 @@
-use code_commons::{CalleeName, CoderunNotifiable};
+use code_commons::{CoderunNotifiable};
+// use code_commons::{CalleeName, CoderunNotifiable};
 /// Trait to be implemented by the instances that handle any thread specifics.
 pub trait ThreadSpecifics {
     /// Sets the thread code run output indentation. E.g. if there are 2 threads, 
@@ -22,7 +23,8 @@ pub trait CallLogger {
 
     fn set_thread_indent(&mut self, thread_indent: &'static str);
 
-    fn log_call(&mut self, name: &CalleeName);
+    fn log_call(&mut self, name: &str);
+    // fn log_call(&mut self, name: &CalleeName);
     fn log_ret(&mut self);
     fn flush(&mut self) {}
 }
