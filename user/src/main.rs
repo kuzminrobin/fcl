@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use fcl::call_log_infra::THREAD_LOGGER;
 // use fcl::{ClosureLogger, closure_logger};
-use fcl_proc_macros::loggable;
+use fcl_proc_macros::{loggable, non_loggable};
 
 #[loggable]
 fn f() {
@@ -39,7 +39,7 @@ pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64
     -1.0
 }
 
-#[loggable]
+// #[loggable]
 fn calls() {
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
@@ -65,6 +65,7 @@ fn calls() {
 
     let _b = Some(true).map(
         #[loggable]
+
         // #[rustfmt::skip]
         move |b| -> bool {
             /*println!("Lambda"); */
@@ -81,12 +82,14 @@ fn calls() {
 
     {
         struct MyStruct;
+        // #[loggable]
         impl MyStruct {
-            #[loggable(name=MyStruct::new)]
+            #[loggable(prefix=)]
+            // #[loggable(prefix=::Ident)]
             fn new() -> Self {
                 Self
             }
-            #[loggable(name=MyStruct::method)]
+            #[loggable(prefix=MyStruct)]
             fn method<T, U>(&self) -> bool {
                 thread::sleep(Duration::from_millis(1));
                 false
@@ -103,7 +106,7 @@ fn calls() {
 
     {
         trait MyTrait {
-            #[loggable(name=MyTrait::trait_method)]
+            #[loggable(prefix=MyTrait)]
             fn trait_method(&self) { // Virtual function.
                 // Default implementation.
             }
@@ -129,7 +132,8 @@ fn calls() {
         }
         struct MyStruct;
         impl MyPureTrait for MyStruct {
-            #[loggable(name=<MyStruct as MyPureTrait>::pure_method)]
+            #[loggable(prefix=MyStruct)]
+            // #[loggable(prefix=::<MyStruct as MyPureTrait>)]
             // #[loggable(MyStruct::as::MyPureTrait::pure_method)]
             // #[loggable((MyStruct as MyPureTrait)::pure_method)]
             // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
@@ -202,21 +206,21 @@ fn thread_func() {
             Some(b)
                 .map(
                     #[loggable]
-                    |v| !v,
+                    |v| !v
                 )
                 .unwrap()
-        },
+        }
     );
     // assert_eq!(Some(false), _b);
 
     {
         struct MyStruct;
         impl MyStruct {
-            #[loggable(name = MyStruct::new)]
+            #[loggable(prefix = MyStruct)]
             fn new() -> Self {
                 Self
             }
-            #[loggable(name = MyStruct::method)]
+            #[loggable(prefix = MyStruct)]
             fn method<T, U>(&self) -> bool {
                 thread::sleep(Duration::from_millis(1));
                 false
@@ -233,14 +237,14 @@ fn thread_func() {
 
     {
         trait MyTrait {
-            #[loggable(name = MyTrait::trait_method)]
+            #[loggable(prefix = MyTrait)]
             fn trait_method(&self) { // Virtual function.
                 // Default implementation.
             }
         }
         struct MyStruct;
         impl MyTrait for MyStruct {
-            #[loggable(name = MyStruct::trait_method)]
+            #[loggable(prefix = MyStruct)]
             fn trait_method(&self) { // Virtual function override.
                 // Override of the default.
             }
@@ -258,8 +262,12 @@ fn thread_func() {
             fn pure_method(&self); // No defualt behavior. Pure virtual function with no def-n.
         }
         struct MyStruct;
+        #[loggable]
         impl MyPureTrait for MyStruct {
-            #[loggable(name = <MyStruct as MyPureTrait>::pure_method)]
+            #[loggable(prefix = <MyStruct as MyPureTrait>)] // OK.
+            // #[loggable(prefix = <MyStruct as MyPureTrait>::MyType)]    // Not OK
+
+            // #[loggable(prefix = <MyStruct as MyPureTrait>::pure_method)]    // Not OK
             // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
             // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
             fn pure_method(&self) {}
@@ -281,7 +289,7 @@ fn thread_func() {
             fn next(&mut self) -> Option<Self::Item> {
                 if self.0 {
                     self.0 = false;
-                    return Some(1)
+                    return Some(1);
                 } else {
                     None
                 }
@@ -310,6 +318,23 @@ fn thread_func() {
             || (),
             true,
         );
+    }
+    {
+        struct ST;
+        #[loggable]
+        impl ST {
+            fn f() {}
+            fn g(&self) {}
+            fn h(&mut self) {}
+            #[non_loggable]
+            fn i(self) {}
+        }
+        let mut st = ST;
+        ST::f();    // ST :: f() {}
+        st.g(); // ST :: g() {}
+        st.h(); // ST :: h() {}
+        st.i(); // - (#[non_loggable])
+        
     }
     // println!("thread_func() ends");
 }

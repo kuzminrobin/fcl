@@ -2,35 +2,75 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse::Parse, spanned::Spanned, *};
 
-// TODO: Likely out-of-date since doesn't handle generics properly.
-// TODO: Consider moving to closure_logger and making it also a decl macro.
-// Creates the `FunctionLogger` instance.
-#[proc_macro]
-pub fn function_logger(name: TokenStream) -> TokenStream {
-    // Assert that the name is exactly one id (probably fully qualified like `MyStruct::method`). TODO: As opposed to what?
-    let ts: proc_macro2::TokenStream = name.into();
-    let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
-    // TODO: Consider
-    // * let func_name: ? = syn::parse(name);
-    // * let func_name = syn::parse_macro_input!(name as String);
-    quote! {
-        let mut _logger = None;
-        fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-            if logger.borrow_mut().logging_is_on() {
-                _logger = Some(FunctionLogger::new(#func_name))
-            }
-        });
-    }
-    .into()
+// // TODO: Likely out-of-date since doesn't handle generics properly.
+// // TODO: Consider moving to closure_logger and making it also a decl macro.
+// // Creates the `FunctionLogger` instance.
+// #[proc_macro]
+// pub fn function_logger(name: TokenStream) -> TokenStream {
+//     // Assert that the name is exactly one id (probably fully qualified like `MyStruct::method`). TODO: As opposed to what?
+//     let ts: proc_macro2::TokenStream = name.into();
+//     let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
+//     // TODO: Consider
+//     // * let func_name: ? = syn::parse(name);
+//     // * let func_name = syn::parse_macro_input!(name as String);
+//     quote! {
+//         let mut _logger = None;
+//         fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+//             if logger.borrow_mut().logging_is_on() {
+//                 _logger = Some(FunctionLogger::new(#func_name))
+//             }
+//         });
+//     }
+//     .into()
+// }
+
+#[proc_macro_attribute]
+pub fn non_loggable(_attr_args: TokenStream, attributed_item: TokenStream) -> TokenStream {
+    attributed_item
 }
 
 #[proc_macro_attribute]
 pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenStream {
     let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
     let mut prefix = quote!{};
-    if let AttrArgs::Prefix { _prefix_token, _eq_token, path } = attr_args {
-        prefix = quote!{ #path };
+    if let AttrArgs::Prefix { /*_prefix_token, _eq_token,*/ qself_or_path, .. } = attr_args {
+        let QSelfOrPath {
+            qself, //: Option<FclQSelf>,
+            path, //: Option<Path>,
+        } = qself_or_path;
+        if let Some(qself) = qself {
+            let FclQSelf {
+                lt_token, //: Lt,
+                ty, //: Box<Type>,
+                as_token, //: Token![as],
+                path, //: Path,
+                gt_token, //: Gt,
+            } = qself;
+            prefix = quote!{ #lt_token #ty #as_token #path #gt_token };
+            // prefix = quote!{ #lt_token #ty #as_clause #gt_token };
+        }
+        if let Some(path) = path {
+            prefix = quote!{ #path };
+        }
+        // prefix = quote!{ #qself #path };
     }
+/*
+enum AttrArgs {
+    // // TODO: Dedup or remove `eq_token` and `path`.
+    // Name{
+    //     _name_token: kw::name,
+    //     _eq_token: Token![=],
+    //     path: ExprPath
+    // },
+    Prefix{
+        _prefix_token: kw::prefix,
+        _eq_token: Token![=],
+        qself_or_path: QSelfOrPath
+        // path: ExprPath
+    },
+    None
+}
+ */    
 /* 
     #[proc_macro_attribute]
     pub fn my_attr(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -61,12 +101,21 @@ pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenSt
         // } else if let Ok(impl_item_fn) = syn::parse::<ImplItemFn>(attributed_item.clone()) {
         //     // Associated function.
         //     quote_as_impl_item_fn(&impl_item_fn, &prefix)
+        } else if let Ok(expr) = syn::parse::<Expr>(attributed_item.clone()) {
+            quote_as_expr(&expr, &prefix)
         } else {
-            let expr_closure = parse_macro_input!(attributed_item as ExprClosure);
-            quote_as_expr_closure(&expr_closure, &prefix)
-            // let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
-            // quote_as_closure(closure_w_opt_comma.closure, &attr_args)
+            let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
+            quote_as_expr_closure(&closure_w_opt_comma.closure, &prefix)
         }
+        // {
+        //     let expr = parse_macro_input!(attributed_item as Expr);
+        //     quote_as_expr(&expr, &prefix)
+        //     // let expr_closure = parse_macro_input!(attributed_item as ExprClosure);
+        //     // quote_as_expr_closure(&expr_closure, &prefix)
+
+        //     // let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
+        //     // quote_as_closure(closure_w_opt_comma.closure, &attr_args)
+        // }
     };
     output.into()
     // if let Ok(module_block) = syn::parse::<ItemMod>(attributed_item.clone()) {
@@ -270,7 +319,13 @@ fn quote_as_expr_array(expr_array: &ExprArray, prefix: &proc_macro2::TokenStream
         elems, //: Punctuated<Expr, Comma>,
         .. // bracket_token
     } = expr_array;
-
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_array }
+        }
+    }
     let elems = {
         let mut traversed_elems = quote!{};
         for elem in elems {
@@ -290,7 +345,13 @@ fn quote_as_expr_assign(expr_assign: &ExprAssign, prefix: &proc_macro2::TokenStr
         eq_token, //: Eq,
         right, //: Box<Expr>,
     } = expr_assign;
-
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_assign }
+        }
+    }
     let left = quote_as_expr(left, prefix);
     let right = quote_as_expr(right, prefix);
     quote!{ #(#attrs)* #left #eq_token #right }
@@ -302,6 +363,13 @@ fn quote_as_expr_async(expr_async: &ExprAsync, prefix: &proc_macro2::TokenStream
         capture, //: Option<Move>,
         block, //: Block,
     } = expr_async;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_async }
+        }
+    }
     let block = quote_as_block(block, prefix);
     quote!{ #(#attrs)* #async_token #capture #block } 
 }
@@ -312,6 +380,13 @@ fn quote_as_expr_await(expr_await: &ExprAwait, prefix: &proc_macro2::TokenStream
         dot_token, //: Dot,
         await_token, //: Await,
     } = expr_await; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_await }
+        }
+    }
     let base = quote_as_expr(base, prefix);
     quote!{ #(#attrs)* #base #dot_token #await_token } 
 }
@@ -322,6 +397,13 @@ fn quote_as_expr_binary(expr_binary: &ExprBinary, prefix: &proc_macro2::TokenStr
         op, //: BinOp,
         right, //: Box<Expr>,
     } = expr_binary; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_binary }
+        }
+    }
     let left = quote_as_expr(left, prefix);
     let right = quote_as_expr(right, prefix);
     quote!{ #(#attrs)* #left #op #right } 
@@ -332,6 +414,13 @@ fn quote_as_expr_block(expr_block: &ExprBlock, prefix: &proc_macro2::TokenStream
         label, //: Option<Label>,
         block, //: Block,
     } = expr_block; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_block }
+        }
+    }
     let block = quote_as_block(block, prefix);
     quote!{ #(#attrs)* #label #block } 
 }
@@ -342,6 +431,13 @@ fn quote_as_expr_break(expr_break: &ExprBreak, prefix: &proc_macro2::TokenStream
         label, //: Option<Lifetime>,
         expr, //: Option<Box<Expr>>,
     } = expr_break; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_break }
+        }
+    }
     let expr = expr.as_ref().map(|expr| quote_as_expr(expr, prefix));
     // let expr = if let Some(expr) = expr {
     //     Some(quote_as_expr(&expr, prefix))
@@ -358,6 +454,13 @@ fn quote_as_expr_call(expr_call: &ExprCall, prefix: &proc_macro2::TokenStream) -
         args, //: Punctuated<Expr, Comma>,
         .. // paren_token
     } = expr_call; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_call }
+        }
+    }
     let func = quote_as_expr(func, prefix);
     let args = {
         let mut traversed_args = quote!{};
@@ -376,6 +479,13 @@ fn quote_as_expr_cast(expr_cast: &ExprCast, prefix: &proc_macro2::TokenStream) -
         as_token, //: As,
         ty, //: Box<Type>,
     } = expr_cast; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_cast }
+        }
+    }
     let expr = quote_as_expr(expr, prefix);
     // let ty = quote_as_type(ty, prefix);
     quote!{ #(#attrs)* #expr #as_token #ty } 
@@ -394,7 +504,13 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
         output, //: ReturnType,
         body, //: Box<Expr>,
     } = expr_closure;
-
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_closure }
+        }
+    }
     // Closure name:
     // let closure_name = // TODO. 
     let (start_line, start_col) = {
@@ -520,6 +636,13 @@ fn quote_as_expr_field(expr_field: &ExprField, prefix: &proc_macro2::TokenStream
         dot_token, //: Dot,
         member, //: Member,
     } = expr_field; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_field }
+        }
+    }
     let base = quote_as_expr(&**base, prefix);
     quote!{ #(#attrs)* #base #dot_token #member } 
 }
@@ -533,6 +656,13 @@ fn quote_as_expr_for_loop(expr_for_loop: &ExprForLoop, prefix: &proc_macro2::Tok
         expr, //: Box<Expr>,
         body, //: Block,
     } = expr_for_loop; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_for_loop }
+        }
+    }
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
     // let pat = quote_as_pat(&**pat, prefix);
@@ -547,6 +677,13 @@ fn quote_as_expr_group(expr_group: &ExprGroup, prefix: &proc_macro2::TokenStream
         expr, //: Box<Expr>,
         .. // group_token
     } = expr_group; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_group }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     // the trait bound `syn::token::Group: quote::ToTokens` is not satisfied
     quote!{ #(#attrs)* #expr } 
@@ -559,6 +696,13 @@ fn quote_as_expr_if(expr_if: &ExprIf, prefix: &proc_macro2::TokenStream) -> proc
         then_branch, //: Block,
         else_branch, //: Option<(Else, Box<Expr>)>,
     } = expr_if; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_if }
+        }
+    }
     let cond = quote_as_expr(&**cond, prefix);
     let then_branch = quote_as_block(then_branch, prefix);
     let else_branch = else_branch.as_ref().map(|(else_token, expr)| {
@@ -575,6 +719,13 @@ fn quote_as_expr_index(expr_index: &ExprIndex, prefix: &proc_macro2::TokenStream
         index, //: Box<Expr>,
         .. // bracket_token
     } = expr_index; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_index }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     let index = quote_as_expr(&**index, prefix);
     quote!{ #(#attrs)* #expr [ #index ] } 
@@ -592,6 +743,13 @@ fn quote_as_expr_let(expr_let: &ExprLet, prefix: &proc_macro2::TokenStream) -> p
         eq_token, //: Eq,
         expr, //: Box<Expr>,
     } = expr_let; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_let }
+        }
+    }
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
     // let pat = quote_as_pat(&**pat, prefix);
@@ -610,6 +768,13 @@ fn quote_as_expr_loop(expr_loop: &ExprLoop, prefix: &proc_macro2::TokenStream) -
         loop_token, //: Loop,
         body, //: Block,
     } = expr_loop; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_loop }
+        }
+    }
     let body = quote_as_block(body, prefix);
     quote!{ #(#attrs)* #label #loop_token #body } 
 }
@@ -634,6 +799,13 @@ fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::To
         body, //: Box<Expr>,
         comma, //: Option<Comma>,
     } = arm;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #arm }
+        }
+    }
     let guard = guard.as_ref().map(|(if_token, expr)| {
         let expr = quote_as_expr(expr, prefix);
         quote!{ #if_token #expr }
@@ -653,6 +825,13 @@ fn quote_as_expr_match(expr_match: &ExprMatch, prefix: &proc_macro2::TokenStream
         arms, //: Vec<Arm>,
         .. // brace_token
     } = expr_match; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_match }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     let mut traveresed_arms = quote!{};
     for arm in arms {
@@ -672,6 +851,13 @@ fn quote_as_expr_method_call(expr_method_call: &ExprMethodCall, prefix: &proc_ma
         args, //: Punctuated<Expr, Comma>,
         .. // paren_token
     } = expr_method_call; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_method_call }
+        }
+    }
     let receiver = quote_as_expr(&**receiver, prefix);
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
@@ -694,6 +880,13 @@ fn quote_as_expr_paren(expr_paren: &ExprParen, prefix: &proc_macro2::TokenStream
         expr, //: Box<Expr>,
         .. // paren_token
     } = expr_paren; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_paren }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     quote!{ #(#attrs)* ( #expr ) } 
 }
@@ -723,6 +916,13 @@ fn quote_as_expr_range(expr_range: &ExprRange, prefix: &proc_macro2::TokenStream
         limits, //: RangeLimits,
         end, //: Option<Box<Expr>>,
     } = expr_range; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_range }
+        }
+    }
     let start = start.as_ref().map(|start| 
         quote_as_expr(&**start, prefix));
     let end = end.as_ref().map(|end|
@@ -737,6 +937,13 @@ fn quote_as_expr_raw_addr(expr_raw_addr: &ExprRawAddr, prefix: &proc_macro2::Tok
         mutability, //: PointerMutability,
         expr, //: Box<Expr>,
     } = expr_raw_addr; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_raw_addr }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     quote!{ #(#attrs)* #and_token #raw #mutability #expr } 
 }
@@ -747,6 +954,13 @@ fn quote_as_expr_reference(expr_reference: &ExprReference, prefix: &proc_macro2:
         mutability, //: Option<Mut>,
         expr, //: Box<Expr>,
     } = expr_reference; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_reference }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     quote!{ #(#attrs)* #and_token #mutability #expr } 
 }
@@ -759,6 +973,13 @@ fn quote_as_expr_repeat(expr_repeat: &ExprRepeat, prefix: &proc_macro2::TokenStr
         len, //: Box<Expr>,
         .. // bracket_token
     } = expr_repeat; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_repeat }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     let len = quote_as_expr(&**len, prefix);
     quote!{ #(#attrs)* [ #expr #semi_token #len ] }
@@ -769,6 +990,13 @@ fn quote_as_expr_return(expr_return: &ExprReturn, prefix: &proc_macro2::TokenStr
         return_token, //: Return,
         expr, //: Option<Box<Expr>>,
     } = expr_return; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_return }
+        }
+    }
     let expr = expr.as_ref().map(|expr|
         quote_as_expr(&**expr, prefix)
     );
@@ -781,6 +1009,13 @@ fn quote_as_field_value(field: &FieldValue, prefix: &proc_macro2::TokenStream) -
         colon_token, //: Option<Colon>,
         expr, //: Expr,
     } = field;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #field }
+        }
+    }
     let expr = quote_as_expr(expr, prefix);
     quote!{ #(#attrs)* #member #colon_token #expr }
 }
@@ -795,6 +1030,13 @@ fn quote_as_expr_struct(expr_struct: &ExprStruct, prefix: &proc_macro2::TokenStr
         rest, //: Option<Box<Expr>>,
         .. // brace_token
     } = expr_struct;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_struct }
+        }
+    }
 
     // quote!{ #qself }: Error: the trait bound `syn::QSelf: quote::ToTokens` is not satisfied
     // NOTE: The interpretation of qself and path combination below is questionable.
@@ -845,6 +1087,13 @@ fn quote_as_expr_try(expr_try: &ExprTry, prefix: &proc_macro2::TokenStream) -> p
         expr, //: Box<Expr>,
         question_token, //: Question,
     } = expr_try; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_try }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     quote!{ #(#attrs)* #expr #question_token } 
 }
@@ -854,6 +1103,13 @@ fn quote_as_expr_try_block(expr_try_block: &ExprTryBlock, prefix: &proc_macro2::
         try_token, //: Try,
         block, //: Block,
     } = expr_try_block;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_try_block }
+        }
+    }
     let block = quote_as_block(block, prefix);
     quote!{ #(#attrs)* #try_token #block } 
 }
@@ -864,6 +1120,13 @@ fn quote_as_expr_tuple(expr_tuple: &ExprTuple, prefix: &proc_macro2::TokenStream
         elems, //: Punctuated<Expr, Comma>,
         .. // paren_token
     } = expr_tuple;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_tuple }
+        }
+    }
     let elems = {
         let mut traversed_elems = quote!{};
         for elem in elems {
@@ -880,6 +1143,13 @@ fn quote_as_expr_unary(expr_unary: &ExprUnary, prefix: &proc_macro2::TokenStream
         op, //: UnOp,
         expr, //: Box<Expr>,
     } = expr_unary; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_unary }
+        }
+    }
     let expr = quote_as_expr(&**expr, prefix);
     quote!{ #(#attrs)* #op #expr } 
 }
@@ -889,6 +1159,13 @@ fn quote_as_expr_unsafe(expr_unsafe: &ExprUnsafe, prefix: &proc_macro2::TokenStr
         unsafe_token, //: Unsafe,
         block, //: Block,
     } = expr_unsafe; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_unsafe }
+        }
+    }
     let block = quote_as_block(block, prefix);
     quote!{ #(#attrs)* #unsafe_token #block }
 }
@@ -900,6 +1177,13 @@ fn quote_as_expr_while(expr_while: &ExprWhile, prefix: &proc_macro2::TokenStream
         cond, //: Box<Expr>,
         body, //: Block,
     } = expr_while;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_while }
+        }
+    }
     let cond = quote_as_expr(&**cond, prefix);
     let body = quote_as_block(body, prefix);
     quote!{ #(#attrs)* #label #while_token #cond #body }
@@ -910,6 +1194,13 @@ fn quote_as_expr_yield(expr_yield: &ExprYield, prefix: &proc_macro2::TokenStream
         yield_token, //: Yield,
         expr, //: Option<Box<Expr>>,
     } = expr_yield; 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #expr_yield }
+        }
+    }
     // TODO: Replace other `match expr` with `expr.as_ref().map()`.
     let expr = expr.as_ref().map(
         |ref_boxed_expr| quote_as_expr(&**ref_boxed_expr, prefix));
@@ -997,6 +1288,13 @@ fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macr
         init, //: Option<LocalInit>,
         semi_token, //: Semi,
     } = local;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #local }
+        }
+    }
 
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
@@ -1130,6 +1428,25 @@ fn quote_as_trait_item_fn(trait_item_fn: &TraitItemFn, prefix: &proc_macro2::Tok
     });
     quote!{ #(#attrs)* #sig #default #semi_token }
 } */
+
+trait IsTraverseStopper {
+    fn is_traverse_stopper(&self) -> bool;
+}
+impl IsTraverseStopper for Attribute {
+    fn is_traverse_stopper(&self) -> bool {
+        let path = match &self.meta {
+            Meta::Path(path) => path,
+            Meta::List(MetaList{ path, .. }) => path,
+            Meta::NameValue(MetaNameValue{ path, .. }) => path,
+        };
+        if let Some(last_path_segment) = path.segments.last() {
+            let last_path_segment_str = last_path_segment.ident.to_string();
+            last_path_segment_str == "loggable" || last_path_segment_str == "non_loggable"
+        } else {
+            return false;
+        }
+    }
+}
 fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let ItemFn {
         attrs, //: Vec<Attribute>,
@@ -1137,6 +1454,15 @@ fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc
         sig, //: Signature,
         block, //: Box<Block>,
     } = item_fn;
+
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #item_fn }
+        }
+    }
+
     let Signature {
         ident, //: Ident,
         generics, //: Generics,
@@ -1265,6 +1591,13 @@ fn quote_as_impl_item_fn(impl_item_fn: &ImplItemFn, prefix: &proc_macro2::TokenS
         sig, //: Signature,
         block, //: Block,
     } = impl_item_fn;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #impl_item_fn }
+        }
+    }
     let Signature {
         ident, //: Ident,
         generics, //: Generics,
@@ -1366,6 +1699,14 @@ fn quote_as_item_impl(item_impl: &ItemImpl, prefix: &proc_macro2::TokenStream) -
         .. // brace_token
     } = item_impl; 
 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #item_impl }
+        }
+    }
+
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
     // let generics = quote_as_generics(generics, prefix);
@@ -1423,6 +1764,14 @@ fn quote_as_item_mod(item_mod: &ItemMod, prefix: &proc_macro2::TokenStream) -> p
         semi, //: Option<Semi>,
     } = item_mod;
 
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #item_mod }
+        }
+    }
+
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, prefix);
@@ -1459,6 +1808,15 @@ fn quote_as_item_static(item_static: &ItemStatic, prefix: &proc_macro2::TokenStr
         expr, //: Box<Expr>,
         semi_token, //: Semi,
     } = item_static; 
+
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #item_static }
+        }
+    }
+
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, prefix);
@@ -1509,6 +1867,13 @@ fn quote_as_trait_item_const(trait_item_const: &TraitItemConst, prefix: &proc_ma
         default, //: Option<(Eq, Expr)>, // NOTE: Can be (re)assigned in trait impl.
         semi_token, //: Semi,
     } = trait_item_const;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #trait_item_const }
+        }
+    }
     let default = default.as_ref().map(|(eq_token, expr)| {
         let expr = quote_as_expr(expr, prefix);
         quote!{ #eq_token #expr }
@@ -1522,6 +1887,13 @@ fn quote_as_trait_item_fn(trait_item_fn: &TraitItemFn, prefix: &proc_macro2::Tok
         default, //: Option<Block>,
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #trait_item_fn }
+        }
+    }
     let default = default.as_ref().map(|block| {
         let Signature {
             ident, //: Ident,
@@ -1599,6 +1971,15 @@ fn quote_as_item_trait(item_trait: &ItemTrait, prefix: &proc_macro2::TokenStream
         items, //: Vec<TraitItem>,
         .. // restriction, brace_token
     } = item_trait;
+
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #item_trait }
+        }
+    }
+
     // // Likely not applicable for instrumenting the run time functions and 
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, prefix);
@@ -2119,26 +2500,90 @@ fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macr
 //     output.into()
 // }
 
-// /// Closure with optional trailing comma 
-// /// (when closure is the last argument of a function):
-// struct ExprClosureWOptComma {
-//     closure: ExprClosure,
-//     _optional_comma: Option<Token![,]>
-// }
-// impl Parse for ExprClosureWOptComma {
-//     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-//         Ok(ExprClosureWOptComma {
-//             closure: input.parse()?,
-//             _optional_comma: input.parse()?
-//         })
-//     }
-// }
+/// Closure with optional trailing comma 
+/// (when closure is the last argument of a function):
+struct ExprClosureWOptComma {
+    closure: ExprClosure,
+    _optional_comma: Option<Token![,]>
+}
+impl Parse for ExprClosureWOptComma {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        Ok(ExprClosureWOptComma {
+            closure: input.parse()?,
+            _optional_comma: input.parse()?
+        })
+    }
+}
 
 mod kw {
     // syn::custom_keyword!(name);
     syn::custom_keyword!(prefix);
 }
 
+// #[derive(quote::to_tokens::ToTokens)]
+struct FclQSelf {   // <T as U::V>
+    lt_token: Token![<],
+    ty: Box<Type>,
+    as_token: Token![as],
+    path: Path,
+    gt_token: Token![>],
+}
+impl Parse for FclQSelf {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        Ok(Self { 
+            lt_token: input.parse()?, 
+            ty: input.parse()?, 
+            as_token: input.parse()?,
+            path: input.parse()?,
+            // as_clause: Some((input.parse()?, input.parse()?)), 
+            gt_token: input.parse()? 
+        })
+    }
+}
+struct QSelfOrPath {
+    qself: Option<FclQSelf>,
+    // qself: Option<QSelf>,
+    path: Option<Path>,
+}
+impl Parse for QSelfOrPath {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        let mut result = Self { qself: None, path: None };
+        if input.is_empty() {
+            Ok(result)
+        } else {
+            let lookahead = input.lookahead1();
+            if lookahead.peek(Token![<]) {
+                result.qself = Some(
+                    FclQSelf {   // <T as U::V>
+                        lt_token: input.parse()?,
+                        ty: input.parse()?,
+                        as_token: input.parse()?,
+                        path: input.parse()?,
+                        gt_token: input.parse()?,
+                    });
+            }
+            if lookahead.peek(Token![::]) || lookahead.peek(Ident) {
+                result.path = Some(input.parse()?);
+                // let mut path: Path = input.parse()?;
+            }
+
+            // // let mut path: Path;
+            // let mut leading_colon = None;
+            // if lookahead.peek(Token![::]) {//|| lookahead.peek(Ident) {
+            //     // path.leading_colon = Some(input.parse()?);
+                
+            //     leading_colon/*: Token![::]*/ = Some(input.parse()?);
+
+            //     let mut path: Path = input.parse()?;
+            //     path.leading_colon = Some(leading_colon);
+            //     result.path = Some(path);
+            // } 
+
+            Ok(result)
+            // Ok(Self { qself: Some(input.parse()?), path: Some(input.parse()?) })
+        }
+    }
+}
 enum AttrArgs {
     // // TODO: Dedup or remove `eq_token` and `path`.
     // Name{
@@ -2149,7 +2594,8 @@ enum AttrArgs {
     Prefix{
         _prefix_token: kw::prefix,
         _eq_token: Token![=],
-        path: ExprPath
+        qself_or_path: QSelfOrPath
+        // path: ExprPath
     },
     None
 }
@@ -2171,7 +2617,7 @@ impl Parse for AttrArgs {
             Ok(AttrArgs::Prefix {
                 _prefix_token: input.parse::<kw::prefix>()?,
                 _eq_token: input.parse()?,
-                path: input.parse()?,
+                qself_or_path: input.parse()?,
             })
         } else {
             Err(lookahead.error())

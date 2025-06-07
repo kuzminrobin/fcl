@@ -1,8 +1,5 @@
 # TODO:
-* Recursive prefix and recursive `#[loggable]` in functions. 
-  * Handle function body recursively to pass `#[loggable]` to local functions and closures.
-  * Same for `ImplItemFn` (associated function).
-* Good compiler error reporting in case of proc_macro error.  
+* `#[non_loggable]`
 * (User practice?) Enable logging globally for everything.  
   Gloobal `#![loggable]`. Log all. Also:  
   `#[loggable] impl ..`
@@ -44,6 +41,7 @@
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
+* `closure { 205usize, 14usize : 212usize, 9usize }() {`
 * Reader practice:
   ```rs
   #[loggable]
@@ -796,3 +794,9 @@ fn f(x: i32, y: i32, flag: bool) -> usize {
   * [Thread log color]
   * Probably single-threaded (faster) and multi-threaded fcl.
 
+Unsorted  
+* Recursive prefix and recursive `#[loggable]` in functions. 
+  * Handle function body recursively to pass `#[loggable]` to local functions and closures.
+  * Same for `ImplItemFn` (associated function).
+* Good compiler error reporting in case of proc_macro error.  
+* Nested `#[loggable]`
