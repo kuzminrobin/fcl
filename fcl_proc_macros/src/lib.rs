@@ -1,6 +1,7 @@
-use proc_macro::TokenStream;
+// use proc_macro::TokenStream;
+// use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, spanned::Spanned, *};
+use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, *};
 
 // // TODO: Likely out-of-date since doesn't handle generics properly.
 // // TODO: Consider moving to closure_logger and making it also a decl macro.
@@ -25,12 +26,12 @@ use syn::{parse::Parse, spanned::Spanned, *};
 // }
 
 #[proc_macro_attribute]
-pub fn non_loggable(_attr_args: TokenStream, attributed_item: TokenStream) -> TokenStream {
+pub fn non_loggable(_attr_args: proc_macro::TokenStream, attributed_item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     attributed_item
 }
 
 #[proc_macro_attribute]
-pub fn loggable(attr_args: TokenStream, attributed_item: TokenStream) -> TokenStream {
+pub fn loggable(attr_args: proc_macro::TokenStream, attributed_item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
     let mut prefix = quote!{};
     if let AttrArgs::Prefix { /*_prefix_token, _eq_token,*/ qself_or_path, .. } = attr_args {
@@ -511,6 +512,19 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
             return quote!{ #expr_closure }
         }
     }
+    let input_vals = {
+        let mut param_format_str = String::new();
+        let mut param_list = quote!{};
+        for input_pat in inputs {
+            update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
+        }
+        if param_format_str.is_empty() {
+            quote!{ None }
+        } else {
+            quote!{ Some(format!(#param_format_str, #param_list)) }
+        }
+    };
+
     // Closure name:
     // let closure_name = // TODO. 
     let (start_line, start_col) = {
@@ -544,12 +558,13 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
         #lifetimes #constness #movability #asyncness #capture 
         #or1_token #inputs #or2_token #output 
         {
+            let param_val_str = #input_vals;
             let mut _logger = None;
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
                 if logger.borrow_mut().logging_is_on() {
                     _logger = Some(fcl::FunctionLogger::new(
                     // _logger = Some(fcl::ClosureLogger::new( // TODO: &str. TODO: Consider merging ClosureLogger and FunctionLogger.
-                        #log_closure_name_str))//$start_line, $start_col, $end_line, $end_col))
+                        #log_closure_name_str, param_val_str))//$start_line, $start_col, $end_line, $end_col))
                 }
             });
 
@@ -1447,27 +1462,64 @@ impl IsTraverseStopper for Attribute {
         }
     }
 }
-fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    let ItemFn {
-        attrs, //: Vec<Attribute>,
-        vis, //: Visibility,
-        sig, //: Signature,
-        block, //: Box<Block>,
-    } = item_fn;
-
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote!{ #item_fn }
+fn update_param_data_from_pat(input_pat: &Pat, param_format_str: &mut String, param_list: &mut proc_macro2::TokenStream) {
+    match input_pat {
+        // Pat::Const(pat_const) => ?, // TODO: An example is needed of using `const { ... }: MyType` among the params.
+        Pat::Ident(pat_ident) => { // x: f32
+            let ident = &pat_ident.ident; 
+            param_format_str.push_str(&format!("{}: {{}}, ", ident)); // + "x: {}, "
+            // param_format_str = quote!{ #param_format_str #ident: {}, };  // ` x: {}, `
+            *param_list = quote!{ #param_list #ident.maybe_print(), } // + `x.maybe_print(), `
+        },
+        // Pat::Lit(pat_lit) => ?, // TODO: Are literals applicable to params pattern?
+        // Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
+        // Pat::Or(pat_or) => ?, // Example/explanation is needed (or-pattern among the params). `a | b | c : MyType`: what does it mean among the params?
+        // Pat::Paren(pat_paren) => ?, // NOTE: At the moment won't dive recursively into `(<pattern>): MyType`
+        // Pat::Path(pat_path) => ?, // NOTE: Example is needed.
+        // Pat::Range(pat_range) => ?, // NOTE: Example is needed. `a..=b: MyRange`?
+        // Pat::Reference(pat_reference) => ?, // NOTE: At the moment won't dive recursively into `&mut <pattern>: MyType`.
+        // Pat::Rest(pat_rest) => ?, // NOTE: Example is needed. `0, 1, ..` -> `0, 1, a: MyType`?
+        // Pat::Slice(pat_slice) => ? , // NOTE: At the moment won't dive recursively into `[a, b, ref i @ .., y, z]`.
+        // Pat::Struct(pat_struct) => ?, // NOTE: At the moment won't dive recursively into `MyStruct { field_a, filed_b, .. }: MyStruct`.
+        // Pat::Tuple(pat_tuple) => ?, // NOTE: At the moment won't dive recursively into `(<pattern>,*): MyTuple`
+        // Pat::TupleStruct(pat_tuple_struct) => ?, // NOTE: At the moment won't dive recursively into `MyTupleStruct ( <pattern>,* ): MyTupleStruct`.
+        // Pat::Type(pat_type) => ?, // NOTE: Not sure is applicable. `<pattern>: MyType` part of `<pattern>: MyType: MyType`?
+        // Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
+        // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
+        _ => {}, // Ignore.
+    }
+}
+fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
+    let mut param_format_str = String::new(); //quote!{};
+    let mut param_list = quote!{};
+    for fn_param in inputs {
+        match fn_param {
+            FnArg::Receiver(_receiver) => {
+                param_format_str.push_str("self: {}, ");
+                // param_format_str = quote!{ #param_format_str self: {}, }; // TODO: Consider String to control the spaces between the tokens.
+                param_list = quote!{ #param_list self.maybe_print(), };
+            }
+            FnArg::Typed(pat_type) => {
+                update_param_data_from_pat(&*pat_type.pat, &mut param_format_str, &mut param_list);
+            }
         }
     }
-
+    // let param_format_str = param_format_str.to_string();
+    if param_format_str.is_empty() {
+        quote!{ None }
+    } else {
+        quote!{ Some(format!(#param_format_str, #param_list)) }
+    }
+}
+fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let Signature {
         ident, //: Ident,
         generics, //: Generics,
+        inputs, //: Punctuated<FnArg, Comma>,
         ..
     } = sig;
+    let inputs = input_vals(inputs);
+
     let block = {
         let func_log_name = {
             if prefix.is_empty() { 
@@ -1481,11 +1533,10 @@ fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc
         // Instrument the local functions and closures inside of the function body:
         let prefix = quote!{ #func_log_name #generics() };
         // let prefix = quote!{ #func_name #generics };
-
         let block = quote_as_block(block, &prefix);
 
         // The proc_macros (pre-compile) part of the infrastructure for 
-        // generic parameters substitution with actual generic arguments.
+        // generic parameters substitution with actual generic arguments. <T, U> -> <char, u8>
         let generics_params_iter = generics.type_params();
         let generic_params_is_empty = generics.params.is_empty();
 
@@ -1505,16 +1556,91 @@ fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc
                     generic_func_name.push_str(">");
                 }
                 
+                let param_val_str = #inputs;
                 let mut _logger = None;
                 fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
                     if logger.borrow_mut().logging_is_on() {
-                        _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
+                        _logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
                     }
                 }); 
                 #block 
             }
         }
     };
+    block
+}
+fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let ItemFn {
+        attrs, //: Vec<Attribute>,
+        vis, //: Visibility,
+        sig, //: Signature,
+        block, //: Box<Block>,
+    } = item_fn;
+
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote!{ #item_fn }
+        }
+    }
+
+    let block = traversed_block_from_sig(block, sig, prefix);
+    // let Signature {
+    //     ident, //: Ident,
+    //     generics, //: Generics,
+    //     inputs, //: Punctuated<FnArg, Comma>,
+    //     ..
+    // } = sig;
+    // let inputs = input_vals(inputs);
+
+    // let block = {
+    //     let func_log_name = {
+    //         if prefix.is_empty() { 
+    //             quote!{ #ident } 
+    //         } 
+    //         else { 
+    //             quote!{ #prefix::#ident } 
+    //         }
+    //     };
+
+    //     // Instrument the local functions and closures inside of the function body:
+    //     let prefix = quote!{ #func_log_name #generics() };
+    //     // let prefix = quote!{ #func_name #generics };
+    //     let block = quote_as_block(block, &prefix);
+
+    //     // The proc_macros (pre-compile) part of the infrastructure for 
+    //     // generic parameters substitution with actual generic arguments. <T, U> -> <char, u8>
+    //     let generics_params_iter = generics.type_params();
+    //     let generic_params_is_empty = generics.params.is_empty();
+
+    //     quote!{ 
+    //         {
+    //             // The run time part of the infrastructure for 
+    //             // generic parameters substitution with actual generic arguments.
+    //             let mut generic_func_name = String::with_capacity(64);
+    //             generic_func_name.push_str(stringify!(#func_log_name));
+    //             if !#generic_params_is_empty {
+    //                 generic_func_name.push_str("<");
+    //                 let generic_arg_names_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+    //                 for generic_arg_name in generic_arg_names_vec {
+    //                     generic_func_name.push_str(generic_arg_name);
+    //                     generic_func_name.push_str(",");
+    //                 }
+    //                 generic_func_name.push_str(">");
+    //             }
+                
+    //             let param_val_str = #inputs;
+    //             let mut _logger = None;
+    //             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+    //                 if logger.borrow_mut().logging_is_on() {
+    //                     _logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+    //                 }
+    //             }); 
+    //             #block 
+    //         }
+    //     }
+    // };
     quote!{ #(#attrs)* #vis #sig #block }
 
     // // // Likely not applicable for instrumenting the run time functions and 
@@ -1598,56 +1724,61 @@ fn quote_as_impl_item_fn(impl_item_fn: &ImplItemFn, prefix: &proc_macro2::TokenS
             return quote!{ #impl_item_fn }
         }
     }
-    let Signature {
-        ident, //: Ident,
-        generics, //: Generics,
-        ..
-    } = sig;
-    let block = {
-        let func_log_name = {
-            if prefix.is_empty() { 
-                quote!{ #ident }
-            } else {
-                quote!{ #prefix::#ident }
-            }
-        };
+    let block = traversed_block_from_sig(block, sig, prefix);
 
-        // Instrument the local functions and closures inside of the function body:
-        let prefix = quote!{ #func_log_name #generics() };
-        // let prefix = quote!{ #func_name #generics };
-        let block = quote_as_block(block, &prefix);
+    // // TODO: Dedup below.
+    // let Signature {
+    //     ident, //: Ident,
+    //     generics, //: Generics,
+    //     inputs,
+    //     ..
+    // } = sig;
+    // // let inputs = input_vals(inputs);
+    // let block = {
+    //     let func_log_name = {
+    //         if prefix.is_empty() { 
+    //             quote!{ #ident }
+    //         } else {
+    //             quote!{ #prefix::#ident }
+    //         }
+    //     };
 
-        // The proc_macros (pre-compile) part of the infrastructure for 
-        // generic parameters substitution with actual generic arguments.
-        let generics_params_iter = generics.type_params();
-        let generic_params_is_empty = generics.params.is_empty();
+    //     // Instrument the local functions and closures inside of the function body:
+    //     let prefix = quote!{ #func_log_name #generics() };
+    //     // let prefix = quote!{ #func_name #generics };
+    //     let block = quote_as_block(block, &prefix);
 
-        quote!{ 
-            {
-                // The run time part of the infrastructure for 
-                // generic parameters substitution with actual generic arguments.
-                let mut generic_func_name = String::with_capacity(64);
-                generic_func_name.push_str(stringify!(#func_log_name));
-                if !#generic_params_is_empty {
-                    generic_func_name.push_str("<");
-                    let generic_arg_names_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-                    for generic_arg_name in generic_arg_names_vec {
-                        generic_func_name.push_str(generic_arg_name);
-                        generic_func_name.push_str(",");
-                    }
-                    generic_func_name.push_str(">");
-                }
+    //     // The proc_macros (pre-compile) part of the infrastructure for 
+    //     // generic parameters substitution with actual generic arguments.
+    //     let generics_params_iter = generics.type_params();
+    //     let generic_params_is_empty = generics.params.is_empty();
+
+    //     quote!{ 
+    //         {
+    //             // The run time part of the infrastructure for 
+    //             // generic parameters substitution with actual generic arguments.
+    //             let mut generic_func_name = String::with_capacity(64);
+    //             generic_func_name.push_str(stringify!(#func_log_name));
+    //             if !#generic_params_is_empty {
+    //                 generic_func_name.push_str("<");
+    //                 let generic_arg_names_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+    //                 for generic_arg_name in generic_arg_names_vec {
+    //                     generic_func_name.push_str(generic_arg_name);
+    //                     generic_func_name.push_str(",");
+    //                 }
+    //                 generic_func_name.push_str(">");
+    //             }
                 
-                let mut _logger = None;
-                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                    if logger.borrow_mut().logging_is_on() {
-                        _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-                    }
-                }); 
-                #block 
-            }
-        }
-    };
+    //             let mut _logger = None;
+    //             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+    //                 if logger.borrow_mut().logging_is_on() {
+    //                     _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
+    //                 }
+    //             }); 
+    //             #block 
+    //         }
+    //     }
+    // };
     quote!{ #(#attrs)* #vis #defaultness #sig #block }
 
     // let prefix = quote!{ #prefix::#ident #generics() };

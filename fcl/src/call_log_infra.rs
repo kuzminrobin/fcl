@@ -51,9 +51,9 @@ impl CallLogger for CallLogInfra {
             .set_thread_indent(thread_indent);
     }
 
-    fn log_call(&mut self, name: &str) {
+    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
     // fn log_call(&mut self, name: &CalleeName) {
-        self.call_graph.add_call(name);
+        self.call_graph.add_call(name, param_vals);
     }
     fn log_ret(&mut self) {
         self.call_graph.add_ret();
@@ -145,12 +145,12 @@ impl CallLogger for CallLoggerArbiter {
             .set_thread_indent(thread_indent)
     }
 
-    fn log_call(&mut self, name: &str) {
+    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
     // fn log_call(&mut self, name: &CalleeName) {
         self.flush_earlier_thread_output();
 
         let current_thread_id = thread::current().id();
-        self.get_thread_logger(current_thread_id).log_call(name);
+        self.get_thread_logger(current_thread_id).log_call(name, param_vals);
         self.last_output_thread = Some(current_thread_id);
     }
     fn log_ret(&mut self) {
@@ -201,9 +201,9 @@ impl CallLogger for CallLoggerAdapter {
         self.get_arbiter().set_thread_indent(thread_indent)
     }
 
-    fn log_call(&mut self, name: &str) {
+    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
     // fn log_call(&mut self, name: &CalleeName) {
-        self.get_arbiter().log_call(name)
+        self.get_arbiter().log_call(name, param_vals)
     }
     fn log_ret(&mut self) {
         self.get_arbiter().log_ret()

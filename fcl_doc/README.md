@@ -6,6 +6,8 @@ Learning material to practice. I perceive it as a test covering the material tha
 To get a record in my resume since (at the moment of writing) I'm unemployed, I live at the expense of my savings, 
 and soon I will need to apply for jobs (after I study Rust to a level sufficient to pass (or bypass) an interview;-).
 
+# Parsing
+The `syn` developers have done an incredible job.
 
 # Traversing a Module
 # Traversing an `impl` Block
@@ -76,3 +78,8 @@ I also didn't know that a function or a closure can be defined (and/or called) i
 
 In case you agree with the proverb "If you want to study a programming language then write a compiler for it", then this section is a step in that direction.
 
+# Unresolved/Known Issues
+```rs
+MyTrait<T, U>::my_func::<char, u8>() {     // `<T, U>` are not resolved with the actual generic args.
+    MyTrait<T, U>::my_func<T, U>()::closure{1,2:4,5} {}
+```

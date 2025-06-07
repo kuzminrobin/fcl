@@ -23,7 +23,7 @@ pub trait CallLogger {
 
     fn set_thread_indent(&mut self, thread_indent: &'static str);
 
-    fn log_call(&mut self, name: &str);
+    fn log_call(&mut self, name: &str, param_vals: Option<String>);
     // fn log_call(&mut self, name: &CalleeName);
     fn log_ret(&mut self);
     fn flush(&mut self) {}

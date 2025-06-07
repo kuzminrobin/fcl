@@ -44,7 +44,7 @@ impl RepeatCountCategory {
 /// (such as function or closure calls, returns, etc.).
 pub trait CoderunNotifiable {
     /// Non-cached call happened.
-    fn notify_call(&mut self, _call_depth: usize, _name: &str) {}
+    fn notify_call(&mut self, _call_depth: usize, _name: &str, _param_vals: &Option<String>) {}
     // fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
     /// Non-cached return happened.
     fn notify_return(&mut self, _call_depth: usize, _name: &str, _has_nested_calls: bool) {}

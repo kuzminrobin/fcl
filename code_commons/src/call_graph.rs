@@ -10,16 +10,18 @@ type Link = Rc<RefCell<CallNode>>;
 
 struct CallNode {
     name: String,
+    param_vals: Option<String>,
     // name: CalleeName,
     children: Vec<Link>,
     repeat_count: RepeatCount,
     has_returned: bool
 }
 impl CallNode {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, param_vals: Option<String>) -> Self {
     // pub fn new(name: &CalleeName) -> Self {
         Self {
             name: name.to_string(),
+            param_vals,  //: param_vals.map(|slice| slice.to_string()),
             // name: name.clone(),
             children: Vec::new(),
             repeat_count: RepeatCount::new(),
@@ -73,7 +75,7 @@ impl CallGraph {
     
     pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
         let pseudo_node = 
-            Rc::new(RefCell::new(CallNode::new(&"")));
+            Rc::new(RefCell::new(CallNode::new(&"", None)));
             // Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(String::new()))));
         Self {
             current_node: pseudo_node.clone(),
@@ -130,10 +132,10 @@ impl CallGraph {
     //     [previous_sibling() {}
     //      [// Repeats 99 time(s).]]
     //     current_sibling() {    // The call being handled.
-    pub fn add_call(&mut self, name: &str) {
+    pub fn add_call(&mut self, name: &str, param_vals: Option<String>) {
     // pub fn add_call(&mut self, name: &CalleeName) {
         // Create the current_sibling node:
-        let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(name)));
+        let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(name, param_vals)));
         // let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(&name)));
 
         // Try to detect the caching start:
@@ -180,14 +182,15 @@ impl CallGraph {
         self.call_stack.push(rc_current_sibling.clone()); // [..., parent] -> [..., parent, current_sibling]
 
         // Mark that the subsequent calls will be added as children to the current_sibling:
-        self.current_node = rc_current_sibling;
+        self.current_node = rc_current_sibling.clone();
 
         // If not caching, log the call:
         if !self.caching_is_active() {
             self.coderun_notifiable.borrow_mut()
                 .notify_call(
                     self.call_depth() - 1, // `- 1`: // The current_sibling is already on the call stack. The call_depth() reflects the indent for current_sibling's children.
-                    &name);
+                    &name,
+                    &rc_current_sibling.borrow().param_vals);
         } // else (caching) nothing.
     }
 
@@ -342,7 +345,7 @@ impl CallGraph {
         let func_children = &current_node.children;
 
         // The call:
-        self.coderun_notifiable.borrow_mut().notify_call(call_depth, name);
+        self.coderun_notifiable.borrow_mut().notify_call(call_depth, name, &current_node.param_vals);
 
         // Traverse children recursively:
         for child in func_children {

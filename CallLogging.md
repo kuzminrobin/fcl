@@ -1,26 +1,6 @@
 # TODO:
-* `#[non_loggable]`
-* (User practice?) Enable logging globally for everything.  
-  Gloobal `#![loggable]`. Log all. Also:  
-  `#[loggable] impl ..`
-  * Example:  
-    ```rust
-    #[loggable]
-    impl MyStruct {
-        // The `#[loggable]` above adds here `#[loggable(MyStruct::new)]`
-        // unless `#[nonloggable]` is specified.
-        pub fn new() -> Self {
-            Self
-        }
-    }
-    ```
-  * Overall for `impl`.  
-    By defualt none of the associated functions is loggable (log none).  
-    `#[loggable] impl ..`: 100% of associated functions are loggable (log all).  
-    Manual `#[loggable] fn ..`: for <=50% loggable (log some, "white list").  
-    `#[loggable] impl ..`, manual `#[nonloggable] fn`: for >50% loggable (log all except some, "black list").
-* ---
 * Logging the parameters and return values.
+* ---
 * User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Structure-up single-threaded and multithreaded
   * Make separate macros
@@ -41,7 +21,9 @@
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
+* `trait MaybePrint` to fcl
 * `closure { 205usize, 14usize : 212usize, 9usize }() {`
+* Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
 * Reader practice:
   ```rs
   #[loggable]
@@ -800,3 +782,23 @@ Unsorted
   * Same for `ImplItemFn` (associated function).
 * Good compiler error reporting in case of proc_macro error.  
 * Nested `#[loggable]`
+* `#[non_loggable]`
+* (User practice?) Enable logging globally for everything.  
+  Gloobal `#![loggable]`. Log all. Also:  
+  `#[loggable] impl ..`
+  * Example:  
+    ```rust
+    #[loggable]
+    impl MyStruct {
+        // The `#[loggable]` above adds here `#[loggable(MyStruct::new)]`
+        // unless `#[nonloggable]` is specified.
+        pub fn new() -> Self {
+            Self
+        }
+    }
+    ```
+  * Overall for `impl`.  
+    By defualt none of the associated functions is loggable (log none).  
+    `#[loggable] impl ..`: 100% of associated functions are loggable (log all).  
+    Manual `#[loggable] fn ..`: for <=50% loggable (log some, "white list").  
+    `#[loggable] impl ..`, manual `#[nonloggable] fn`: for >50% loggable (log all except some, "black list").

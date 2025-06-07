@@ -1,6 +1,8 @@
 #![feature(c_variadic)]
 #![feature(stmt_expr_attributes)] // Loggable closures.
 #![feature(proc_macro_hygiene)] // Loggable closures.
+#![feature(specialization)]
+// #![feature(min_specialization)]
 
 use std::thread;
 use std::time::Duration;
@@ -9,9 +11,25 @@ use fcl::call_log_infra::THREAD_LOGGER;
 // use fcl::{ClosureLogger, closure_logger};
 use fcl_proc_macros::{loggable, non_loggable};
 
+trait MaybePrint {
+    fn maybe_print(&self) -> String;
+}
+impl<T> MaybePrint for T {
+    default fn maybe_print(&self) -> String {
+        String::from("?")
+    }
+}
+
+impl<T: std::fmt::Display> MaybePrint for T {
+    fn maybe_print(&self) -> String {
+        format!("{}", self)
+    }
+}
+
+
 #[loggable]
 fn f() {
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(1)); 
 }
 
 #[loggable]
@@ -84,8 +102,8 @@ fn calls() {
         struct MyStruct;
         // #[loggable]
         impl MyStruct {
-            #[loggable(prefix=)]
-            // #[loggable(prefix=::Ident)]
+            // #[loggable(prefix=)]
+            #[loggable(prefix=MyStruct)]
             fn new() -> Self {
                 Self
             }
@@ -132,8 +150,8 @@ fn calls() {
         }
         struct MyStruct;
         impl MyPureTrait for MyStruct {
-            #[loggable(prefix=MyStruct)]
-            // #[loggable(prefix=::<MyStruct as MyPureTrait>)]
+            // #[loggable(prefix=MyStruct)]
+            #[loggable(prefix=<MyStruct as MyPureTrait>)]
             // #[loggable(MyStruct::as::MyPureTrait::pure_method)]
             // #[loggable((MyStruct as MyPureTrait)::pure_method)]
             // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
@@ -305,16 +323,60 @@ fn thread_func() {
         // let iter = (&LoggableStruct).iter();
     }
 
+    // {
+    //     trait ToStr<T, M> {
+    //         fn to_string(value: T) -> String;
+    //     }
+    //     struct S;
+    //     struct P;
+    //     impl<T> ToStr<T, P> for S 
+    //     where T: ToString
+    //     {
+    //         fn to_string(value: T) -> String {
+    //             value.to_string()
+    //         }
+    //     }
+    //     struct NP;
+    //     impl<T> ToStr<T, NP> for S 
+    //     // where T: !ToString
+    //     {
+    //         fn to_string(_value: T) -> String {
+    //             String::new()
+    //             // value.to_string()
+    //         }
+    //     }
+    //     let s: String = S::to_string(true);
+    // }
+    // {
+    //     // fn to_string<Marker, T>
+    //     struct S<T> {
+    //         pd: PhantomData<T>
+    //     }
+    //     impl<T> S<T> {
+    //         fn debug_str(_val: &T) -> String {
+    //             String::new()
+    //         }
+    //     }
+    //     impl<T: std::fmt::Debug> S<T> {
+    //         fn debug_str(_val: &T) -> String {
+    //             format!("_val: {:?}, ", _val)
+    //         }
+    //     }
+    // }
+
     {
         #[loggable]
         fn f<F /*: FnOnce()*/>(fun: F, _b: bool)
         where
             F: FnOnce(),
         {
+            // let params = String::new() + &format!("_b: {:?}, ", _b) + &format!("_b: {:?}, ", _b);
+            // println!("{}", params);
+            // println!("fun: {:?}, _b: {:?}", fun.to_string(), _b);
             fun()
         }
+        #[loggable]
         f(
-            #[loggable]
             || (),
             true,
         );
@@ -335,6 +397,28 @@ fn thread_func() {
         st.h(); // ST :: h() {}
         st.i(); // - (#[non_loggable])
         
+    }
+    {
+        #[loggable]
+        fn f_with_f<F /*: FnOnce()*/>(fun: F, _b: bool)
+        where
+            F: FnOnce(),
+        {
+            // let param_format_str = format!("fun: {}, _b: {}, ", fun.maybe_print(), _b.maybe_print());
+            // let params = "fun: ?, _b: true";
+            // // let params = String::new() + &format!("_b: {:?}, ", _b) + &format!("_b: {:?}, ", _b);
+            // // println!("{}", params);
+            // // println!("fun: {:?}, _b: {:?}", fun.to_string(), _b);
+            // println!("fun: {}", fun.maybe_print());
+            // println!("_b: {}", _b.maybe_print());
+            fun()
+        }
+        f_with_f(
+            #[loggable]
+            || (),
+            true,
+        );
+
     }
     // println!("thread_func() ends");
 }
