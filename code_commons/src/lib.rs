@@ -47,7 +47,14 @@ pub trait CoderunNotifiable {
     fn notify_call(&mut self, _call_depth: usize, _name: &str, _param_vals: &Option<String>) {}
     // fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
     /// Non-cached return happened.
-    fn notify_return(&mut self, _call_depth: usize, _name: &str, _has_nested_calls: bool) {}
+    fn notify_return(
+        &mut self,
+        _call_depth: usize,
+        _name: &str,
+        _has_nested_calls: bool,
+        _output: &Option<String>,
+    ) {
+    }
     // fn notify_return(&mut self, _call_depth: usize, _name: &CalleeName, _has_nested_calls: bool) {}
     /// Repeat count has stopped being cached.
     fn notify_repeat_count(
@@ -58,7 +65,7 @@ pub trait CoderunNotifiable {
         _count: RepeatCountCategory,
     ) {
     }
-    
+
     /// Flush needed (any output cached by this trait implementor needs to be flushed).
     fn notify_flush(&mut self) {}
 }

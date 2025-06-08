@@ -25,6 +25,6 @@ pub trait CallLogger {
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>);
     // fn log_call(&mut self, name: &CalleeName);
-    fn log_ret(&mut self);
+    fn log_ret(&mut self, output: Option<String>);
     fn flush(&mut self) {}
 }

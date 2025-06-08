@@ -1,9 +1,27 @@
+#![feature(specialization)]
+
 pub mod call_log_infra;
 pub mod writer;
 
 use call_log_infra::THREAD_LOGGER;
 // use code_commons::{ClosureInfo};
 // use code_commons::{CalleeName, ClosureInfo};
+
+pub trait MaybePrint {
+    fn maybe_print(&self) -> String;
+}
+impl<T> MaybePrint for T {
+    default fn maybe_print(&self) -> String {
+        String::from("?")
+    }
+}
+
+impl<T: std::fmt::Debug> MaybePrint for T {
+    // impl<T: std::fmt::Display> MaybePrint for T {
+    fn maybe_print(&self) -> String {
+        format!("{:?}", self)
+    }
+}
 
 // #[macro_export]
 // macro_rules! closure_logger {
@@ -17,26 +35,38 @@ use call_log_infra::THREAD_LOGGER;
 //     }
 // }
 
-struct CalleeLogger; // TODO: Merge with FunctionLogger.
-impl Drop for CalleeLogger {
-    fn drop(&mut self) {
-        THREAD_LOGGER.with(|logger| logger.borrow_mut().log_ret());
-    }
-}
+// struct CalleeLogger; // TODO: Merge with FunctionLogger.
+// impl Drop for CalleeLogger {
+//     fn drop(&mut self) {
+//         THREAD_LOGGER.with(|logger|
+//             logger.borrow_mut().log_ret(self.output));
+//     }
+// }
 
 pub struct FunctionLogger {
-    _dropper: CalleeLogger
+    // _dropper: CalleeLogger,
+    output: Option<String>,
 }
 
 impl FunctionLogger {
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         THREAD_LOGGER.with(|logger| {
-            logger
-                .borrow_mut()
-                .log_call(func_name, param_vals)
-                // .log_call(&CalleeName::Function(String::from(func_name)))
+            logger.borrow_mut().log_call(func_name, param_vals)
+            // .log_call(&CalleeName::Function(String::from(func_name)))
         });
-        Self { _dropper: CalleeLogger }
+        Self {
+            // _dropper: CalleeLogger,
+            output: None,
+        }
+    }
+    pub fn set_output(&mut self, output: String) {
+        self.output = Some(output);
+    }
+}
+impl Drop for FunctionLogger {
+    fn drop(&mut self) {
+        THREAD_LOGGER.with(|logger| 
+            logger.borrow_mut().log_ret(self.output.take()));
     }
 }
 

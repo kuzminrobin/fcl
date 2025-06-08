@@ -55,8 +55,8 @@ impl CallLogger for CallLogInfra {
     // fn log_call(&mut self, name: &CalleeName) {
         self.call_graph.add_call(name, param_vals);
     }
-    fn log_ret(&mut self) {
-        self.call_graph.add_ret();
+    fn log_ret(&mut self, output: Option<String>) {
+        self.call_graph.add_ret(output);
     }
 
     // TODO: Consider making this impl conditional, for multithreaded case only.
@@ -153,11 +153,11 @@ impl CallLogger for CallLoggerArbiter {
         self.get_thread_logger(current_thread_id).log_call(name, param_vals);
         self.last_output_thread = Some(current_thread_id);
     }
-    fn log_ret(&mut self) {
+    fn log_ret(&mut self, output: Option<String>) {
         self.flush_earlier_thread_output();
 
         let current_thread_id = thread::current().id();
-        self.get_thread_logger(current_thread_id).log_ret();
+        self.get_thread_logger(current_thread_id).log_ret(output);
         self.last_output_thread = Some(current_thread_id);
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
@@ -205,8 +205,8 @@ impl CallLogger for CallLoggerAdapter {
     // fn log_call(&mut self, name: &CalleeName) {
         self.get_arbiter().log_call(name, param_vals)
     }
-    fn log_ret(&mut self) {
-        self.get_arbiter().log_ret()
+    fn log_ret(&mut self, output: Option<String>) {
+        self.get_arbiter().log_ret(output)
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }

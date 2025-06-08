@@ -1,7 +1,6 @@
 #![feature(c_variadic)]
 #![feature(stmt_expr_attributes)] // Loggable closures.
 #![feature(proc_macro_hygiene)] // Loggable closures.
-#![feature(specialization)]
 // #![feature(min_specialization)]
 
 use std::thread;
@@ -11,20 +10,6 @@ use fcl::call_log_infra::THREAD_LOGGER;
 // use fcl::{ClosureLogger, closure_logger};
 use fcl_proc_macros::{loggable, non_loggable};
 
-trait MaybePrint {
-    fn maybe_print(&self) -> String;
-}
-impl<T> MaybePrint for T {
-    default fn maybe_print(&self) -> String {
-        String::from("?")
-    }
-}
-
-impl<T: std::fmt::Display> MaybePrint for T {
-    fn maybe_print(&self) -> String {
-        format!("{}", self)
-    }
-}
 
 
 #[loggable]
@@ -43,7 +28,7 @@ fn _h() {
     unsafe { _i::<i32, bool>(1, 2.0, true) };
 }
 
-#[loggable]
+#[loggable] 
 // #[somemyattr]
 // #[anotherattr]
 pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64 {
@@ -279,6 +264,7 @@ fn thread_func() {
             // #[loggable]      // Error: expected `|`
             fn pure_method(&self); // No defualt behavior. Pure virtual function with no def-n.
         }
+        #[derive(std::fmt::Debug)] 
         struct MyStruct;
         #[loggable]
         impl MyPureTrait for MyStruct {
@@ -420,6 +406,11 @@ fn thread_func() {
         );
 
     }
+
+    #[loggable]
+    fn fs(_s: String) {}
+    fs(String::from("Abc"));
+
     // println!("thread_func() ends");
 }
 

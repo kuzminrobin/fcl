@@ -81,7 +81,7 @@ impl CoderunNotifiable for CodeLikeDecorator {
         }
     }
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
-    // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
+        // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
         }
@@ -91,21 +91,36 @@ impl CoderunNotifiable for CodeLikeDecorator {
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
             name,
-            param_vals.as_ref().map(|string| string.as_str()).unwrap_or(&""),
+            param_vals
+                .as_ref()
+                .map(|string| string.as_str())
+                .unwrap_or(&""),
             // CommonDecorator::get_callee_name_string(name)
         ); // E.g. "<thread_indent><indent>sibling() {"
         self.line_end_pending = true; // '\n' pending. Won't be printed if there will be no nested calls (immediate "}\n").
     }
-    fn notify_return(&mut self, call_depth: usize, name: &str, has_nested_calls: bool) {
-    // fn notify_return(&mut self, call_depth: usize, name: &CalleeName, has_nested_calls: bool) {
+    fn notify_return(
+        &mut self,
+        call_depth: usize,
+        name: &str,
+        has_nested_calls: bool,
+        output: &Option<String>,
+    ) {
+        // fn notify_return(&mut self, call_depth: usize, name: &CalleeName, has_nested_calls: bool) {
+        let output_str = output
+            .as_ref()
+            .map_or_else(
+                || "".to_string(), // None -> "".
+                |output| format!(" -> {}", output)); // Some() -> "-> Value".
         if !has_nested_calls && self.line_end_pending {
-            decorator_write!(self, "}}\n"); // "}\n"
+            decorator_write!(self, "}}{}\n", output_str); // "}\n"
         } else {
             decorator_write!(
                 self,
-                "{}{}}} // {}().\n", // E.g. "<thread_indent><indent>} // sibling().\n".
+                "{}{}}}{} // {}().\n", // E.g. "<thread_indent><indent>} -> RetVal // sibling().\n".
                 self.common.get_thread_indent(),
                 self.get_indent_string(call_depth),
+                output_str,
                 name
                 // CommonDecorator::get_callee_name_string(name)
             );
@@ -189,7 +204,7 @@ impl CoderunDecorator for TreeLikeDecorator {
 
 impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
-    // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
+        // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         decorator_write!(
             self,
             "{}{}{}{}({})\n",
@@ -197,8 +212,10 @@ impl CoderunNotifiable for TreeLikeDecorator {
             self.get_indent_string(call_depth),
             self.indent_step_call,
             name,
-            param_vals.as_ref().map(|string| string.as_str()).unwrap_or(&"")
-            // CommonDecorator::get_callee_name_string(name)
+            param_vals
+                .as_ref()
+                .map(|string| string.as_str())
+                .unwrap_or(&"") // CommonDecorator::get_callee_name_string(name)
         ); // E.g."<thread_indent><indent>+-sibling", "| | | | +-sibling"
     }
 

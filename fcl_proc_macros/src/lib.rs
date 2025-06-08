@@ -558,6 +558,7 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
         #lifetimes #constness #movability #asyncness #capture 
         #or1_token #inputs #or2_token #output 
         {
+            use fcl::MaybePrint;
             let param_val_str = #input_vals;
             let mut _logger = None;
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
@@ -1516,10 +1517,20 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
         ident, //: Ident,
         generics, //: Generics,
         inputs, //: Punctuated<FnArg, Comma>,
+        output, //: ReturnType,
         ..
     } = sig;
     let inputs = input_vals(inputs);
+    // match output {
+    //     ReturnType::Default,
+    //     ReturnType::Type(r_arrow, ty),
+    // }
 
+    let mut returns_something = false;
+    if let ReturnType::Type(..) = output {
+        returns_something = true;
+    }
+    
     let block = {
         let func_log_name = {
             if prefix.is_empty() { 
@@ -1556,17 +1567,41 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
                     generic_func_name.push_str(">");
                 }
                 
+                use fcl::MaybePrint;
                 let param_val_str = #inputs;
-                let mut _logger = None;
-                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                    if logger.borrow_mut().logging_is_on() {
-                        _logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                let mut _function_logger = None;    // TODO: -> without initial `_`.
+                fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+                    if thread_logger.borrow_mut().logging_is_on() {
+                        _function_logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
                     }
                 }); 
-                #block 
+
+                let _output = #block;
+
+                if #returns_something {
+                    let output_str = format!("{}", _output.maybe_print());
+                    if let Some(function_logger) = _function_logger.as_mut() {
+                        function_logger.set_output(output_str);
+                    }
+                }
+
+                _output
             }
         }
     };
+    // // If returns something then log the output:
+    // if let ReturnType::Type(..) = output {
+    //     block = quote!{
+    //         {
+    //             let _output = #block;
+    //             let output_str = format!("{}", _output.maybe_print());
+    //             if let Some(function_logger) = _function_logger.as_mut() {
+    //                 function_logger.set_output(output_str);
+    //             }
+    //             _output
+    //         }
+    //     } 
+    // }
     block
 }
 fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {

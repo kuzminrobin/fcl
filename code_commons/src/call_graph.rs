@@ -11,22 +11,30 @@ type Link = Rc<RefCell<CallNode>>;
 struct CallNode {
     name: String,
     param_vals: Option<String>,
+    output: Option<String>,
     // name: CalleeName,
     children: Vec<Link>,
     repeat_count: RepeatCount,
     has_returned: bool
 }
 impl CallNode {
-    pub fn new(name: &str, param_vals: Option<String>) -> Self {
+    fn new(name: &str, param_vals: Option<String>) -> Self {
     // pub fn new(name: &CalleeName) -> Self {
         Self {
             name: name.to_string(),
             param_vals,  //: param_vals.map(|slice| slice.to_string()),
+            output: None,
             // name: name.clone(),
             children: Vec::new(),
             repeat_count: RepeatCount::new(),
             has_returned: false
         }
+    }
+    fn set_output(&mut self, output: Option<String>) {
+        self.output = output;
+    }
+    fn get_output(&self) -> &Option<String> {
+        &self.output
     }
 }
 
@@ -202,7 +210,7 @@ impl CallGraph {
     //        [... // Nested calls (children).
     //         [// last_child() repeats 9 time(s). // (Not yet logged) ]]
     //     } // The return being handled.
-    pub fn add_ret(&mut self) {
+    pub fn add_ret(&mut self, output: Option<String>) {
         // If caching is not active {
         //     Log the repeat count, if non-zero, of the last_child, if present.
         //     Log the return of the returning_sibling.
@@ -211,6 +219,7 @@ impl CallGraph {
             let call_depth = self.call_depth();
             // Log the repeat count, if non-zero, of the last_child, if present:
             let returning_sibling = self.call_stack.last().unwrap();
+            returning_sibling.borrow_mut().set_output(output);
             if let Some(last_child) = returning_sibling.borrow().children.last()
                 && !last_child.borrow().repeat_count.non_flushed_is_empty()
             {
@@ -227,7 +236,8 @@ impl CallGraph {
             self.coderun_notifiable.borrow_mut()
                 .notify_return(
                     call_depth - 1, // `- 1`: // The returning_sibling is still on the call stack. The call_depth reflects the children's indent.
-                    &name, has_nested_calls);
+                    &name, has_nested_calls,
+                    self.current_node.borrow().get_output());
 
             self.current_node.borrow_mut().has_returned = true;
 
@@ -357,7 +367,7 @@ impl CallGraph {
             // The return:
             let has_nested_calls = !func_children.is_empty();
             self.coderun_notifiable.borrow_mut()
-                .notify_return(call_depth, name, has_nested_calls);
+                .notify_return(call_depth, name, has_nested_calls, current_node.get_output());
 
             // The repeat count:
             if !current_node.repeat_count.non_flushed_is_empty() {
