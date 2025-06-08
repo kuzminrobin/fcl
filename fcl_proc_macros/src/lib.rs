@@ -553,6 +553,12 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
     let body = {
         quote_as_expr(&**body, prefix)
     };
+
+    // let mut returns_something = false;
+    // if let ReturnType::Type(..) = output {
+    //     returns_something = true;
+    // }
+
     quote! {
         #(#attrs)*
         #lifetimes #constness #movability #asyncness #capture 
@@ -560,11 +566,11 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
         {
             use fcl::MaybePrint;
             let param_val_str = #input_vals;
-            let mut _logger = None;
-            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                if logger.borrow_mut().logging_is_on() {
-                    _logger = Some(fcl::FunctionLogger::new(
-                    // _logger = Some(fcl::ClosureLogger::new( // TODO: &str. TODO: Consider merging ClosureLogger and FunctionLogger.
+            let mut optional_callee_logger = None;
+            fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+                if thread_logger.borrow_mut().logging_is_on() {
+                    optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    // optional_callee_logger = Some(fcl::ClosureLogger::new( // TODO: &str. TODO: Consider merging ClosureLogger and FunctionLogger.
                         #log_closure_name_str, param_val_str))//$start_line, $start_col, $end_line, $end_col))
                 }
             });
@@ -584,7 +590,20 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
             // }
 
             // closure_logger!(#prefix);   //#start_line, #start_col, #end_line, #end_col);
-            #body              
+            let _output = #body; // TODO: Consider logging the ret val unconditionally for closure.
+
+            // Uncondititonally print what closure returns
+            // since if its return type is not specified explicitely
+            // then the return type is determined with the type inference
+            // which is not available at pre-compile (preprocessing) time.
+            let output_str = format!("{}", _output.maybe_print());
+            if let Some(callee_logger) = optional_callee_logger.as_mut() {
+                callee_logger.set_output(output_str);
+            }
+
+            _output
+
+            // #body              
         }
     }
 }
@@ -1569,10 +1588,10 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
                 
                 use fcl::MaybePrint;
                 let param_val_str = #inputs;
-                let mut _function_logger = None;    // TODO: -> without initial `_`.
+                let mut optional_callee_logger = None;    // TODO: -> without initial `_`.
                 fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
                     if thread_logger.borrow_mut().logging_is_on() {
-                        _function_logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                        optional_callee_logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
                     }
                 }); 
 
@@ -1580,8 +1599,8 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
 
                 if #returns_something {
                     let output_str = format!("{}", _output.maybe_print());
-                    if let Some(function_logger) = _function_logger.as_mut() {
-                        function_logger.set_output(output_str);
+                    if let Some(callee_logger) = optional_callee_logger.as_mut() {
+                        callee_logger.set_output(output_str);
                     }
                 }
 
