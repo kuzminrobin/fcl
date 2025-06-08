@@ -1,5 +1,5 @@
 # TODO:
-* Logging the parameters and return values.
+* Logging the return values.
 * ---
 * User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Structure-up single-threaded and multithreaded
@@ -21,7 +21,6 @@
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
 * ---
-* `trait MaybePrint` to fcl
 * `closure { 205usize, 14usize : 212usize, 9usize }() {`
 * Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
 * Reader practice:
