@@ -79,6 +79,7 @@ impl CoderunNotifiable for CodeLikeDecorator {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before an output of another thread.
             self.line_end_pending = false;
         }
+        // let _ = self.common.writer.flush();
     }
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
         // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {

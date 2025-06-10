@@ -147,6 +147,24 @@ fn calls() {
         }
         MyStruct.pure_method();
     }
+    #[loggable]
+    {
+        fn f(i: u8) {
+            g(i);
+        }
+        fn g(i: u8) {
+            if i == 8 {
+                // println!("stdout output");
+                eprintln!("stderr output");
+                // panic!("Panicking volunterely")
+            }
+        }
+
+        for i in 0..10 {
+            f(i);
+        }
+        g(20);
+    }
 }
 
 // #[loggable]
@@ -412,6 +430,26 @@ fn thread_func() {
     fs(String::from("Abc"));
 
     // println!("thread_func() ends");
+
+    #[loggable]
+    {
+        fn f(i: u8) {
+            g(i);
+        }
+        fn g(i: u8) {
+            if i == 8 {
+                // println!("stdout output");
+                eprintln!("T1 stderr output");
+                // panic!("Panicking volunterely")
+            }
+        }
+
+        for i in 0..10 {
+            f(i);
+        }
+        g(20);
+    }
+
 }
 
 fn main() {

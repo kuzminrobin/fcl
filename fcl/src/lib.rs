@@ -1,7 +1,8 @@
 #![feature(specialization)]
 
-pub mod call_log_infra;
-pub mod writer;
+pub mod call_log_infra; // TODO: Really `pub`?
+pub mod writer; // TODO: Really `pub`?
+mod output_sync;
 
 use call_log_infra::THREAD_LOGGER;
 // use code_commons::{ClosureInfo};
@@ -45,7 +46,7 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 
 pub struct FunctionLogger {
     // _dropper: CalleeLogger,
-    output: Option<String>,
+    output: Option<String>, // TODO: -> ret_val_str
 }
 
 impl FunctionLogger {

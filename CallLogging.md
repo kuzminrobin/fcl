@@ -1,16 +1,246 @@
 # TODO:
-* Logging the return values.
+* Output outpaces the cached logging. Ideally intercept the output and flush before,
+  otherwise document that.
+  * [`gag::Hold`](https://docs.rs/gag/latest/gag/): 
+    * Hold the non-fcl `print[ln]!()` output until the next fcl {output or cache update},
+    * drop the `hold` before the fcl {output or cache update},
+    * do the fcl {output or cache update},
+    * get a new `hold`.  
+
+    Disadvantages: 
+    * During FCL caching deos not provide the expected behavior.  
+      The non-fcl ouptut is held without any info about which part of the cahce the non-fcl output relates to.
+      E.g. f() is called 10 times, but only the 8th call does println!(). That println!() ouptut is held, 
+      and then upon flush is dropped either before or after `// f() repeats 9 time(s)`. But must be 
+      `// f() repeats 6 time(s)`
+      `f() {`
+      `println!() output`
+      `} // f()`
+      `// f() repeats 2 time(s)`
+    * drop the hold (and get a new hold) every time of fcl {output or cache update}  
+      instead of flushing the fcl before any non-fcl output. Not good for lots of fcl output and little other output, which is expected to be the case.
+    * See [Limitations](https://crates.io/crates/gag).
+    * Does not work for non-fcl-code panic: the panic report is held
+      ([`stderr` is held](https://docs.rs/gag/latest/gag/struct.Hold.html#method.stdout)),
+      but after the panic 
+      the fcl does not get control and does not drop the held panic report.  
+      Can be easily worked around with `set_panic()`. Upon panic the fcl drops all its holds and flushes its data.
+
+    Advantages:
+    * Stable.
+  * `std::io::set_print()`  
+    Disadvantages:
+    * Unstable
+
+    Advantages:
+    * Does the right thing. In particular flushes the fcl upon non-fcl output
+      which is good for the expected case of lots of fcl output and little other output
+      (the output synchroinization mechanism gets triggered as rarely as the non-fcl output happens).
+
+**Chat-GPT about `std::io::set_print()`:**  
+> _Is it possible for the Rust program to intercept its own output to stdout and/or stderr such that certain Rust subroutine (hook) gets control before some other part of the same Rust program outputs to stdout and/or stderr?_
+
+Yes, in **Rust**, it is **possible** to intercept (or redirect) output to `stdout` and `stderr` so that a **hook or function** can be invoked **before** the actual output happens. This can be done through:
+
+---
+
+## ✅ 1. **Replacing `stdout` / `stderr` with custom writers**
+
+You can use Rust’s I/O traits to **swap out `stdout` / `stderr`** with a custom implementation of `Write` that runs your hook logic.
+
+### Example: Custom `Write` Wrapper
+
+```rust
+use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
+
+struct HookedWriter<W: Write> {
+    inner: W,
+    hook: Arc<dyn Fn(&[u8]) + Send + Sync>,
+}
+
+impl<W: Write> Write for HookedWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (self.hook)(buf); // Call hook first
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+```
+
+Then, you can redirect output using the `set_print` and `set_panic` hooks or through redirection (next section).
+
+---
+
+## ✅ 2. **Global redirection with `set_print` and `set_panic` (stable)**
+
+Rust provides the ability to override the default print and panic behavior globally.
+
+### Redirect `println!` and `print!` output:
+
+```rust
+use std::io::{self, Write};
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+fn main() {
+    INIT.call_once(|| {
+        let hook = |buf: &[u8]| {
+            eprintln!("[HOOKED]: {}", String::from_utf8_lossy(buf));
+        };
+
+        let writer = HookedWriter {
+            inner: io::stdout(),
+            hook: Arc::new(hook),
+        };
+
+        let locked_writer = Arc::new(Mutex::new(writer));
+        let cloned = locked_writer.clone();
+
+        std::io::set_print(Some(Box::new(move |s: &str| {
+            let mut w = cloned.lock().unwrap();
+            w.write_all(s.as_bytes()).unwrap();
+        })));
+    });
+
+    println!("Hello world"); // This goes through the hooked writer
+}
+```
+
+> `std::io::set_print` is **stable since Rust 1.58**.
+
+---
+
+## 🧪 3. **Use crates like `duct`, `assert_cmd`, `test-case`, or capture macros**
+
+For **testing** or **temporary redirection**, you can also use `std::io::set_output_capture` (unstable) or crates like:
+
+* [`duct`](https://crates.io/crates/duct) for process-based I/O
+* [`assert_cmd`](https://crates.io/crates/assert_cmd) to capture and test CLI output
+
+---
+
+## ⚠️ Notes and Limitations
+
+* You **must set the hook before any output happens**, because `stdout()` returns a global handle that is shared across the program.
+* This approach does **not** stop other code from accessing `stdout()` directly unless you globally override `print`/`println` macros.
+* `eprintln!` and `panic!` go to `stderr`, which can be hooked with `std::panic::set_hook`.
+
+---
+
+## 🔄 To hook `stderr` (e.g., from panics):
+
+```rust
+std::panic::set_hook(Box::new(|info| {
+    eprintln!("[PANIC HOOK] {}", info);
+}));
+```
+
+---
+
+## ✅ Summary
+
+| Goal                                      | Possible?   | How                                            |
+| ----------------------------------------- | ----------- | ---------------------------------------------- |
+| Intercept `stdout`/`stderr`               | ✅           | Use custom `Write` types + `set_print`         |
+| Run hook before printing                  | ✅           | Wrap in custom `Write` and invoke in `write()` |
+| Intercept `panic!` messages               | ✅           | Use `std::panic::set_hook`                     |
+| Redirect all output globally              | ✅ (partial) | Requires global override early in main()       |
+| Introspect printing from arbitrary crates | ❌           | Not directly (unless you control their I/O)    |
+
+==============================================================
+> ***Refer me to the documentation of std::io::set_print.***
+
+The function you're looking for is **`std::io::set_print`**, which indeed exists in Rust but is **unstable** and **hidden from the stable API** (you won't find it in the official docs). It's guarded behind the `"set_stdio"` feature and was originally introduced to support test harness capture behavior ([github.com][1]).
+
+---
+
+### 🔍 What the docs say
+
+In the Rust standard library source, it looks like this:
+
+> `pub fn set_print(sink: Box<Write + Send>) -> Option<Box<Write + Send>>`
+
+This function:
+
+* **Replaces the thread-local stdout handle** for `print!`, `println!`, etc.
+* Returns the **previous handle**, allowing you to restore it.
+* Only affects output generated by the print macros (not direct `io::stdout()` usage) ([github.com][1]).
+
+It's marked with:
+
+* `#[unstable(feature = "set_stdio", …)]`
+* `#[doc(hidden)]`
+
+---
+
+### ⚙️ Example usage
+
+Here's how `set_print` might be used internally in `libtest` (the default test harness):
+
+```rust
+use std::io::{Write, set_print};
+
+// Replace stdout for this thread
+let old = std::io::set_print(Some(Box::new(my_custom_writer())));
+// run code that uses println!()
+// ...
+// Restore original stdout
+std::io::set_print(old);
+```
+
+---
+
+### ✅ Summary
+
+* **`std::io::set_print` exists but is unstable and hidden.**
+* It allows **redirecting `println!` output** within the current thread.
+* It doesn't cover **direct `io::stdout()` writes**.
+* It's primarily used by the standard test harness for **capturing test output**.
+
+---
+
+Would you like help with a stable alternative for capturing `stdout` in your own code—perhaps using crates like `gag` or custom `Write` wrappers?
+
+[1]: https://github.com/rust-lang/rust/issues/31343?utm_source=chatgpt.com "Tracking issue for std::io::set_panic and set_print #31343 - GitHub"
+
+---
+
+Let me know if you want a complete working example with both `stdout` and `stderr` interception in a real application.
+
+* Consider loggin the ret val in the TreeLikeDecorator
+* `closure { 205usize, 14usize : 212usize, 9usize }() {`
+* Remove spaces inside of paths/names. Consider making `prefix` a `String`.
+  * `generic_func < T, U >() {}` remove spaces.
+  * `MyStruct :: new() {}` remove spaces.
+* Clean-up:
+  * Remove commented code.
+* Consider moving the thread_local use deeper into the call.
+  Such that a {Call|Closure}Logger is created unconditionally.
+* Finalize the user's use
+  * All the globals and thread_locals to separate macros.
+  * Structure-up single-threaded and multithreaded
+    * Make separate macros
+    * Make separate examples and/or tests.
+
 * ---
-* User practice: HTML-decorator (code-like, tree-like), XML-decorator.
-* Structure-up single-threaded and multithreaded
-  * Make separate macros
-  * Make separate examples and/or tests.
+* Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
+* `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
+  `#[loggable(MyPureTrait::pure_method)]`.  
+  Undesirable. Either work-around or document it.
+* Consider removing all the occurrences of `unwrap()`.
+* Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`
 * Test
   * Testing
     * Log to string and compare.
     * Basics (from user/main.rs).
     * Output 
     * enable/disable.
+    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
   * Test the logging by logging oneself.  
     Or try logging oneself and see how it works.
     Preliminary result: Causes sophisticated circular dependencies.  
@@ -20,9 +250,22 @@
 * Overall clean-up.
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
+* Doc-comments.  
+* Documenting checklist
+  * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
+  * Doc comments
+  * .md
+  * Book 
+  * [toolchain stable or document why inachievable]
+* Video
+  * YT
+* SRUG talk.
+  * Video to YT
+* Rust Conf Talk
+  * Video to YT
 * ---
-* `closure { 205usize, 14usize : 212usize, 9usize }() {`
 * Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
+* User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Reader practice:
   ```rs
   #[loggable]
@@ -30,37 +273,6 @@
   ```
   The [Struct Generics](https://docs.rs/syn/latest/syn/struct.Generics.html) does not support `: FnOnce()` there,
   only in `where` clause.
-* Make `#[loggable]` recursive (same for `prefix`) such as for 
-  ```rs
-  #[loggable(prefix=e)]
-  fn f() {
-    fn g() {} // Local function is defined.
-    g(); // Local function is called.
-
-    let closure = || 5; // Closure is defined
-    closure(); // Closure is called.
-  }
-  ```
-  the effect is the same as of
-  ```rs
-  #[loggable(prefix=e)]
-  fn f() { // e::f()
-    #[loggable(prefix=e::f)] // `prefix` is optional.
-    fn g() {} // Local function is defined. `e::f::g()`
-    g(); // Local function is called. `e::f::g()`
-
-    let closure = 
-      #[loggable(prefix=e::f)] // `prefix` is optional.
-      || 5; // Closure is defined. `e::f::closure{L,C:l,c}()`
-    closure(); // Closure is called. `e::f::closure{L,C:l,c}()`
-  }
-  ```
-
-* Clean-up:
-  * Remove commented code.
-* Finalize the user's use
-  * All the globals and thread_locals to separate macros.
-* Consider removing all the occurrences of `unwrap()`.
 * {Reader Practice: ?} Logging the async funcs.
 * Document the `NOTE: Curious trick`.  
   What's the diff between `Rc::clone(&rc)` and `rc.clone()`? The latter works when casting `Rc<dyn SuperTrait>` to `Rc<dyn Trait>`?  
@@ -75,7 +287,8 @@
   let rcb: Rc<dyn MyTraitB> = sup.clone(); // `Rc::clone(&sup)` fails.
   ```
   * `rc.cone()` -> `Rc::clone(&rc)`. Works not always, see the curious trick. Document it.
-* Optional. User practice, change to:
+* Optional. User practice, change to (loggin the repeat count in the call line):  
+  Pitfalls: Every function has to be cached until flush (such that the repeat count is known while logging the call (as opposed to return)). The top-level func (like main()) will have to be cached until the return, i.e. the whole output will have to be cached. Nothing will be printed until the top-level function returns.
   ```
   | +-g (repeats 29 time(s).)
   | | +-f
@@ -88,26 +301,10 @@
     } // g().
   ```
 * [Graph clearing]
-* Output outpaces the cached logging. Ideally intercept the output and flush before, otherwise document that.
-* `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
-  `#[loggable(MyPureTrait::pure_method)]`.  
-  Undesirable. Either work-around or document it.
-* Consider moving the thread_local use deeper into the call. Such that a {Call|Closure}Logger is created unconditionally.
 * Macro
   * [Decl Macro](https://veykril.github.io/tlborm/decl-macros/building-blocks/parsing.html#function)
   * Attr Proc-Macro.
-* `generic_func < T, U >() {}` remove spaces.
-* `MyStruct :: new() {}` remove spaces.
-* toolchain stable
-* Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`
-* Documenting
-  * .md
-  * Book 
-* Video
-  * YT
-  * SRUG talk.
 * [Peeking](https://docs.rs/syn/latest/syn/parse/struct.ParseBuffer.html#method.peek) ([details](https://docs.rs/syn/latest/syn/token/index.html#other-operations)).
-* [Report Compiler Error in proc macros]
 
 
 # Prerequisites
@@ -801,3 +998,29 @@ Unsorted
     `#[loggable] impl ..`: 100% of associated functions are loggable (log all).  
     Manual `#[loggable] fn ..`: for <=50% loggable (log some, "white list").  
     `#[loggable] impl ..`, manual `#[nonloggable] fn`: for >50% loggable (log all except some, "black list").
+* Logging the params and return values.
+* Make `#[loggable]` recursive (same for `prefix`) such as for 
+  ```rs
+  #[loggable(prefix=e)]
+  fn f() {
+    fn g() {} // Local function is defined.
+    g(); // Local function is called.
+
+    let closure = || 5; // Closure is defined
+    closure(); // Closure is called.
+  }
+  ```
+  the effect is the same as of
+  ```rs
+  #[loggable(prefix=e)]
+  fn f() { // e::f()
+    #[loggable(prefix=e::f)] // `prefix` is optional.
+    fn g() {} // Local function is defined. `e::f::g()`
+    g(); // Local function is called. `e::f::g()`
+
+    let closure = 
+      #[loggable(prefix=e::f)] // `prefix` is optional.
+      || 5; // Closure is defined. `e::f::closure{L,C:l,c}()`
+    closure(); // Closure is called. `e::f::closure{L,C:l,c}()`
+  }
+  ```

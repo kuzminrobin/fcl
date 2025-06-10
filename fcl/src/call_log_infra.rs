@@ -2,14 +2,10 @@ use code_commons::{CallGraph, CoderunNotifiable};
 // use code_commons::{CallGraph, CalleeName, CoderunNotifiable};
 use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-    sync::{Arc, LazyLock, Mutex, MutexGuard},
-    thread,
+    cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::{Arc, LazyLock, Mutex, MutexGuard}, thread
 };
 
-use crate::writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter};
+use crate::{output_sync::Hold, writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter}};
 
 pub struct CallLogInfra {
     logging_is_on: Vec<bool>, // Enabled by default (if empty). // TODO: Test.
@@ -68,14 +64,24 @@ impl CallLogger for CallLogInfra {
 pub struct CallLoggerArbiter {
     thread_loggers: HashMap<thread::ThreadId, Box<dyn CallLogger>>,
     last_output_thread: Option<thread::ThreadId>,
+    stderr_holder: Option<Hold>,
 }
 
 impl CallLoggerArbiter {
     pub fn new() -> Self {
-        Self {
+        return Self {
             thread_loggers: HashMap::new(),
             last_output_thread: None,
+            stderr_holder: None,
         }
+    }
+    pub fn sync_stderr(&mut self) /*-> Result<(), std::io::error::Error>*/ {
+        match Hold::stderr() {
+            Ok(stderr_holder) => self.stderr_holder = Some(stderr_holder),
+            Err(e) => print!("Warning: Failed to sync FCL and stderr output: '{}'", e)
+        }
+        // let stderr_holder = Hold::stderr()?;
+        // self.stderr_holder = Some(stderr_holder);
     }
     pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
         if self
@@ -99,6 +105,9 @@ impl CallLoggerArbiter {
                 "Internal error suspected: Unregistering non-registered thread"
             );
         }
+        if self.thread_loggers.is_empty() { // The main() has terminated,
+            self.stderr_holder = None;  // flush the held stderr and do not hold any more.
+        }
         if self.last_output_thread == Some(current_thread_id) {
             self.last_output_thread = None; // Prevent subsequent flushing of the terminated thread.
         }
@@ -110,11 +119,63 @@ impl CallLoggerArbiter {
             panic!("Internal error: Logging by unregistered thread");
         }
     }
-    fn flush_earlier_thread_output(&mut self) {
-        if let Some(last_output_thread) = self.last_output_thread
+    fn take_pending_stderr(&mut self) -> String {   // TODO: -> read_pending_stderr
+        if let Some(holder) = self.stderr_holder.as_mut() {
+            let mut stderr_output_held = String::new();
+            if let Err(e) = holder.take(&mut stderr_output_held) {
+                println!("Warning: Failed to get pending stderr output: '{}'", e)
+            }
+            // match holder.read(&mut stderr_output_held) {
+            //     Ok(_) => stderr_output_held,
+            //     Err(e) => println!("Warning: Failed to sync FCL and stderr output: '{}'", e)
+            // }
+            stderr_output_held
+        } else {
+            String::new()
+        }
+    }
+    fn flush_earlier_thread_output(&mut self) { // TODO: -> flush_earlier_thread_and_stderr_output
+        // let pending_stderr = self.take_pending_stderr();
+
+        if let Some(last_output_thread) = self.last_output_thread // TODO: last_output_thread -> last_fcl_update_thread
             && thread::current().id() != last_output_thread
+            // && (thread::current().id() != last_output_thread || 
+            //     ! pending_stderr.is_empty())
         {
             self.get_thread_logger(last_output_thread).flush()
+        }
+
+        // if let Some(holder) = self.stderr_holder.as_mut() {
+        //     let result = holder.read_byte();
+        //     match result {
+        //         Ok(None) => {}, // Do nothing 
+        //         Ok(Some(byte)) => {
+        //             self.get_thread_logger(thread::current().id()).flush();
+
+        //             let _ = std::io::stderr().lock().write(&[byte]); // TODO: Handle error.
+        //             // eprintln!("{}", byte)
+        //             self.stderr_holder = None; // Drop (flush the held stderr output to stderr and stop holding).
+        //             self.sync_stderr(); // Start holding again.
+        //         },
+        //         Err(e) => 
+        //             println!("Failed to read a byte from stderr holder: '{}'", e),
+        //     }
+        // }
+
+        let pending_stderr = self.take_pending_stderr();
+        if ! pending_stderr.is_empty() {
+            self.get_thread_logger(thread::current().id()).flush();
+
+            // let mut stderr_lock = std::io::stderr().lock();
+            // if let Err(e) = stderr_lock.write_all(pending_stderr.as_bytes()) {
+            //     println!("Warning: Failed to print pending stderr output: '{}'", e);
+            // }
+            // // } else if let Err(e) = stderr_lock.flush() {
+            // //     println!("Warning: Failed to flush pending stderr output: '{}'", e);
+            // // }
+            self.stderr_holder = None;
+            eprint!("{}", pending_stderr);
+            self.sync_stderr();
         }
     }
 }
@@ -211,12 +272,19 @@ impl CallLogger for CallLoggerAdapter {
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
 
+// Global data shared by all the threads:
 // TODO: Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
 static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> =
     LazyLock::new(|| Arc::new(RefCell::new(ThreadSharedWriter::new(None))));
 static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(CallLoggerArbiter::new())));
+    LazyLock::new(|| Arc::new(Mutex::new({
+        let mut arbiter = CallLoggerArbiter::new();
+        arbiter.sync_stderr();
+        arbiter
+    })));
 
+// Global data per thread. Each thread has its own copy of these data.
+// These data are initialized first upon thread start, and destroyed last upon thread termination.
 thread_local! {
     pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = {
         RefCell::new(Box::new(CallLoggerAdapter::new(
