@@ -1,6 +1,8 @@
 # TODO:
 * Output outpaces the cached logging. Ideally intercept the output and flush before,
   otherwise document that.
+  * +stdout and sync stderr and stdout.
+  * panic
   * [`gag::Hold`](https://docs.rs/gag/latest/gag/): 
     * Hold the non-fcl `print[ln]!()` output until the next fcl {output or cache update},
     * drop the `hold` before the fcl {output or cache update},

@@ -436,10 +436,15 @@ fn thread_func() {
         fn f(i: u8) {
             g(i);
         }
+        #[loggable]
         fn g(i: u8) {
             if i == 8 {
                 // println!("stdout output");
+                print!("hmm");
                 eprintln!("T1 stderr output");
+                println!("hmm...");
+                eprint!("Oh");
+                // std::io::_print(std::format_args!("hmm"));
                 // panic!("Panicking volunterely")
             }
         }
