@@ -120,7 +120,7 @@ impl CallLoggerArbiter {
     fn read_pending_stderr(&mut self) -> String {
         if let Some(holder) = self.stderr_holder.as_mut() {
             let mut stderr_output_held = String::new();
-            if let Err(e) = holder.take(&mut stderr_output_held) {
+            if let Err(e) = holder.read_to_string(&mut stderr_output_held) {
                 println!("Warning: Failed to get pending stderr output: '{}'", e)
             }
             stderr_output_held

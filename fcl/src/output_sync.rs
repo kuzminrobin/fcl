@@ -27,39 +27,9 @@ impl Hold {
         })
     }
 
-    // pub fn read_byte(&mut self) -> std::io::Result<Option<u8>> {
-    //     if let Some(from) = self.buf_redir.as_mut() {
-    //         let mut buf = [0u8];
-    //         let result = from.read(&mut buf);
-    //         match result {
-    //             Ok(len) => 
-    //                 if len == 1 {
-    //                     return Ok(Some(buf[0]))
-    //                 } else {
-    //                     return Ok(None)
-    //                 },
-    //             Err(e) => return Err(e)
-    //         }
-    //     } else {
-    //         debug_assert!(false, "Internal Error: Unexpected lack of redirection");
-    //         Err(Error::from(io::ErrorKind::NotFound))
-    //     }
-    // }
-    pub fn take(&mut self, to_str: &mut String) -> std::io::Result<usize> { // TODO: -> read_to_string
-        // if let Some(from) = self.buf_redir.as_mut() {
-        //     let mut buf = [0u8];
-        //     let result = from.read(&mut buf);
-        //     match result {
-        //         Ok(len) => if len != 0 {
-
-        //         }
-        //     }
-        // }
-
+    pub fn read_to_string(&mut self, to_str: &mut String) -> std::io::Result<usize> {
         if let Some(from) = self.buf_redir.as_mut() {
-        // if let Some(from) = self.buf_redir.take() {
             from.read_to_string(to_str)
-            // from.into_inner().read_to_string(to_str)
         } else {
             debug_assert!(false, "Internal Error: Unexpected lack of redirection");
             Err(Error::from(io::ErrorKind::NotFound))
