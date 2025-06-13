@@ -28,7 +28,7 @@ impl StdOutputRedirector {
         })
     }
     pub fn new_stdout() -> io::Result<Self> {
-        Self::make(StdioDescriptor::Stderr)
+        Self::make(StdioDescriptor::Stdout)
     }
     pub fn new_stderr() -> io::Result<Self> {
         Self::make(StdioDescriptor::Stderr)
@@ -36,7 +36,7 @@ impl StdOutputRedirector {
     pub fn get_original_writer(&mut self) -> &mut dyn Write {
         &mut self.original_std_output_fd
     }
-    pub fn clone_original_writer(&mut self) -> filedescriptor::Result<File> {
+    pub fn clone_original_writer(&self) -> filedescriptor::Result<File> {
         self.original_std_output_fd.as_file()
     }
     // pub fn get_original_writer(&mut self) -> &mut dyn Write {

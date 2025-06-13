@@ -10,7 +10,7 @@ pub enum FclWriter {
     Other(Box<dyn Write>),
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum WriterKind {
     Stdout,
     Stderr,

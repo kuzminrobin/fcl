@@ -440,10 +440,10 @@ fn thread_func() {
         fn g(i: u8) {
             if i == 8 {
                 // println!("stdout output");
-                print!("hmm");
-                eprintln!("T1 stderr output");
-                println!("hmm...");
-                eprint!("Oh");
+                println!("0. stdout: hmm. ");
+                eprintln!("1. stderr: T1 stderr output");
+                println!("2. stdout: hmm...");
+                eprintln!("3. stderr: Oh");
                 // std::io::_print(std::format_args!("hmm"));
                 // panic!("Panicking volunterely")
             }
