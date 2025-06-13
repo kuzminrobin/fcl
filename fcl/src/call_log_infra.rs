@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    output_sync::{StdOutputRedirector},
-    writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter},
+    output_sync::StdOutputRedirector,
+    writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
 };
 
 pub struct CallLogInfra {
@@ -68,29 +68,47 @@ impl CallLogger for CallLogInfra {
 }
 
 pub struct CallLoggerArbiter {
+    thread_shared_writer: ThreadSharedWriterPtr, // = Arc<RefCell<ThreadSharedWriter>>
     thread_loggers: HashMap<thread::ThreadId, Box<dyn CallLogger>>,
     last_fcl_update_thread: Option<thread::ThreadId>,
     stderr_redirector: Option<StdOutputRedirector>,
 }
 
 impl CallLoggerArbiter {
-    pub fn new() -> Self {
+    pub fn new(thread_shared_writer: ThreadSharedWriterPtr) -> Self {
         return Self {
+            thread_shared_writer,
             thread_loggers: HashMap::new(),
             last_fcl_update_thread: None,
             stderr_redirector: None,
         };
     }
-    pub fn sync_stderr(&mut self) /*-> Result<(), std::io::error::Error>*/
+    pub fn set_stderr_sync(&mut self) /*-> Result<(), std::io::error::Error>*/
     {
+        let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
+
         let stderr_redirector_result = StdOutputRedirector::new_stderr();
         self.stderr_redirector = match stderr_redirector_result {
             Err(e) => {
                 eprintln!("Warning: Failed to sync FCL and stderr output: '{}'", e);
                 None
             }
-            Ok(redirector) => Some(redirector),
+            Ok(mut redirector) => {
+                if writer_kind == WriterKind::Stderr { //&& let Some(redirector) = self.stderr_redirector.as_mut() {
+                    match redirector.clone_original_writer() {
+                        Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
+                        Err(e) => 
+                            // Something is wrong with stderr, log the error to stdout:
+                            println!("Warning: Failed to sync FCL and stderr output: '{}'", e)
+                    }
+                    
+                }
+                Some(redirector)
+            },
         };
+        // if writer_kind == WriterKind::Stderr && let Some(redirector) = self.stderr_redirector.as_mut() {
+        //     self.thread_shared_writer.borrow_mut().set_writer(Box::new(redirector.get_original_writer()));
+        // }
     }
     pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
         if self
@@ -130,26 +148,74 @@ impl CallLoggerArbiter {
         }
     }
     fn sync_fcl_and_std_output(&mut self) {
-        if let Some(last_fcl_update_thread) = self.last_fcl_update_thread // TODO: last_output_thread -> last_fcl_update_thread
-            && thread::current().id() != last_fcl_update_thread
-        {
-            self.get_thread_logger(last_fcl_update_thread).flush()
-        }
+        // {Previuous thread}'s activity, if any, ended with
+        // * either FCL updates (cached or flushed), in which case there's no buffered std output,
+        // * or buffered std output.
+        // The cached FCL updates or buffered std output need to be flushed in any order.
 
-        // If there's any buffered std output, flush the thread's own FCL log and the std output:
-        if let Some(redirector) = &mut self.stderr_redirector {
-            let mut buf_content = String::new();
-            let read_result = redirector
-                .get_buffer_reader()
-                .read_to_string(&mut buf_content);
-            if let Ok(_size) = read_result && _size != 0 {
-                self.get_thread_logger(thread::current().id()).flush();
+        // If there was an earlier FCL update
+        if let Some(last_fcl_update_thread) = self.last_fcl_update_thread {
+            // by a different thread 
+            if thread::current().id() != last_fcl_update_thread {
+                // Flush the previous thread's cahced FCL updates, if any:
+                self.get_thread_logger(last_fcl_update_thread).flush();
+
+                // Flush the previous thread's buffered std output, if any:
                 if let Some(redirector) = &mut self.stderr_redirector {
-                    let _write_result = redirector
-                        .get_original_writer()
-                        .write_all(buf_content.as_bytes());
+                    redirector.flush()
                 }
+                // The pregvious thread's activity is fully flushed.
+            } else {
+                // The previous FCL update was done by the current thread.
+                // If that FCL update was the last thing then there is no buffered std output, 
+                //   and no any flush should happen.
+                // Else (the std output was buffered after the last (potentially cached) FCL update) {
+                //   Flush the FCL updates,
+                //   Flush the buffered std output.
+                // }
+
+                // If redirection is active:
+                if let Some(redirector) = &mut self.stderr_redirector {
+                    // If there's any buffered std output, flush the thread's own FCL updates and the std output:
+                    let mut buf_content = String::new();
+                    let read_result = redirector
+                        .get_buffer_reader()
+                        .read_to_string(&mut buf_content);
+                    if let Ok(read_size) = read_result
+                        && read_size != 0
+                    {
+                        self.get_thread_logger(thread::current().id()).flush();
+
+                        // "Redundant" `if` to work around multiple borrowing of `self`:
+                        if let Some(redirector) = &mut self.stderr_redirector {
+                            let _ignore_error = redirector
+                                .get_original_writer()
+                                .write_all(buf_content.as_bytes());
+                            // An error upon redirector flush means that the program (instrumented with this FCL)
+                            // has done something with this (redirected) std output handle 
+                            // (like set another redirection or something). 
+                            // What else (other than ignoring) can we do with the flush error upon every FCL update?
+                            // We don't want to log the error upon every FCL update, do we?
+                        } // "Redundant" `if`.
+                    }
+                    // else (the std output redirection buffer is malfunctioning (Err) 
+                    // or empty (read_size == 0), the latter is the major case)
+                    // Nothing to flush (continue caching the FCL updates).
+                }
+                // Else (redirection is inactive, failed to set redirection (and reported an error) earlier)
+                //   Do nothing (continue caching the FCL updates).
             }
+        } else {
+            // There were no earlier FCL updates since start or enabling 
+            // (the first-most FCL update is about to happen).
+            // If there's any buffered std output by this moment then flush that std output.
+
+            // If redirection is active
+            if let Some(redirector) = &mut self.stderr_redirector {
+                redirector.flush()
+            }
+            // Else (redirection is inactive, failed to set redirection (and reported an error) earlier)
+            //   Do nothing (proceed to the FCL updates).
         }
     }
 }
@@ -248,12 +314,16 @@ impl CallLogger for CallLoggerAdapter {
 
 // Global data shared by all the threads:
 // TODO: Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
-static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> =
-    LazyLock::new(|| Arc::new(RefCell::new(ThreadSharedWriter::new(None))));
+static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
+    Arc::new(RefCell::new(ThreadSharedWriter::new(
+        None
+        // Some(Box::new(std::io::stderr /*stdout*/())), /*None*/
+    )))
+});
 static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> = LazyLock::new(|| {
     Arc::new(Mutex::new({
-        let mut arbiter = CallLoggerArbiter::new();
-        arbiter.sync_stderr();
+        let mut arbiter = unsafe { CallLoggerArbiter::new((*THREAD_SHARED_WRITER).clone()) };
+        arbiter.set_stderr_sync();
         arbiter
     }))
 });

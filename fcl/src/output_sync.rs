@@ -36,8 +36,25 @@ impl StdOutputRedirector {
     pub fn get_original_writer(&mut self) -> &mut dyn Write {
         &mut self.original_std_output_fd
     }
+    pub fn clone_original_writer(&mut self) -> filedescriptor::Result<File> {
+        self.original_std_output_fd.as_file()
+    }
+    // pub fn get_original_writer(&mut self) -> &mut dyn Write {
+    //     &mut self.original_std_output_fd
+    // }
     pub fn get_buffer_reader(&mut self) -> &mut dyn Read {
         &mut self.tmpfile_for_fcl_to_read_from
+    }
+    pub fn flush(&mut self) {
+        let mut buf_content = String::new();
+        let read_result = self.get_buffer_reader().read_to_string(&mut buf_content);
+        if let Ok(size) = read_result
+            && size != 0
+        {
+            let _ignore_error = self // redirector
+                .get_original_writer()
+                .write_all(buf_content.as_bytes());
+        }
     }
 }
 
@@ -47,10 +64,14 @@ impl Drop for StdOutputRedirector {
         let mut buf_content = String::new();
         let read_result = self.get_buffer_reader().read_to_string(&mut buf_content);
         let flush_error = match read_result {
-            Ok(_size) => {
-                let write_result = self.get_original_writer().write_all(buf_content.as_bytes());
-                if let Err(e) = write_result {
-                    Some(e)
+            Ok(size) => {
+                if size != 0 {
+                    let write_result = self.get_original_writer().write_all(buf_content.as_bytes());
+                    if let Err(e) = write_result {
+                        Some(e)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -58,7 +79,7 @@ impl Drop for StdOutputRedirector {
             Err(e) => Some(e),
         };
         // Report any flush error to the other std output stream
-        // (i.e. report stderr flushing error to stdout, and vice versa):
+        // (i.e. report stderr error to stdout, and vice versa):
         if let Some(error) = flush_error {
             let error_report_destination: &mut dyn Write = if self.stdio == StdioDescriptor::Stderr
             {
@@ -66,14 +87,15 @@ impl Drop for StdOutputRedirector {
             } else {
                 &mut std::io::stderr()
             };
-            let _ignore_error = write!(
+            let _ignore_another_error = write!(
                 error_report_destination,
                 "Warning: Failed to flush the buffered std output: '{}'",
                 error
             );
         }
 
-        // Cancel the std output redirection:
-        let _ = FileDescriptor::redirect_stdio(&self.original_std_output_fd, self.stdio);
+        // Cancel the std output redirection (recover the original std output handle):
+        let _ignore_error =
+            FileDescriptor::redirect_stdio(&self.original_std_output_fd, self.stdio);
     }
 }
