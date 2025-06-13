@@ -1,17 +1,15 @@
 use code_commons::{CallGraph, CoderunNotifiable};
-// use code_commons::{CallGraph, CalleeName, CoderunNotifiable};
 use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use std::{
     cell::RefCell,
     collections::HashMap,
-    // io::Write,
     rc::Rc,
     sync::{Arc, LazyLock, Mutex, MutexGuard},
     thread,
 };
 
 use crate::{
-    output_sync::{/*Hold,*/ StdOutputRedirector},
+    output_sync::{StdOutputRedirector},
     writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter},
 };
 
@@ -73,7 +71,6 @@ pub struct CallLoggerArbiter {
     thread_loggers: HashMap<thread::ThreadId, Box<dyn CallLogger>>,
     last_fcl_update_thread: Option<thread::ThreadId>,
     stderr_redirector: Option<StdOutputRedirector>,
-    // stderr_holder: Option<Hold>,
 }
 
 impl CallLoggerArbiter {
@@ -81,7 +78,7 @@ impl CallLoggerArbiter {
         return Self {
             thread_loggers: HashMap::new(),
             last_fcl_update_thread: None,
-            stderr_redirector: None, // stderr_holder: None,
+            stderr_redirector: None,
         };
     }
     pub fn sync_stderr(&mut self) /*-> Result<(), std::io::error::Error>*/
@@ -94,10 +91,6 @@ impl CallLoggerArbiter {
             }
             Ok(redirector) => Some(redirector),
         };
-        // match Hold::stderr() {
-        //     Ok(stderr_holder) => self.stderr_holder = Some(stderr_holder),
-        //     Err(e) => print!("Warning: Failed to sync FCL and stderr output: '{}'", e)
-        // }
     }
     pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
         if self
@@ -124,7 +117,6 @@ impl CallLoggerArbiter {
         if self.thread_loggers.is_empty() {
             // The main() has terminated, its thread_local data are being destroyed.
             self.stderr_redirector = None; // Flush the buffered stderr and do not buffer any more.
-            // self.stderr_holder = None;  // flush the held stderr and do not hold any more.
         }
         if self.last_fcl_update_thread == Some(current_thread_id) {
             self.last_fcl_update_thread = None; // Prevent subsequent flushing of the terminated thread.
@@ -137,22 +129,11 @@ impl CallLoggerArbiter {
             panic!("Internal error: Logging by unregistered thread");
         }
     }
-    // fn read_pending_stderr(&mut self) -> String {
-    //     if let Some(holder) = self.stderr_holder.as_mut() {
-    //         let mut stderr_output_held = String::new();
-    //         if let Err(e) = holder.read_to_string(&mut stderr_output_held) {
-    //             println!("Warning: Failed to get pending stderr output: '{}'", e)
-    //         }
-    //         stderr_output_held
-    //     } else {
-    //         String::new()
-    //     }
-    // }
     fn sync_fcl_and_std_output(&mut self) {
-        if let Some(last_output_thread) = self.last_fcl_update_thread // TODO: last_output_thread -> last_fcl_update_thread
-            && thread::current().id() != last_output_thread
+        if let Some(last_fcl_update_thread) = self.last_fcl_update_thread // TODO: last_output_thread -> last_fcl_update_thread
+            && thread::current().id() != last_fcl_update_thread
         {
-            self.get_thread_logger(last_output_thread).flush()
+            self.get_thread_logger(last_fcl_update_thread).flush()
         }
 
         // If there's any buffered std output, flush the thread's own FCL log and the std output:
@@ -170,43 +151,6 @@ impl CallLoggerArbiter {
                 }
             }
         }
-        // let mut buf_content = String::new();
-        // let read_result = self.get_buffer_reader().read_to_string(&mut buf_content);
-        // let flush_error = match read_result {
-        //     Ok(_size) => {
-        //         let write_result = self.get_original_writer().write_all(buf_content.as_bytes());
-        //         if let Err(e) = write_result {
-        //             Some(e)
-        //         } else {
-        //             None
-        //         }
-        //     }
-        //     Err(e) => Some(e),
-        // };
-        // // Report any flush error to the other std output stream
-        // // (i.e. report stderr flushing error to stdout, and vice versa):
-        // if let Some(error) = flush_error {
-        //     let error_report_destination: &mut dyn Write = if self.stdio == StdioDescriptor::Stderr
-        //     {
-        //         &mut std::io::stdout()
-        //     } else {
-        //         &mut std::io::stderr()
-        //     };
-        //     write!(
-        //         error_report_destination,
-        //         "Warning: Failed to flush the buffered std output: '{}'",
-        //         error
-        //     );
-        // }
-
-        // let pending_stderr = self.read_pending_stderr();
-        // if ! pending_stderr.is_empty() {
-        //     self.get_thread_logger(thread::current().id()).flush();
-
-        //     self.stderr_holder = None;
-        //     eprint!("{}", pending_stderr);
-        //     self.sync_stderr();
-        // }
     }
 }
 
