@@ -332,13 +332,7 @@ impl CallLogger for CallLoggerArbiter {
         self.last_fcl_update_thread = Some(current_thread_id);
     }
     fn maybe_flush(&mut self) {
-        self.sync_fcl_and_std_output(); // TODO: Consider, do we really need that much?
-        // if let Some(redirector) = &mut self.stderr_redirector {
-        //     redirector.flush()
-        // }
-        // if let Some(redirector) = &mut self.stdout_redirector {
-        //     redirector.flush()
-        // }
+        self.sync_fcl_and_std_output();
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
@@ -388,10 +382,10 @@ impl CallLogger for CallLoggerAdapter {
     fn log_ret(&mut self, output: Option<String>) {
         self.get_arbiter().log_ret(output)
     }
-    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
     fn maybe_flush(&mut self) {
         self.get_arbiter().maybe_flush();
     }
+    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
 
 // Global data shared by all the threads:

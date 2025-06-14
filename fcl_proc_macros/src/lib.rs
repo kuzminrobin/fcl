@@ -485,10 +485,7 @@ fn quote_as_expr_call(expr_call: &ExprCall, prefix: &proc_macro2::TokenStream) -
     quote!{ 
         {
             #maybe_flush_call;
-            // { // Tmp
-            //    {}
-                #(#attrs)* #func ( #args ) 
-            // }
+            #(#attrs)* #func ( #args ) 
         }
     } 
 }
@@ -870,7 +867,7 @@ fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::To
     let body = quote_as_expr(&**body, None, prefix);
     quote!{ #(#attrs)* #pat #guard #fat_arrow_token #body #comma }
 }
-fn quote_as_macro(macro_: &Macro, maybe_flush_invocation: /*Option<*/&mut proc_macro2::TokenStream/*>*/, _prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_macro(macro_: &Macro, maybe_flush_invocation: &mut proc_macro2::TokenStream, _prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let Macro {
         path, //: Path,
         // bang_token, //: Not,
@@ -878,43 +875,20 @@ fn quote_as_macro(macro_: &Macro, maybe_flush_invocation: /*Option<*/&mut proc_m
         // tokens, //: TokenStream,
         .. // All others.
     } = macro_;
-
-    // let delimited_tokens = match delimiter {
-    //     MacroDelimiter::Paren(_paren) => quote!{ ( #tokens ) },
-    //     MacroDelimiter::Brace(_brace) => quote!{ { #tokens } },
-    //     MacroDelimiter::Bracket(_bracket) => quote!{ [ #tokens ] },
-    // };
-    // let maybe_flush_invocation =
-        if let Some(macro_name) = path.segments.last() {
-            if     &macro_name.ident.to_string() == &"println"
-                || &macro_name.ident.to_string() == &"print"
-                || &macro_name.ident.to_string() == &"eprintln"
-                || &macro_name.ident.to_string() == &"eprint"
-            { 
-                // println!("C");
-                *maybe_flush_invocation = 
-                quote!{
-                    THREAD_LOGGER.with(|logger| {
-                        logger.borrow_mut().maybe_flush();
-                    });                
-                }
-            }  
-        //     else {
-        //         println!("B");
-        //         quote!{ B }
-        //     }
-        // } else {
-        //     println!("A");
-        //     quote!{ A }
-        };
-    quote!{ #macro_
-        // {
-        //     #path
-        //     #bang_token
-        //     #delimited_tokens   //;{};;
-        //     // #maybe_flush_invocation
-        // }
-    }
+    if let Some(macro_name) = path.segments.last() {
+        if     &macro_name.ident.to_string() == &"println"
+            || &macro_name.ident.to_string() == &"print"
+            || &macro_name.ident.to_string() == &"eprintln"
+            || &macro_name.ident.to_string() == &"eprint"
+        { 
+            *maybe_flush_invocation = quote!{
+                THREAD_LOGGER.with(|logger| {
+                    logger.borrow_mut().maybe_flush();
+                });                
+            }
+        }
+    }  
+    quote!{ #macro_ }
 }
 fn quote_as_expr_macro(expr_macro: &ExprMacro, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let ExprMacro {
@@ -926,7 +900,7 @@ fn quote_as_expr_macro(expr_macro: &ExprMacro, prefix: &proc_macro2::TokenStream
     quote!{ 
         {
             #maybe_flush_invocation;
-            #(#attrs)* #mac//; {}; 
+            #(#attrs)* #mac
         }
     }
 }
@@ -1031,27 +1005,13 @@ fn quote_as_expr_path(expr_path: &ExprPath, is_print_func_name: Option<&mut bool
         .. // attrs, qself
     } = expr_path;
 
-    // // Tmp
-    // if let Some(_is_print_func_name) = is_print_func_name {
-    //     quote!{ A }
-    // } else {
-    //     quote!{ #expr_path } 
-    // }
-
     if let Some(name) = path.segments.last() {
         let name = name.ident.to_string();
-        // Tmp
-        // if let Some(_is_print_func_name) = is_print_func_name {
-        //     return quote!{ #name }
-        // }
         if     &name == &"_print"
             || &name == &"_eprint" 
         {
-            // return quote!{ #name true }
-
             if let Some(is_print_func_name) = is_print_func_name {
                 *is_print_func_name = true;
-                // return quote!{ #name ._true }
             }
         }
     }
@@ -2619,7 +2579,7 @@ fn quote_as_stmt_macro(stmt_macro: &StmtMacro, prefix: &proc_macro2::TokenStream
         semi_token, //: Option<Semi>,
     } = stmt_macro;
     let mut maybe_flush_invocation = quote!{};
-    let mac = quote_as_macro(&mac, /*Some(*/&mut maybe_flush_invocation/* )*/, prefix);
+    let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, prefix);
     quote!{ 
         {
             #maybe_flush_invocation;
@@ -2636,7 +2596,6 @@ fn quote_as_stmt(stmt: &Stmt, prefix: &proc_macro2::TokenStream) -> proc_macro2:
             quote!{ #expr #opt_semi }
         }
         Stmt::Macro(stmt_macro) => quote_as_stmt_macro(stmt_macro, prefix),
-        // other => quote!{ #other }   // Stmt::Macro
     }
 }
 fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
