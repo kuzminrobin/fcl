@@ -438,12 +438,25 @@ fn thread_func() {
         }
         #[loggable]
         fn g(i: u8) {
+            fn _println() {}
+            _println();
             if i == 8 {
                 // println!("stdout output");
+                // std::io::_eprint("0. stdout: hmm. ");
+                // {
+                //     std::io::_eprint(std::format_args_nl!("1. stderr: T1 stderr output"));
+                // };
+                // {
+                //     std::io::_eprint(println!("1. stderr: T1 stderr output"));
+                // };
+
                 println!("0. stdout: hmm. ");
-                eprintln!("1. stderr: T1 stderr output");
+                eprintln!["1. stderr: T1 stderr output"];
                 println!("2. stdout: hmm...");
                 eprintln!("3. stderr: Oh");
+                // std::io::_print(std::format_args_nl!("0. stdout: hmm. "));
+                // std::io::_eprint(std::format_args_nl!("1. stderr: T1 stderr output"));
+
                 // std::io::_print(std::format_args!("hmm"));
                 // panic!("Panicking volunterely")
             }

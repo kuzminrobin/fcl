@@ -53,7 +53,6 @@ impl FunctionLogger {
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         THREAD_LOGGER.with(|logger| {
             logger.borrow_mut().log_call(func_name, param_vals)
-            // .log_call(&CalleeName::Function(String::from(func_name)))
         });
         Self {
             // _dropper: CalleeLogger,

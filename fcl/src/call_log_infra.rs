@@ -65,6 +65,7 @@ impl CallLogger for CallLogInfra {
     fn flush(&mut self) {
         self.call_graph.flush()
     }
+    fn maybe_flush(&mut self) {}
 }
 
 pub struct CallLoggerArbiter {
@@ -91,9 +92,6 @@ impl CallLoggerArbiter {
         writer_kind: WriterKind,
         stdx_redirector_result: std::io::Result<StdOutputRedirector>,
     ) -> Option<StdOutputRedirector> {
-        // let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
-
-        // let stderr_redirector_result = StdOutputRedirector::new_stderr();
         let stderr_redirector = match stdx_redirector_result {
             Err(e) => {
                 eprintln!(
@@ -103,16 +101,6 @@ impl CallLoggerArbiter {
                 None
             }
             Ok(redirector) => {
-            // Ok(mut redirector) => {
-                // if writer_kind == WriterKind::Stderr {
-                //     match redirector.clone_original_writer() {
-                //         Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
-                //         Err(e) =>
-                //             // Something is wrong with stderr, log the error to stdout:
-                //             println!("Warning: Failed to sync FCL and {:?} output: '{}'", writer_kind, e)
-                //     }
-
-                // }
                 Some(redirector)
             }
         };
@@ -120,7 +108,7 @@ impl CallLoggerArbiter {
     }
 
     pub fn set_std_output_sync(&mut self) {
-        // Set stdout and stderr redirection to a buffer (set std output buffering):
+        // Set stdout and stderr redirection to a corresponding buffer (set std output buffering):
         let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
         self.stderr_redirector = self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
         self.stdout_redirector = self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
@@ -159,38 +147,6 @@ impl CallLoggerArbiter {
                 );
             }
         });
-
-        //     match redirector.clone_original_writer() {
-        //         Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
-        //         Err(e) =>
-        //             // Something is wrong with stderr, log the error to stdout:
-        //             println!("Warning: Failed to sync FCL and {:?} output: '{}'", writer_kind, e)
-        //     }
-
-        // }
-
-        // let stderr_redirector_result = StdOutputRedirector::new_stderr();
-        // self.stderr_redirector = match stderr_redirector_result {
-        //     Err(e) => {
-        //         eprintln!("Warning: Failed to sync FCL and stderr output: '{}'", e);
-        //         None
-        //     }
-        //     Ok(mut redirector) => {
-        //         if writer_kind == WriterKind::Stderr { //&& let Some(redirector) = self.stderr_redirector.as_mut() {
-        //             match redirector.clone_original_writer() {
-        //                 Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
-        //                 Err(e) =>
-        //                     // Something is wrong with stderr, log the error to stdout:
-        //                     println!("Warning: Failed to sync FCL and stderr output: '{}'", e)
-        //             }
-
-        //         }
-        //         Some(redirector)
-        //     },
-        // };
-        // // if writer_kind == WriterKind::Stderr && let Some(redirector) = self.stderr_redirector.as_mut() {
-        // //     self.thread_shared_writer.borrow_mut().set_writer(Box::new(redirector.get_original_writer()));
-        // // }
     }
     pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
         if self
@@ -235,13 +191,13 @@ impl CallLoggerArbiter {
         // {Previuous thread}'s activity, if any, ended with
         // * either FCL updates (cached or flushed), in which case there's no buffered std output,
         // * or buffered std output.
-        // The cached FCL updates or buffered std output need to be flushed in any order.
+        // The cached FCL updates or buffered std output need to be flushed, in any order.
 
         // If there was an earlier FCL update
         if let Some(last_fcl_update_thread) = self.last_fcl_update_thread {
             // by a different thread
             if thread::current().id() != last_fcl_update_thread {
-                // Flush the previous thread's cahced FCL updates, if any:
+                // Flush the previous thread's cached FCL updates, if any:
                 self.get_thread_logger(last_fcl_update_thread).flush();
 
                 // Flush the previous thread's buffered std output, if any:
@@ -277,13 +233,6 @@ impl CallLoggerArbiter {
                         .get_buffer_reader()
                         .read_to_string(&mut stdout_buf_content));
                 }
-
-                // let mut flush_needed = 
-                //     if let Some(Ok(stderr_read_size)) = stderr_buf_read_result
-                //         && stderr_read_size != 0 { true } else { false };
-                // flush_needed = flush_needed || 
-                //     if let Some(Ok(stdout_read_size)) = stdout_buf_read_result
-                //         && stdout_read_size != 0 { true } else { false };
 
                 // If there was any std output, flush the FCL updates:
                 if !stderr_buf_content.is_empty() || !stdout_buf_content.is_empty() {
@@ -382,6 +331,15 @@ impl CallLogger for CallLoggerArbiter {
         self.get_thread_logger(current_thread_id).log_ret(output);
         self.last_fcl_update_thread = Some(current_thread_id);
     }
+    fn maybe_flush(&mut self) {
+        self.sync_fcl_and_std_output(); // TODO: Consider, do we really need that much?
+        // if let Some(redirector) = &mut self.stderr_redirector {
+        //     redirector.flush()
+        // }
+        // if let Some(redirector) = &mut self.stdout_redirector {
+        //     redirector.flush()
+        // }
+    }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
 }
 
@@ -431,6 +389,9 @@ impl CallLogger for CallLoggerAdapter {
         self.get_arbiter().log_ret(output)
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
+    fn maybe_flush(&mut self) {
+        self.get_arbiter().maybe_flush();
+    }
 }
 
 // Global data shared by all the threads:
