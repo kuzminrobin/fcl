@@ -200,7 +200,7 @@ impl CallLoggerArbiter {
                 // Flush the previous thread's cached FCL updates, if any:
                 self.get_thread_logger(last_fcl_update_thread).flush();
 
-                // Flush the previous thread's buffered std output, if any:
+                // Flush the previous (and dcurrent) thread's buffered std output, if any:
                 if let Some(redirector) = &mut self.stderr_redirector {
                     redirector.flush()
                 }

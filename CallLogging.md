@@ -1,5 +1,8 @@
 # TODO:
-* panic. `set_panic()`
+* panic. `std::panic::set_hook()`
+  * [`std::panic::set_hook()`](https://doc.rust-lang.org/std/panic/fn.set_hook.html): aborting and unwinding runtimes.
+
+* loop start - end (wrapping the repating groups).
 * Structure-up single-threaded and multithreaded
 * Consider loggin the ret val in the TreeLikeDecorator
 * `closure { 205usize, 14usize : 212usize, 9usize }() {`
@@ -17,6 +20,7 @@
     * Make separate examples and/or tests.
 
 * ---
+* Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
 * `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
   `#[loggable(MyPureTrait::pure_method)]`.  
@@ -46,6 +50,7 @@
   * .md
   * Book 
   * [toolchain stable or document why inachievable]
+* [Crates.io publication]
 * Video
   * YT
 * SRUG talk.

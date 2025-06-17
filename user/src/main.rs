@@ -155,6 +155,7 @@ fn calls() {
         fn g(i: u8) {
             if i == 8 {
                 // println!("stdout output");
+                panic!("main(): Testing the panic");
                 eprintln!("stderr output");
                 // panic!("Panicking volunterely")
             }
@@ -450,10 +451,13 @@ fn thread_func() {
                 //     std::io::_eprint(println!("1. stderr: T1 stderr output"));
                 // };
 
+                panic!("T1: Testing the panic");
+
                 println!("0. stdout: hmm. ");
                 eprintln!["1. stderr: T1 stderr output"];
                 println!("2. stdout: hmm...");
                 eprintln!("3. stderr: Oh");
+
                 // std::io::_print(std::format_args_nl!("0. stdout: hmm. "));
                 // std::io::_eprint(std::format_args_nl!("1. stderr: T1 stderr output"));
 
