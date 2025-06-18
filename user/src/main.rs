@@ -10,7 +10,15 @@ use fcl::call_log_infra::THREAD_LOGGER;
 // use fcl::{ClosureLogger, closure_logger};
 use fcl_proc_macros::{loggable, non_loggable};
 
+fn main() {
+    // TODO: -> macro, or simplify otherwise.
+    // set_is_on(true);
+    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
 
+    let result = thread::Builder::new().name("T1".into()).spawn(thread_func); // T1 thread.
+    calls(); // main() thread.
+    let _ = result.unwrap().join();
+}
 
 #[loggable]
 fn f() {
@@ -155,9 +163,9 @@ fn calls() {
         fn g(i: u8) {
             if i == 8 {
                 // println!("stdout output");
-                panic!("main(): Testing the panic");
-                eprintln!("stderr output");
-                // panic!("Panicking volunterely")
+                // panic!("main(): Testing the panic");
+                eprintln!("Sample stderr output in main()");
+                panic!("main(): Panicking voluntarily")
             }
         }
 
@@ -212,7 +220,7 @@ fn thread_func() {
     // println!("thread_func() called f2()");
 
     g();
-    f();
+    ff();
     for _ in 0..5 {
         g();
     }
@@ -439,8 +447,8 @@ fn thread_func() {
         }
         #[loggable]
         fn g(i: u8) {
-            fn _println() {}
-            _println();
+            // fn _println() {}
+            // _println();
             if i == 8 {
                 // println!("stdout output");
                 // std::io::_eprint("0. stdout: hmm. ");
@@ -451,12 +459,12 @@ fn thread_func() {
                 //     std::io::_eprint(println!("1. stderr: T1 stderr output"));
                 // };
 
-                panic!("T1: Testing the panic");
-
                 println!("0. stdout: hmm. ");
                 eprintln!["1. stderr: T1 stderr output"];
                 println!("2. stdout: hmm...");
                 eprintln!("3. stderr: Oh");
+
+                // panic!("T1: Testing the panic");
 
                 // std::io::_print(std::format_args_nl!("0. stdout: hmm. "));
                 // std::io::_eprint(std::format_args_nl!("1. stderr: T1 stderr output"));
@@ -471,18 +479,21 @@ fn thread_func() {
         }
         g(20);
     }
+    #[loggable]
+    fn ff() {
+        thread::sleep(Duration::from_millis(1)); 
+    }
 
+    #[loggable]
+    fn gg(i: i32) {
+        ff();
+    }
+
+    for i in 0..150 {
+        gg(i);
+    }
 }
 
-fn main() {
-    // TODO: -> macro, or simplify otherwise.
-    // set_is_on(true);
-    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
-
-    let result = thread::Builder::new().name("T1".into()).spawn(thread_func); // T1 thread.
-    calls(); // main() thread.
-    let _ = result.unwrap().join();
-}
 
 // CodeLikeDecorator:
 // main() {

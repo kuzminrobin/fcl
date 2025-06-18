@@ -13,6 +13,10 @@ use crate::{
     writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
 };
 
+macro_rules! NO_LOGGER_ERR_STR {
+    () => { "Internal Error: Unexpected lack of logger" }
+}
+
 pub struct CallLogInfra {
     logging_is_on: Vec<bool>, // Enabled by default (if empty). // TODO: Test.
     thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
@@ -74,6 +78,8 @@ pub struct CallLoggerArbiter {
     last_fcl_update_thread: Option<thread::ThreadId>,
     stderr_redirector: Option<StdOutputRedirector>,
     stdout_redirector: Option<StdOutputRedirector>,
+    main_thread_id: thread::ThreadId,
+    // original_panic_hook: Option<Box<dyn Fn(&std::panic::PanicHookInfo<'_>)>>
 }
 
 impl CallLoggerArbiter {
@@ -84,7 +90,51 @@ impl CallLoggerArbiter {
             last_fcl_update_thread: None,
             stderr_redirector: None,
             stdout_redirector: None,
+            main_thread_id: thread::current().id(),
+            // original_panic_hook: None,
         };
+    }
+
+    fn panic_hook(/*&mut self,*/ panic_hook_info: &std::panic::PanicHookInfo<'_>) {
+        unsafe {
+            // match (*CALL_LOGGER_ARBITER).try_lock() {
+            match (*CALL_LOGGER_ARBITER).lock() {
+                Ok(mut guard) => {
+                    guard.sync_fcl_and_std_output(true);
+
+                    // if thread::current().id() == guard.main_thread_id {
+                    //     // The main() thread is panicking, suppress the fake returns in all the threads.
+                    //     let _ = guard.thread_loggers.drain();
+                    // } else {
+                        guard.remove_thread_logger();
+                    // }
+                    if thread::current().id() == guard.main_thread_id {
+                        // TMP:
+                        // The main() has terminated, its thread_local data are being destroyed.
+                        // Flush the buffered std output and do not buffer any more.
+                        guard.stderr_redirector = None; 
+                        guard.stdout_redirector = None;
+                    }
+
+                    // TODO: In a single-threaded case cancel the std output buffering.
+                }
+                Err(_e) => {
+                    println!("Internal Error: Unexpected mutex lock failure in panic_hook(): '{:?}'", _e);
+                    // panic!("Internal Error: Unexpected mutex lock failure: '{:?}'", _e);
+                }
+            }
+            (*ORIGINAL_PANIC_HOOK).borrow().as_ref().map(|hook| hook(panic_hook_info));
+        }
+    }
+
+    pub fn set_panic_sync(&mut self) {
+        unsafe { *(*ORIGINAL_PANIC_HOOK).borrow_mut() = Some(std::panic::take_hook()); }
+        // self.original_panic_hook = Some(std::panic::take_hook());
+
+        std::panic::set_hook(Box::new(Self::panic_hook))
+        // std::panic::set_hook(Box::new(|panic_hook_info| {
+        //     self.panic_hook(panic_hook_info);
+        // }));
     }
 
     pub fn set_stdx_sync(
@@ -162,14 +212,23 @@ impl CallLoggerArbiter {
     }
     pub fn remove_thread_logger(&mut self) {
         let current_thread_id = thread::current().id();
-        self.get_thread_logger(current_thread_id).flush(); // Flush the possible trailing repeat count.
+        if let Some(_logger) = self.get_thread_logger(current_thread_id) {
+            self.sync_fcl_and_std_output(true);
+            // _logger.flush(); // Flush the possible trailing repeat count.
 
-        if self.thread_loggers.remove(&current_thread_id).is_none() {
-            debug_assert!(
-                false,
-                "Internal error suspected: Unregistering non-registered thread"
-            );
-        }
+            if self.thread_loggers.remove(&current_thread_id).is_none() {
+                println!("remove_thread_logger debug_assert");
+                debug_assert!(
+                    false,
+                    "Internal Error: Unregistering failed"
+                );
+            }
+        } // else (no logger) the logger for the current thread is assumed removed in the panic handler.
+
+        // else {
+        //     debug_assert!(false, NO_LOGGER_ERR_STR!());//"Internal Error: Unexpected lack of logger");
+        // }
+
         if self.thread_loggers.is_empty() {
             // The main() has terminated, its thread_local data are being destroyed.
             // Flush the buffered std output and do not buffer any more.
@@ -180,14 +239,16 @@ impl CallLoggerArbiter {
             self.last_fcl_update_thread = None; // Prevent subsequent flushing of the terminated thread.
         }
     }
-    fn get_thread_logger(&mut self, thread_id: thread::ThreadId) -> &mut Box<dyn CallLogger> {
-        if let Some(logger) = self.thread_loggers.get_mut(&thread_id) {
-            return logger;
-        } else {
-            panic!("Internal error: Logging by unregistered thread");
-        }
+    fn get_thread_logger(&mut self, thread_id: thread::ThreadId) -> Option<&mut Box<dyn CallLogger>> {
+    // fn get_thread_logger(&mut self, thread_id: thread::ThreadId) -> &mut Box<dyn CallLogger> {
+        self.thread_loggers.get_mut(&thread_id)
+        // if let Some(logger) = self.thread_loggers.get_mut(&thread_id) {
+        //     return logger;
+        // } else {
+        //     panic!("Internal error: Logging by unregistered thread");
+        // }
     }
-    fn sync_fcl_and_std_output(&mut self) {
+    fn sync_fcl_and_std_output(&mut self, full_flush: bool) {
         // {Previuous thread}'s activity, if any, ended with
         // * either FCL updates (cached or flushed), in which case there's no buffered std output,
         // * or buffered std output.
@@ -198,7 +259,12 @@ impl CallLoggerArbiter {
             // by a different thread
             if thread::current().id() != last_fcl_update_thread {
                 // Flush the previous thread's cached FCL updates, if any:
-                self.get_thread_logger(last_fcl_update_thread).flush();
+                if let Some(logger) = self.get_thread_logger(last_fcl_update_thread) {
+                    logger.flush();
+                } else {
+                    debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+                } 
+                // self.get_thread_logger(last_fcl_update_thread).flush();
 
                 // Flush the previous (and dcurrent) thread's buffered std output, if any:
                 if let Some(redirector) = &mut self.stderr_redirector {
@@ -235,8 +301,15 @@ impl CallLoggerArbiter {
                 }
 
                 // If there was any std output, flush the FCL updates:
-                if !stderr_buf_content.is_empty() || !stdout_buf_content.is_empty() {
-                    self.get_thread_logger(thread::current().id()).flush();
+                if !stderr_buf_content.is_empty() || !stdout_buf_content.is_empty() 
+                   || full_flush
+                {
+                    if let Some(logger) = self.get_thread_logger(thread::current().id()) {
+                        logger.flush();
+                    } else {
+                        debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+                    } 
+                    // self.get_thread_logger(thread::current().id()).flush();
                 }
                 // Flush the buffered stderr output (to the original stderr):
                 if !stderr_buf_content.is_empty() {
@@ -292,49 +365,93 @@ impl CallLoggerArbiter {
 
 impl CallLogger for CallLoggerArbiter {
     fn push_logging_is_on(&mut self, is_on: bool) {
-        self.get_thread_logger(thread::current().id())
-            .push_logging_is_on(is_on)
+        if let Some(logger) = self.get_thread_logger(thread::current().id()) {
+            logger.push_logging_is_on(is_on);
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+        } 
+        // self.get_thread_logger(thread::current().id())
+        //     .push_logging_is_on(is_on)
     }
     fn pop_logging_is_on(&mut self) {
-        self.get_thread_logger(thread::current().id())
-            .pop_logging_is_on()
+        if let Some(logger) = self.get_thread_logger(thread::current().id()) {
+            logger.pop_logging_is_on();
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+        } 
+        // self.get_thread_logger(thread::current().id())
+        //     .pop_logging_is_on()
     }
     fn logging_is_on(&self) -> bool {
         if let Some(logger) = self.thread_loggers.get(&thread::current().id()) {
             return logger.logging_is_on();
         } else {
+            println!("logging_is_on() panic");
             panic!("Internal error: Logging by unregistered thread");
         }
     }
     fn set_logging_is_on(&mut self, is_on: bool) {
-        self.get_thread_logger(thread::current().id())
-            .set_logging_is_on(is_on)
+        if let Some(logger) = self.get_thread_logger(thread::current().id()) {
+            logger.set_logging_is_on(is_on);
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+        } 
+        // self.get_thread_logger(thread::current().id())
+        //     .set_logging_is_on(is_on)
     }
 
     fn set_thread_indent(&mut self, thread_indent: &'static str) {
-        self.get_thread_logger(thread::current().id())
-            .set_thread_indent(thread_indent)
+        if let Some(logger) = self.get_thread_logger(thread::current().id()) {
+            logger.set_thread_indent(thread_indent);
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+        } 
+        // self.get_thread_logger(thread::current().id())
+        //     .set_thread_indent(thread_indent)
     }
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        self.sync_fcl_and_std_output();
+        self.sync_fcl_and_std_output(false);
 
         let current_thread_id = thread::current().id();
-        self.get_thread_logger(current_thread_id)
-            .log_call(name, param_vals);
+        if let Some(logger) = self.get_thread_logger(current_thread_id) {
+            logger.log_call(name, param_vals);
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!()); //"Internal Error: Unexpected lack of logger"); // TODO: Reuse the &str.
+        } 
+        // self.get_thread_logger(current_thread_id)
+        //     .log_call(name, param_vals);
         self.last_fcl_update_thread = Some(current_thread_id);
     }
     fn log_ret(&mut self, output: Option<String>) {
-        self.sync_fcl_and_std_output();
-
         let current_thread_id = thread::current().id();
-        self.get_thread_logger(current_thread_id).log_ret(output);
-        self.last_fcl_update_thread = Some(current_thread_id);
+
+        // Potentially a call during stack unwinding. 
+        // In that case suppress flushing and logging the return. 
+        if self.get_thread_logger(current_thread_id).is_some() {
+            self.sync_fcl_and_std_output(false);
+        }
+        if let Some(logger) = self.get_thread_logger(current_thread_id) {
+            logger.log_ret(output);
+            self.last_fcl_update_thread = Some(current_thread_id);
+
+        }
+        // let current_thread_id = thread::current().id();
+        // self.sync_fcl_and_std_output(false);
+
+        // self.get_thread_logger(current_thread_id).log_ret(output);
+        // self.last_fcl_update_thread = Some(current_thread_id);
     }
     fn maybe_flush(&mut self) {
-        self.sync_fcl_and_std_output();
+        self.sync_fcl_and_std_output(false);
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
+}
+
+impl Drop for CallLoggerArbiter {
+    fn drop(&mut self) {
+        println!("<CallLoggerArbiter as Drop>::drop()");
+    }
 }
 
 struct CallLoggerAdapter {
@@ -345,11 +462,21 @@ impl CallLoggerAdapter {
         Self { arbiter }
     }
     fn get_arbiter(&self) -> MutexGuard<'_, CallLoggerArbiter> {
-        if let Ok(guard) = self.arbiter.lock() {
-            return guard;
-        } else {
-            panic!("Unexpected mutex lock failure")
+        match self.arbiter.lock() {
+            Ok(guard) => {
+                return guard;
+            }
+            Err(poisoned) => {
+                println!("Internal Error: Unexpected mutex lock failure in get_arbiter(): '{:?}'", poisoned);
+                // panic!("Internal Error: Unexpected mutex lock failure: '{:?}'", e);
+                return poisoned.into_inner()
+            }
         }
+        // if let Ok(guard) = self.arbiter.lock() {
+        //     return guard;
+        // } else {
+        //     panic!("Unexpected mutex lock failure")
+        // }
     }
 }
 impl Drop for CallLoggerAdapter {
@@ -401,9 +528,16 @@ static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> = LazyLo
     Arc::new(Mutex::new({
         let mut arbiter = unsafe { CallLoggerArbiter::new((*THREAD_SHARED_WRITER).clone()) };
         arbiter.set_std_output_sync();
+        arbiter.set_panic_sync();
         arbiter
     }))
 });
+
+// TODO: COnsider removing `LazyLock<RefCell<>>`.
+static mut ORIGINAL_PANIC_HOOK: LazyLock<RefCell<Option<Box<dyn Fn(&std::panic::PanicHookInfo<'_>)>>>> = 
+    LazyLock::new(|| {
+        RefCell::new(None)
+    });
 
 // Global data per thread. Each thread has its own copy of these data.
 // These data are initialized first upon thread start, and destroyed last upon thread termination.
@@ -422,6 +556,7 @@ thread_local! {
                                     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                                     None))))))
                     } else {
+                        println!("CallLoggerAdapter creation panic");
                         panic!("Unexpected mutex lock failure")
                     }
                 }

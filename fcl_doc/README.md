@@ -113,7 +113,7 @@ But having the current implementation I would expect that after logging the firs
 would send the panic report to `stderr`. Since the `stderr` is redirected to a buffer, 
 the panic report would be buffered. Since the panic handler is not instrumented with the FCL, the multiple lines sent to the `stderr` by the panic handler would not be interleaved with the calls to 
 `maybe_flush()`. I.e. the whole panic report would stay in the buffer waiting for a flush. Then the panic handler would never return the control to the instrumented code (to function `g()`).
-And the cached repeaded calls to `g()` would never get a chance to be flushed. I would expect to see a single iteration followed by nothing
+And the cached repeaded calls to `g()` would never get a chance to be flushed. I would expect to see a single iteration followed by nothing.
 ```c
 f() {
   g(i: 0) {}
@@ -135,7 +135,7 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 Such logs confused me a bit for a while. 
 * How could panic report end up in the log? 
 * How could functions `g()` and `f()` (and potentially other enclosing ones) get a control back 
-  from the panic handler all the way back to the most-enclosing thread function?
+  from the panic handler all the way up to the most-enclosing thread function?
 
 I have placed some more code (`println!()`) after `panic!()` and saw that the control 
 was not returned by the panic handler. And I realized that the output 
@@ -143,11 +143,10 @@ was not returned by the panic handler. And I realized that the output
   } // g().
 } // f().  
 ```
-was logged by the destructors of the correspoinding instances of the `FunctionLogger` 
-during stack unwinding. And the first-most destructor (printing `} // g().`) has noticed that 
-there was some bufferd `stderr` output - the panic report - and has flushed that panic report.
+was logged by the destructors of the correspoinding `FunctionLogger` instances during stack unwinding. And the first-most destructor (printing the fragment `} // g().`) has noticed that 
+there was some buffered `stderr` output - the panic report - and has flushed that panic report.
 
-Such an output of returns after the panic handler (the returns from `g()`, `f()`, and other enclosing functions all the way back to the 
+Such fake returns after the panic handler (the returns from `g()`, `f()`, and other enclosing functions all the way back to the 
 thread function or to a function called first after logging enabling), will definitely confuse the users. That output needs to be suppressed. But the suppression can prevent the panic report flushing to `stderr`.
 
 In addition to that, the observation above is only applicable to the _unwinding_ runtimes.
@@ -174,10 +173,10 @@ The FCL's handler is to
   which serves as the "panic" flag for the current thread (in the `CallLoggerArbiter`),
   which will subsequently suppress logging by the `FunctionLogger` destructors during stack unwinding, if any, for the current thread,
 * in a single-threaded case cancel the std output buffering,
-* transfer the control (of the current thread) to the saved previous panic handler 
-  that never returns the control to the current thread,
-  but in case of an unwinding runtime still runs the `FunctionLogger` destructors whose output is to be suppressed based on the thread's "panic" flag;  
-  that panic handler will also send the panic report to the `stderr`  
+* transfer the control (within the context of the panicking thread) to the
+  saved previous panic handler that will never return the control to the caller,
+  but in case of unwinding runtimes will still run the `FunctionLogger` destructors whose output is to be suppressed based on the thread's "panic" flag;  
+  that saved previous panic handler will also send the panic report to the `stderr`  
   that in a single-threaded case will be sent directly to the original unbuffered `stderr`,  
   and in multithreaded case will be buffered and then flushed upon the activity of the other threads, unless they all hang ;-).
 
@@ -186,3 +185,101 @@ Upon thread panic all of the thread's data are to be detached from the FCL data 
 
 **Reader Practice.**  
 If not yet, implement the solution.
+
+<!-- Next page -->
+## The panic in `main()`
+The implementation has shown that if the `main()` thread panics while the other threads are still running,
+then the other threads continue running during the `main()` thread's panic handler (panic hook).
+And some of the threads can come to a normal completion and terminate, destroying their thread-local data, while the panic handler is running for the `main()` thread.  
+
+The FCL's panic handler `CallLoggerArbiter::panic_hook()`, within the context of the `main()` thread, manipulates the FCL's data structures by accessing the `CallLoggerArbiter` instance protected by `Mutex`. The other threads log their function calls (or destroy/unregister their own data) by 
+also locking the `Mutex` protecting the `CallLoggerArbiter` instance. In combination with the buffered 
+std output the situation sometimes ends up in a freezing, that looks like a deadlock, with no panic report, that does not return the control to the command line, and cannot be interrupted with `<Ctrl+c>`. 
+In the debugger the problem either does not show itself, or, when shows, what I see in the halted debugger confuses me: 
+* The `main()` thread is running (in a loop?) somewhere in the internals of the saved original panic handler,
+invoked from the FCL's panic handler _after dropping the `Mutex` lock_, 
+* and another thread is waiting, trying to lock the `Mutex` (totally two threads).
+
+Continuing the execution (or stepping) in the debugger just magically moves forward 
+to the expected return to the command line, showing the expected output (plus the stack backtrace in the panic report). 
+
+At the moment of writing I wasn't able to resolve, and even understand, the issue. The suspicion is that, if the other 
+thread tries to lock the `Mutex` when the `Mutex` is locked by the panic handler in the context of the `main()` thread, the 
+situation is close to the [documentation fragment](https://doc.rust-lang.org/std/sync/struct.Mutex.html#poisoning) "a mutex is considered poisoned whenever a thread panics while holding the mutex".
+However the "recover from a poisoned mutex" (on that same documentation page) does not help. 
+
+Feels like such a simultaneous 
+access to the `Mutex` by another thread and the panic handler within the `main()` thread, prevents  
+* either the panic handler's normal release of the `Mutex`  
+* or the other thread's normal acquisition of the `Mutex`.  
+
+But canceling the std output buffering 
+in the FCL's panic handler, if the handler is called for the `main()` thread, lowers down the probability of output freezing, at the expence of desynchronized output, concurrent between 
+the other thread's function log and the panic report. See the "ggnote" fragment 
+in the output below (the `main()` thread output is on the left, and the other thread output is on the right. The std output should be on the left, but in practice it interferes with the log output).
+
+> TODO: Provide a code exmaple and a better output log.
+
+```c
+  g(i: 0, ) {}
+} // f().
+                                  gg(i: 6, ) {
+                                    ff() {
+// f() repeats 7 time(s).
+f(i: 8, ) {
+  g(i: 8, ) {
+Sample stderr output
+                                    } // ff().
+
+thread 'main' panicked at user\src\main.rs:168:17:
+main(): Panicking voluntarily
+                                  } // ggnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace().
+error: process didn't exit successfully: `target\debug\user.exe` (exit code: 101)
+```
+The other run of the same binary can show the panic moment more clearly:
+```c
+f(i: 0, ) {
+  g(i: 0, ) {}
+} // f().
+                                  } // gg().
+                                  gg(i: 4, ) {
+                                    ff() {
+// f() repeats 7 time(s).
+f(i: 8, ) {
+  g(i: 8, ) {
+Sample stderr output
+                                    } // ff().
+
+thread 'main' panicked at user\src\main.rs:168:17:
+main(): Panicking voluntarily
+                                  } // gg().
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: process didn't exit successfully: `target\debug\user.exe` (exit code: 101)
+```
+
+**Reader Practice.**  
+Try to solve the problem or come up with an explanation of it.  
+Ideally the output 
+* should not freeze (deadlock), 
+* should clearly demonstrate what's going on,
+* should go 
+  * to the right destination (whatever is sent to `stderr` or `stdout` or other, 
+    should end up in `stderr` or `stdout` or other correspondingly)
+  * and in the right order (whatever is sent earlier, should land earlier), such that 
+    if the `stderr` and `stdout` are both forwarded to the same place 
+    (screen, or redirected to the same file), the order is preserved.
+
+We can try to discuss your approach in your pull request but I don't promise that.
+
+## Wrapping Up the Output Synchronization
+
+Now I can state that I came up with an output synchronization solution that most readers can live with!!! ;-DDD.
+
+And some of you will _generously_ complement my words: "That's right! The only tiny exception is when my 
+instrumented Rust function calls a native function in C or C++, that calls a forest
+of functions that pipe a few waterfalls to `stderr` and `stdout` in an arbitrary order ;-)".
+
+And I will _hospitably_ reply: "For that case I have an excellent solution below ;-)..."
+
+**Reader Pracice.**  
+You understand what I mean... what should happen to C and C++ code... ;-DDD
