@@ -1,7 +1,4 @@
 # TODO:
-* panic. `std::panic::set_hook()`
-  * [`std::panic::set_hook()`](https://doc.rust-lang.org/std/panic/fn.set_hook.html): aborting and unwinding runtimes.
-
 * loop start - end (wrapping the repating groups).
 * Structure-up single-threaded and multithreaded
 * Consider loggin the ret val in the TreeLikeDecorator
@@ -18,7 +15,8 @@
   * Structure-up single-threaded and multithreaded
     * Make separate macros
     * Make separate examples and/or tests.
-
+* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
+The same with color in the HTML decorator adapter.
 * ---
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
@@ -1033,3 +1031,6 @@ Would you like help with a stable alternative for capturing `stdout` in your own
 
 Let me know if you want a complete working example with both `stdout` and `stderr` interception in a real application.
 ----
+
+* panic. `std::panic::set_hook()`
+  * [`std::panic::set_hook()`](https://doc.rust-lang.org/std/panic/fn.set_hook.html): aborting and unwinding runtimes.

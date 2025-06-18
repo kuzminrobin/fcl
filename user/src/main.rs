@@ -176,7 +176,7 @@ fn calls() {
     }
 }
 
-// #[loggable]
+#[loggable]
 fn thread_func() {
     THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
     // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
