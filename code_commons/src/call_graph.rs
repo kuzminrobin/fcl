@@ -209,8 +209,7 @@ impl CallGraph {
 
                 // If there is a previous_sibling
                 if let Some(previous_sibling) = optional_previous_sibling {
-
-                    // If two last siblings differ then 
+                    // If two last siblings differ then
                     // * log the previous sibling's repeat count, if non-zero;
                     // * log the call.
                     let previous_sibling_kind = previous_sibling.borrow().kind.clone();
@@ -265,8 +264,7 @@ impl CallGraph {
                 // If the caching has started at the enclosing loopbody
                 // (with optional intermediate enclosing loopbodies in between)
                 // and that loopbody is initial then flush and stop caching.
-                if self.caching_info.model_node.is_none()
-                {
+                if self.caching_info.model_node.is_none() {
                     self.flush(); // It also stops caching.
                 }
             }
@@ -392,12 +390,7 @@ impl CallGraph {
                             if siblings_count > 1 {
                                 let previous_node =
                                     parent_or_pseudo.borrow().children[siblings_count - 2].clone();
-                                if previous_node.borrow().kind.is_loopbody()
-                                // let previous_node_kind = previous_node.borrow().kind.clone();
-                                // if let ItemKind::Loopbody { ended_the_loop } =
-                                //     previous_node_kind
-                                //     && !ended_the_loop
-                                {
+                                if previous_node.borrow().kind.is_loopbody() {
                                     // Compare this loopbody to the previous loopbody.
                                     // If equal
                                     if Self::trees_are_equal(
@@ -412,8 +405,10 @@ impl CallGraph {
                                             // Increment the previous loopbody repeat count.
                                             previous_node.borrow_mut().repeat_count.inc();
                                             // If the current loopbody is the node being cached,
-                                            if let Some(node_being_cached) = &self.caching_info.node_being_cached 
-                                                && node_being_cached.as_ptr() == ending_loopbody.as_ptr() 
+                                            if let Some(node_being_cached) =
+                                                &self.caching_info.node_being_cached
+                                                && node_being_cached.as_ptr()
+                                                    == ending_loopbody.as_ptr()
                                             {
                                                 // Stop caching.
                                                 self.caching_info.clear();
@@ -424,7 +419,8 @@ impl CallGraph {
                                     }
                                     // Otherwise (differs)
                                     // If caching and the current node is the one being cached
-                                    if let Some(node_being_cahed) = &self.caching_info.node_being_cached
+                                    if let Some(node_being_cahed) =
+                                        &self.caching_info.node_being_cached
                                         && ending_loopbody.as_ptr() == node_being_cahed.as_ptr()
                                     {
                                         // Flush and stop caching.
@@ -547,17 +543,12 @@ impl CallGraph {
         // ([name,] repeat count, call depth, etc.).
         let call_depth = self.call_depth();
         let mut previous_sibling_node_info = None;
-        if let Some(previous_sibling) = self.current_node.borrow().children.last().clone()
-        {
+        if let Some(previous_sibling) = self.current_node.borrow().children.last().clone() {
             previous_sibling_node_info = Some(previous_sibling.clone());
         }
 
         // Create the loopbody node,
-        let new_loopbody_node = Rc::new(RefCell::new(CallNode::new(ItemKind::Loopbody 
-            // {
-            //     ended_the_loop: false,
-            // }
-        )));
+        let new_loopbody_node = Rc::new(RefCell::new(CallNode::new(ItemKind::Loopbody)));
 
         // add it to the call graph (by adding to the parent's list of children),
         self.current_node // parent
@@ -576,10 +567,6 @@ impl CallGraph {
             // and NOT the last iteration of the previous loop ;-) then {
             if let Some(rc_previous_sibling) = previous_sibling_node_info.as_ref()
                 && !rc_previous_sibling.borrow().kind.is_loopbody()
-                // && match rc_previous_sibling.borrow().kind {
-                //     ItemKind::Call { .. } => true, // Function or closure.
-                //     ItemKind::Loopbody { ended_the_loop } => ended_the_loop, // Previous (different) loop.
-                // }
             {
                 // Log the repeat count, if non-zero, of the previous sibling-level node.
                 let mut previous_sibling = rc_previous_sibling.borrow_mut();
@@ -587,7 +574,7 @@ impl CallGraph {
                 if !previous_sibling.repeat_count.non_flushed_is_empty() {
                     self.coderun_notifiable.borrow_mut().notify_repeat_count(
                         call_depth,
-                        &previous_sibling.kind, //&previous_sibling_name,
+                        &previous_sibling.kind,
                         previous_sibling.repeat_count.non_flushed(),
                     );
                     previous_sibling.repeat_count.mark_flushed();
@@ -603,12 +590,6 @@ impl CallGraph {
                     } else {
                         None
                     }
-                    // let kind = previous_sibling.borrow().kind.clone();
-                    // match kind {
-                    //     ItemKind::Call { .. } => None, // Function or closure.
-                    //     ItemKind::Loopbody { ended_the_loop } if ended_the_loop => None, // Previous loop.
-                    //     ItemKind::Loopbody { .. } => Some(previous_sibling), // Previous iteration of the current loop.
-                    // }
                 });
             // then the caching info
             //     * gets NO model_node (new loopbody node marked as initial),
