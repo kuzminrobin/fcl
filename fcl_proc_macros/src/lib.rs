@@ -717,6 +717,22 @@ fn quote_as_expr_for_loop(expr_for_loop: &ExprForLoop, prefix: &proc_macro2::Tok
     let expr = quote_as_expr(&**expr, None, prefix);
     let body = quote_as_loop_block(body, prefix);    
     quote!{ #(#attrs)* #label #for_token #pat #in_token #expr #body } 
+    // quote!{ 
+    //     {
+    //         let ret_val = {
+    //             #(#attrs)* #label #for_token #pat #in_token #expr #body 
+    //         };
+    //         fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+    //             if thread_logger.borrow_mut().logging_is_on() {
+    //                 thread_logger.borrow_mut().log_loop_end()
+    //             }
+    //         });
+    //         ret_val
+    //     }
+    //     // {
+    //     //     #(#attrs)* #label #for_token #pat #in_token #expr #body 
+    //     // } 
+    // }
 }
 fn quote_as_expr_group(expr_group: &ExprGroup, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let ExprGroup {
@@ -825,6 +841,22 @@ fn quote_as_expr_loop(expr_loop: &ExprLoop, prefix: &proc_macro2::TokenStream) -
     }
     let body = quote_as_loop_block(body, prefix);    
     quote!{ #(#attrs)* #label #loop_token #body } 
+    // quote!{ 
+    //     {
+    //         let ret_val = {
+    //             #(#attrs)* #label #loop_token #body 
+    //         };
+    //         fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+    //             if thread_logger.borrow_mut().logging_is_on() {
+    //                 thread_logger.borrow_mut().log_loop_end()
+    //             }
+    //         });
+    //         ret_val
+    //     }
+    //     // {
+    //     //     #(#attrs)* #label #loop_token #body 
+    //     // } 
+    // }
 }
 // // Likely not applicable for instrumenting the run time functions and 
 // // closures (as opposed to compile time const functions and closures).
@@ -1292,6 +1324,17 @@ fn quote_as_expr_while(expr_while: &ExprWhile, prefix: &proc_macro2::TokenStream
     let cond = quote_as_expr(&**cond, None, prefix);
     let body = quote_as_loop_block(body, prefix);
     quote!{ #(#attrs)* #label #while_token #cond #body }
+    // quote!{ 
+    //     let ret_val = {
+    //         #(#attrs)* #label #while_token #cond #body 
+    //     };
+    //     fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+    //         if thread_logger.borrow_mut().logging_is_on() {
+    //             thread_logger.borrow_mut().log_loop_end()
+    //         }
+    //     });
+    //     ret_val
+    // }
 }
 fn quote_as_expr_yield(expr_yield: &ExprYield, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let ExprYield {

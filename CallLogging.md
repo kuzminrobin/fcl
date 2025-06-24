@@ -1,8 +1,10 @@
 # TODO:
 * loop start - end (wrapping the repating groups).
-  * Loop completion (ended_the_loop) and ret val.
+  * Canceled: Loop completion (ended_the_loop) and ret val.
   * [Loop varaible logging (sort of iteration number)]
-* quote_as_trait_item_fn(): in FunctionLogger::new() the param vals are missing.
+* quote_as_trait_item_fn(): 
+  * in FunctionLogger::new() the param vals are missing.
+  * `LoggableStruct :: next()` does not log the ret_val, ret_val logging is missing?
 * Structure-up single-threaded and multithreaded
 * Consider loggin the ret val in the TreeLikeDecorator
 * `closure { 205usize, 14usize : 212usize, 9usize }() {`
@@ -21,6 +23,7 @@
 * Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
 The same with color in the HTML decorator adapter.
 * ---
+* Document that sequential loops can be logged as a single loop (if the iterations are equal).
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
 * `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  

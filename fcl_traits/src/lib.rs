@@ -29,4 +29,5 @@ pub trait CallLogger {
     fn maybe_flush(&mut self);
     fn log_loopbody_start(&mut self);
     fn log_loopbody_end(&mut self);
+    // fn log_loop_end(&mut self);
 }

@@ -444,6 +444,22 @@ impl CallGraph {
             } // match
         }
     }
+    // // parent() { // current: parent (call or loopbody). `call_stack`: [..., parent]. `current.children`: siblings.
+    // //      . . .
+    // //      [{ // Loop body start.   // Previous iterations of the current loop.
+    // //          . . .
+    // //          child() { ... } // At least one function call in the loopbody.
+    // //          [// child() repeats 7 time(s).]
+    // //      } // Loop body end.
+    // //      // Loop body repeats 6 time(s).]
+    // pub fn add_loop_end(&mut self) {
+    //     if let Some(last_sibling) = self.current_node.borrow_mut().children.last() {
+    //         match &mut last_sibling.borrow_mut().kind {
+    //             ItemKind::Loopbody { ended_the_loop } => *ended_the_loop = true,
+    //             ItemKind::Call { .. } => debug_assert!(false, "Unexpected state"),
+    //         }
+    //     }
+    // }
 
     // < `parent() {` | `{ // Loop body start` > // `current`. `call_stack`: [..., parent]. `current.children`: [..., {previous_sibling | loopbody}].
     //     [...]
