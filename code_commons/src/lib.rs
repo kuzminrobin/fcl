@@ -109,7 +109,7 @@ pub trait CoderunNotifiable {
 /// The function call repeat count. Consists of the two parts.
 /// * Actual repeat count. Stops incrementing upon reaching `REPEAT_COUNT_MAX` (saturates).
 /// * The flushed part of the actual repeat count. Value less than or equal to the actual repeat count.
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct RepeatCount {
     overall: RepeatCountType,
     flushed: RepeatCountType, // flushed <= overall
@@ -140,5 +140,10 @@ impl RepeatCount {
     }
     pub fn mark_flushed(&mut self) {
         self.flushed = self.overall
+    }
+}
+impl core::cmp::PartialEq for RepeatCount {
+    fn eq(&self, other: &Self) -> bool {
+        self.overall.eq(&other.overall)
     }
 }

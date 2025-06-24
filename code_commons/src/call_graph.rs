@@ -301,11 +301,11 @@ impl CallGraph {
         //      (Here, caching could only start at a parent or earlier
         //      or the current node can be being cached if the node is not initial loopbody)
         //      If caching is not active
-        //          Flush the last child's repat count, if non-zero.
+        //          Log the last child's repat count, if non-zero.
         //          Log the current loopbody's end.
-        //          Mark loopbody (but not the whole loop) as ended (node.ended).
         //      otherwise (caching is active)
         //          Do noithing here, move on.
+        //      Mark loopbody (but not the whole loop) as ended (node.ended).
         //      If there is a previous loopbody (previous iteration of the current loop)
         //          Compare this loopbody to the previous loopbody.
         //          If equal
@@ -316,7 +316,8 @@ impl CallGraph {
         //                      Stop caching.
         //              //Return.
         //          Otherwise (differs)
-        //              Do nothing here, move on.
+        //              If caching and the current node is the one being cached
+        //                  Flush and stop caching.
         //      Otherwise (no previous iteration of the current loop)
         //          Do nothing here, move on.
         //      Remove this loopbody from call stack and make parent a current node.
@@ -360,6 +361,7 @@ impl CallGraph {
                     match self.call_stack.last() {
                         None => debug_assert!(false, "Unexpected bottom of call stack"), // TODO: -> call stack bottom.
                         Some(parent_or_pseudo) => {
+                            let parent_or_pseudo = parent_or_pseudo.clone();
                             // If caching is not active
                             if !self.caching_is_active() {
                                 // Flush the last child's repat count, if non-zero.
@@ -377,11 +379,12 @@ impl CallGraph {
                                 self.coderun_notifiable
                                     .borrow_mut()
                                     .notify_loopbody_end(self.call_depth());
-                                // Mark loopbody (but not the whole loop) as ended.
-                                self.current_node.borrow_mut().has_ended = true;
                             }
                             // otherwise (caching is active, starting with parent or earlier)
                             //     Do noithing here, continue caching, move on.
+
+                            // Mark loopbody (but not the whole loop) as ended.
+                            self.current_node.borrow_mut().has_ended = true;
 
                             // If there is a previous loopbody (previous iteration of the current loop)
                             let siblings_count = parent_or_pseudo.borrow().children.len();
@@ -407,8 +410,8 @@ impl CallGraph {
                                             // Increment the previous loopbody repeat count.
                                             previous_node.borrow_mut().repeat_count.inc();
                                             // If the current loopbody is the node being cached,
-                                            if let Some(node_being_cahced) = &self.caching_info.node_being_cached 
-                                                && node_being_cahced.as_ptr() == ending_loopbody.as_ptr() 
+                                            if let Some(node_being_cached) = &self.caching_info.node_being_cached 
+                                                && node_being_cached.as_ptr() == ending_loopbody.as_ptr() 
                                             {
                                                 // Stop caching.
                                                 self.caching_info.clear();
@@ -418,7 +421,13 @@ impl CallGraph {
                                         // return;
                                     }
                                     // Otherwise (differs)
-                                    //     Do nothing here, move on.
+                                    // If caching and the current node is the one being cached
+                                    if let Some(node_being_cahed) = &self.caching_info.node_being_cached
+                                        && ending_loopbody.as_ptr() == node_being_cahed.as_ptr()
+                                    {
+                                        // Flush and stop caching.
+                                        self.flush(); // It also stops caching.
+                                    }
                                 }
                                 // Otherwise (no previous iteration of the current loop, previous node is a call or a different loop)
                                 //     Do nothing here, move on.

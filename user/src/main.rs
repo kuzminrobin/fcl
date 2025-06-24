@@ -217,6 +217,24 @@ fn calls() {
 
         f();
     }
+    #[loggable]
+    {
+        fn z() {}
+        fn x() {
+            z();
+            z();
+        }
+        fn y() {}
+        for _ in 0..2 {
+            x();
+            y();
+        }
+        for _ in 0..3 {
+            x();
+            y();
+        }
+        z();
+    }
 }
 
 #[loggable]
