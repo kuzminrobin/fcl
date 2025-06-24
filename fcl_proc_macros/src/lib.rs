@@ -1653,10 +1653,6 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
         ..
     } = sig;
     let inputs = input_vals(inputs);
-    // match output {
-    //     ReturnType::Default,
-    //     ReturnType::Type(r_arrow, ty),
-    // }
 
     let mut returns_something = false;
     if let ReturnType::Type(..) = output {
@@ -1708,7 +1704,8 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
                     }
                 }); 
 
-                let ret_val = #block;
+                // NOTE: Running `block` as a closure to handle `return` (in the `block`) correctly.
+                let ret_val = (move || #block )();
 
                 if #returns_something {
                     let ret_val_str = format!("{}", ret_val.maybe_print());

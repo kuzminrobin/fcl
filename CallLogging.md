@@ -1,8 +1,4 @@
 # TODO:
-* Logging the ret val for functions having `return`.
-* quote_as_trait_item_fn(): 
-  * in FunctionLogger::new() the param vals are missing.
-  * `LoggableStruct :: next()` does not log the ret_val, ret_val logging is missing?
 * Structure-up single-threaded and multithreaded
 * Consider loggin the ret val in the TreeLikeDecorator
 * `closure { 205usize, 14usize : 212usize, 9usize }() {`
@@ -1043,3 +1039,7 @@ Let me know if you want a complete working example with both `stdout` and `stder
   * [`std::panic::set_hook()`](https://doc.rust-lang.org/std/panic/fn.set_hook.html): aborting and unwinding runtimes.
 * loop start - end (wrapping the repating groups).
   * Canceled: Loop completion (ended_the_loop) and ret val.
+* quote_as_trait_item_fn(): 
+  * in FunctionLogger::new() the param vals are missing.
+  * `LoggableStruct :: next()` does not log the ret_val, ret_val logging is missing?
+* Logging the ret val for functions having `return`.
