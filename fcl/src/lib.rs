@@ -5,8 +5,6 @@ pub mod writer; // TODO: Really `pub`?
 mod output_sync;
 
 use call_log_infra::THREAD_LOGGER;
-// use code_commons::{ClosureInfo};
-// use code_commons::{CalleeName, ClosureInfo};
 
 pub trait MaybePrint {
     fn maybe_print(&self) -> String;
@@ -18,7 +16,6 @@ impl<T> MaybePrint for T {
 }
 
 impl<T: std::fmt::Debug> MaybePrint for T {
-    // impl<T: std::fmt::Display> MaybePrint for T {
     fn maybe_print(&self) -> String {
         format!("{:?}", self)
     }
@@ -46,7 +43,7 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 
 pub struct FunctionLogger {
     // _dropper: CalleeLogger,
-    output: Option<String>, // TODO: -> ret_val_str
+    ret_val_str: Option<String>,
 }
 
 impl FunctionLogger {
@@ -56,17 +53,17 @@ impl FunctionLogger {
         });
         Self {
             // _dropper: CalleeLogger,
-            output: None,
+            ret_val_str: None,
         }
     }
-    pub fn set_output(&mut self, output: String) {
-        self.output = Some(output);
+    pub fn set_ret_val(&mut self, output: String) {
+        self.ret_val_str = Some(output);
     }
 }
 impl Drop for FunctionLogger {
     fn drop(&mut self) {
         THREAD_LOGGER.with(|logger| 
-            logger.borrow_mut().log_ret(self.output.take()));
+            logger.borrow_mut().log_ret(self.ret_val_str.take()));
     }
 }
 

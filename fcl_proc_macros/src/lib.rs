@@ -606,18 +606,18 @@ fn quote_as_expr_closure(expr_closure: &ExprClosure, prefix: &proc_macro2::Token
             // }
 
             // closure_logger!(#prefix);   //#start_line, #start_col, #end_line, #end_col);
-            let _output = #body; // TODO: Consider logging the ret val unconditionally for closure.
+            let ret_val = #body; // TODO: Consider logging the ret val unconditionally for closure.
 
             // Uncondititonally print what closure returns
             // since if its return type is not specified explicitely
             // then the return type is determined with the type inference
             // which is not available at pre-compile (preprocessing) time.
-            let output_str = format!("{}", _output.maybe_print());
+            let ret_val_str = format!("{}", ret_val.maybe_print());
             if let Some(callee_logger) = optional_callee_logger.as_mut() {
-                callee_logger.set_output(output_str);
+                callee_logger.set_ret_val(ret_val_str);
             }
 
-            _output
+            ret_val
 
             // #body              
         }
@@ -1701,23 +1701,23 @@ fn traversed_block_from_sig(block: &Block, sig: &Signature, prefix: &proc_macro2
                 
                 use fcl::MaybePrint;
                 let param_val_str = #inputs;
-                let mut optional_callee_logger = None;    // TODO: -> without initial `_`.
+                let mut optional_callee_logger = None;
                 fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
                     if thread_logger.borrow_mut().logging_is_on() {
                         optional_callee_logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
                     }
                 }); 
 
-                let _output = #block;
+                let ret_val = #block;
 
                 if #returns_something {
-                    let output_str = format!("{}", _output.maybe_print());
+                    let ret_val_str = format!("{}", ret_val.maybe_print());
                     if let Some(callee_logger) = optional_callee_logger.as_mut() {
-                        callee_logger.set_output(output_str);
+                        callee_logger.set_ret_val(ret_val_str);
                     }
                 }
 
-                _output
+                ret_val
             }
         }
     };
@@ -2193,49 +2193,51 @@ fn quote_as_trait_item_fn(trait_item_fn: &TraitItemFn, prefix: &proc_macro2::Tok
         }
     }
     let default = default.as_ref().map(|block| {
-        let Signature {
-            ident, //: Ident,
-            generics, //: Generics,
-            ..
-        } = sig;
-        let func_name = {
-            if prefix.is_empty() { 
-                quote!{ #ident }
-            } 
-            else { 
-                quote!{ #prefix::#ident }
-            }
-        };
-        // let func_name = quote!{ #prefix::#ident };
-        let prefix = quote!{ #func_name #generics() };
-        let block = quote_as_block(block, &prefix);
+        traversed_block_from_sig(block, sig, prefix)
+        // let block = traversed_block_from_sig(block, sig, prefix);
+        // let Signature {
+        //     ident, //: Ident,
+        //     generics, //: Generics,
+        //     ..
+        // } = sig;
+        // let func_name = {
+        //     if prefix.is_empty() { 
+        //         quote!{ #ident }
+        //     } 
+        //     else { 
+        //         quote!{ #prefix::#ident }
+        //     }
+        // };
+        // // let func_name = quote!{ #prefix::#ident };
+        // let prefix = quote!{ #func_name #generics() };
+        // let block = quote_as_block(block, &prefix);
 
-        let generics_params_iter = generics.type_params();
-        let generic_params_is_empty = generics.params.is_empty();
+        // let generics_params_iter = generics.type_params();
+        // let generic_params_is_empty = generics.params.is_empty();
 
-        quote!{ 
-            {
-                let mut generic_func_name = String::with_capacity(64);
-                generic_func_name.push_str(stringify!(#func_name));
-                if !#generic_params_is_empty {
-                    generic_func_name.push_str("<");
-                    let generic_param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-                    for generic_type_name in generic_param_vec {
-                        generic_func_name.push_str(generic_type_name);
-                        generic_func_name.push_str(",");
-                    }
-                    generic_func_name.push_str(">");
-                }
+        // quote!{ 
+        //     {
+        //         let mut generic_func_name = String::with_capacity(64);
+        //         generic_func_name.push_str(stringify!(#func_name));
+        //         if !#generic_params_is_empty {
+        //             generic_func_name.push_str("<");
+        //             let generic_param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+        //             for generic_type_name in generic_param_vec {
+        //                 generic_func_name.push_str(generic_type_name);
+        //                 generic_func_name.push_str(",");
+        //             }
+        //             generic_func_name.push_str(">");
+        //         }
                 
-                let mut _logger = None;
-                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                    if logger.borrow_mut().logging_is_on() {
-                        _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-                    }
-                }); 
-                #block 
-            }
-        }
+        //         let mut _logger = None;
+        //         fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+        //             if logger.borrow_mut().logging_is_on() {
+        //                 _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
+        //             }
+        //         }); 
+        //         #block 
+        //     }
+        // }
     });
     quote!{ #(#attrs)* #sig #default #semi_token }
 }

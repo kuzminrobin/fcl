@@ -109,21 +109,21 @@ impl CoderunNotifiable for CodeLikeDecorator {
         call_depth: usize,
         name: &str,
         has_nested_calls: bool,
-        output: &Option<String>,
+        ret_val: &Option<String>,
     ) {
-        let output_str = output.as_ref().map_or_else(
+        let ret_val_str = ret_val.as_ref().map_or_else(
             || "".to_string(), // None -> "".
             |output| format!(" -> {}", output),
         ); // Some() -> "-> Value".
         if !has_nested_calls && self.line_end_pending {
-            decorator_write!(self, "}}{}\n", output_str); // "}\n"
+            decorator_write!(self, "}}{}\n", ret_val_str); // "}\n"
         } else {
             decorator_write!(
                 self,
                 "{}{}}}{} // {}().\n", // E.g. "<thread_indent><indent>} -> RetVal // sibling().\n".
                 self.common.get_thread_indent(),
                 self.get_indent_string(call_depth),
-                output_str,
+                ret_val_str,
                 name
             );
         }

@@ -1,7 +1,5 @@
 # TODO:
-* loop start - end (wrapping the repating groups).
-  * Canceled: Loop completion (ended_the_loop) and ret val.
-  * [Loop varaible logging (sort of iteration number)]
+* Logging the ret val for functions having `return`.
 * quote_as_trait_item_fn(): 
   * in FunctionLogger::new() the param vals are missing.
   * `LoggableStruct :: next()` does not log the ret_val, ret_val logging is missing?
@@ -23,6 +21,9 @@
 * Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
 The same with color in the HTML decorator adapter.
 * ---
+* [Loops]
+  * [Log the `loop` return value]
+  * [Loop varaible logging (sort of iteration number)]
 * Document that sequential loops can be logged as a single loop (if the iterations are equal).
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
@@ -1040,3 +1041,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
 
 * panic. `std::panic::set_hook()`
   * [`std::panic::set_hook()`](https://doc.rust-lang.org/std/panic/fn.set_hook.html): aborting and unwinding runtimes.
+* loop start - end (wrapping the repating groups).
+  * Canceled: Loop completion (ended_the_loop) and ret val.

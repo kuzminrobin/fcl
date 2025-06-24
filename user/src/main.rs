@@ -381,7 +381,8 @@ fn thread_func() {
             fn next(&mut self) -> Option<Self::Item> {
                 if self.0 {
                     self.0 = false;
-                    return Some(1);
+                    Some(1)
+                    // return Some(1); // TODO: Handle the `return` correctly.
                 } else {
                     None
                 }
