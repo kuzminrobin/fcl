@@ -83,7 +83,7 @@ fn calls() {
             Some(b)
                 .map(
                     // main()::closure()::closure() {}
-                    #[loggable]
+                    // #[loggable]
                     |v| !v,
                 )
                 .unwrap()
