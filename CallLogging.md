@@ -1,7 +1,11 @@
 # TODO:
+* Shrink function name paths. 
+  * Consider making `prefix` a `&str` or `String`.
+  * `closure{205usize,14usize:212usize,9usize}` as a prefix.
+* Consider all occurrences of `body` agains `return`.
+* Consider restructuring `struct QSelfOrPath`
 * Structure-up single-threaded and multithreaded
-* Consider loggin the ret val in the TreeLikeDecorator
-* `closure { 205usize, 14usize : 212usize, 9usize }() {`
+* [Consider loggin the ret val in the TreeLikeDecorator]
 * Remove spaces inside of paths/names. Consider making `prefix` a `String`.
   * `generic_func < T, U >() {}` remove spaces.
   * `MyStruct :: new() {}` remove spaces.
@@ -14,8 +18,9 @@
   * Structure-up single-threaded and multithreaded
     * Make separate macros
     * Make separate examples and/or tests.
-* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
-The same with color in the HTML decorator adapter.
+* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
+  indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
+  The same with color in the HTML decorator adapter.
 * ---
 * [Loops]
   * [Log the `loop` return value]

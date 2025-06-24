@@ -1,5 +1,3 @@
-// use proc_macro::TokenStream;
-// use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, *};
 
@@ -58,8 +56,7 @@ pub fn loggable(
                 gt_token, //: Gt,
             } = qself;
             prefix = quote! { #lt_token #ty #as_token #path #gt_token };
-            // prefix = quote!{ #lt_token #ty #as_clause #gt_token };
-        }
+        } // TODO: Something is wrong here. `else` seems reasonable here.
         if let Some(path) = path {
             prefix = quote! { #path };
         }
@@ -82,110 +79,17 @@ pub fn loggable(
         None
     }
      */
-    /*
-        #[proc_macro_attribute]
-        pub fn my_attr(args: TokenStream, input: TokenStream) -> TokenStream {
-            let args = parse_macro_input!(args as MyAttrArgs);
-    */
-    // let attr_args = parse_attr_args(&attr_args);
-
-    // TODO:
-    // * Both assoc functions (ImplItemFn) and free-standing functions (ItemFn) are currently parsed
-    //   the same way (by the one tried first).
-    // * Both have generics (in my code missing for ImplItemFn).
-    // Resolve:
-    // * Either add generics to ImplItemFn,
-    // * or figure out the differnece exactly and use the correct one in each case.
-    // TODO:
-    // #[loggable(prefix=Parent)]
-    // impl ...
     let output = {
         if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
             quote_as_item(&item, &prefix)
-        // if let Ok(item_mod) = syn::parse::<ItemMod>(attributed_item.clone()) {
-        //     quote_as_item_mod(&item_mod, &prefix)
-        // } else if let Ok(item_impl) = syn::parse::<ItemImpl>(attributed_item.clone()) {
-        //     quote_as_item_impl(&item_impl, &prefix)
-        // } else if let Ok(item_fn) = syn::parse::<ItemFn>(attributed_item.clone()) {
-        //     // A free-standing function.
-        //     quote_as_item_fn(&item_fn, &prefix)
-        // } else if let Ok(impl_item_fn) = syn::parse::<ImplItemFn>(attributed_item.clone()) {
-        //     // Associated function.
-        //     quote_as_impl_item_fn(&impl_item_fn, &prefix)
         } else if let Ok(expr) = syn::parse::<Expr>(attributed_item.clone()) {
             quote_as_expr(&expr, None, &prefix)
         } else {
             let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
             quote_as_expr_closure(&closure_w_opt_comma.closure, &prefix)
         }
-        // {
-        //     let expr = parse_macro_input!(attributed_item as Expr);
-        //     quote_as_expr(&expr, &prefix)
-        //     // let expr_closure = parse_macro_input!(attributed_item as ExprClosure);
-        //     // quote_as_expr_closure(&expr_closure, &prefix)
-
-        //     // let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
-        //     // quote_as_closure(closure_w_opt_comma.closure, &attr_args)
-        // }
     };
     output.into()
-    // if let Ok(module_block) = syn::parse::<ItemMod>(attributed_item.clone()) {
-    //     quote_as_module(module_block, &attr_args)
-    // } else if let Ok(impl_block) = syn::parse::<ItemImpl>(attributed_item.clone()) {
-    //     quote_as_impl(impl_block, &attr_args)
-    // } else if let Ok(func) = syn::parse::<ItemFn>(attributed_item.clone()) {
-    //     // A free-standing function.
-    //     quote_as_function(func, &attr_args)
-    // } else if let Ok(assoc_func) = syn::parse::<ImplItemFn>(attributed_item.clone()) {
-    //     quote_as_associated_function(assoc_func, &attr_args)
-    // } else {
-    //     let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
-    //     quote_as_closure(closure_w_opt_comma.closure, &attr_args)
-    // }
-
-    // TODO: Review the closure parsing below such that after the closure
-    // if nothing is parsed/recognized successfully then just forward the input to the output.
-    // E.g. if `#[loggable] impl` has non-function items, e.g. `type ...` (that get recursively marked as `#[loggable]`),
-    // then those items just need to be forwarded from input to output (with `#[loggable]` removed).
-
-    // if let Ok(closure_w_opt_comma) =
-    //     syn::parse::<ExprClosureWOptComma>(attributed_item.clone())
-    // {
-    //     let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
-    //     result
-    // } else {
-    //     // TODO: Compiler error instead of forwarding.
-    //     attributed_item
-    // }
-
-    // } else {
-    //     // Handling closure differently because of an optional trailing comma,
-    //     // when closure is the last argument of a function.
-    //     // This handling may erroneously consume comma if closure is NOT the last argument (TODO: Test).
-    //     let closure_w_opt_comma =
-    //         parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
-    //     // TODO: What about parsing failure? (not a closure) Consider TODO below.
-    //     let result = quote_as_closure(closure_w_opt_comma.closure, &attr_args);
-    //     result
-    // }
-
-    // } else if let Ok(closure) = syn::parse::<ExprClosure>(&_attributed_item) {
-    //     let result = quote_as_closure(closure);
-    //     // TODO: Optional trailing comma after the closure.
-    //     // syn::parse::<Option<Token![,]>>(_attributed_item);
-    //
-    //     result
-
-    // } else {
-    //     // TODO: Compiler error:
-    //     // Failed to parse as a callable (function //, associated function, closure,
-    //     quote! {
-    //         fn failed () {
-    //             //function_logger!(failed); // The `FunctionLogger` instance.
-    //         }
-    //     }
-    //     .into()
-    // }
 }
 
 /*
@@ -207,121 +111,6 @@ pub fn closure_logger(name: TokenStream) -> TokenStream {
 
 */
 
-// #[rustfmt::skip]
-// fn quote_as_module(module_block: ItemMod, attr_args: &AttrArgs) -> TokenStream {
-//     let ItemMod {
-//         attrs, // : Vec<Attribute>,
-//         vis, // : Visibility,
-//         unsafety, // : Option<Unsafe>,
-//         mod_token, // : Mod,
-//         ident, // : Ident,
-//         content, // : Option<(Brace, Vec<Item>)>,
-//         semi, // : Option<Semi>,
-//     } = module_block;
-//     // // Likely not applicable for instrumenting the run time functions and
-//     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
-//     let mut output = quote! {
-//         #(#attrs)* // : Vec<Attribute>,
-//         #vis // : Visibility,
-//         #unsafety // : Option<Unsafe>,
-//         #mod_token // : Mod,
-//         #ident // : Ident,
-//     };
-
-//     if let Some((_, item_vec)) = content {
-//         let mut prefix = quote! { #ident };
-//         if let AttrArgs::Prefix { path, .. } = attr_args {
-//             prefix = quote!{ #path::#prefix };
-//         }
-//         let loggable_attr: Attribute = parse_quote! {
-//             #[fcl_proc_macros::loggable(prefix=#prefix)]
-//         };
-
-//         let mut content = quote! {};
-//         for item in &item_vec {
-//             match item {
-//                 Item::Fn(_) |
-//                 Item::Impl(_) |
-//                 Item::Mod(_)  => content = quote! { #content #loggable_attr #item },
-//                 _             => content = quote! { #content                #item },
-//             }
-//         }
-//         output = quote! {
-//             #output {
-//                 #content
-//             }
-//         }
-//         // output = quote! {
-//         //     #output {
-//         //         #(#loggable_attr #item_vec)*
-//         //     }
-//         // }
-//     }
-//     output = quote! {
-//         #output
-//         #semi
-//     };
-//     output.into()
-// }
-
-// #[rustfmt::skip]
-// fn quote_as_impl(impl_block: ItemImpl, attr_args: &AttrArgs) -> TokenStream {
-//     let ItemImpl {
-//         attrs,  // [ #[my_attr] #[another_attr] ]
-//         defaultness, // [ default ]
-//         unsafety, // [ unsafe ]
-//         impl_token, // impl
-//         generics, // <T, U>
-//         trait_, // [ [!] MyPath::MyTrait for ]
-//         self_ty, // MyStruct
-//                             // { // brace_token,
-//         items, // type MyType = u8; fn my_fn() {} fn my_fn2() {}
-//         .. // brace_token,
-//     } = impl_block;
-
-//     let mut output = quote! {
-//         #(#attrs)*
-//         #defaultness
-//         #unsafety
-//         #impl_token
-//         #generics
-//     };
-//     // #trait_
-//     if let Some((exclamation, path, for_token)) = trait_ {
-//         output = quote!{
-//             #output
-//             #exclamation #path #for_token
-//         };
-//     }
-//     output = quote!{
-//         #output
-//         #self_ty
-//     };
-//     if ! items.is_empty() {
-//         let mut prefix = quote! { #self_ty };
-//         if let AttrArgs::Prefix { path, .. } = attr_args {
-//             prefix = quote!{ #path::#prefix };
-//         }
-//         let loggable_attr: Attribute = parse_quote! {
-//             #[fcl_proc_macros::loggable(prefix=#prefix)]
-//         };
-
-//         let mut content = quote! {};
-//         for item in &items {
-//             match item {
-//                 ImplItem::Fn(_) => content = quote! { #content #loggable_attr #item },
-//                 _               => content = quote! { #content                #item },
-//             }
-//         }
-//         output = quote! {
-//             #output {
-//                 #content
-//             }
-//         }
-//     }
-//     output.into()
-// }
 
 fn quote_as_expr_array(
     expr_array: &ExprArray,
@@ -587,16 +376,12 @@ fn quote_as_expr_closure(
     };
 
     // Closure name:
-    // let closure_name = // TODO.
     let (start_line, start_col) = {
         let proc_macro2::LineColumn { line, column } = or1_token.span().start();
-        // proc_macro2::Span::call_site().start();
         (line, column + 1)
     };
     let (end_line, end_col) = {
         let proc_macro2::LineColumn { line, column } = body.span().end();
-        // closure.body.span().end();
-        // proc_macro2::Span::call_site().end();
         (line, column)
     };
     let log_closure_name_str = {
@@ -615,19 +400,9 @@ fn quote_as_expr_closure(
             quote! { #prefix::closure{#start_line,#start_col:#end_line,#end_col} }
         }
     };
-    // let log_closure_name_str: String = log_closure_name
-    //     .to_string()
-    //     .chars()
-    //     .filter(|ch| *ch != ' ')
-    //     .collect();
     let prefix = &log_closure_name;
 
     let body = { quote_as_expr(&**body, None, prefix) };
-
-    // let mut returns_something = false;
-    // if let ReturnType::Type(..) = output {
-    //     returns_something = true;
-    // }
 
     quote! {
         #(#attrs)*
@@ -640,8 +415,7 @@ fn quote_as_expr_closure(
             fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
                 if thread_logger.borrow_mut().logging_is_on() {
                     optional_callee_logger = Some(fcl::FunctionLogger::new(
-                    // optional_callee_logger = Some(fcl::ClosureLogger::new( // TODO: &str. TODO: Consider merging ClosureLogger and FunctionLogger.
-                        #log_closure_name_str, param_val_str))//$start_line, $start_col, $end_line, $end_col))
+                        #log_closure_name_str, param_val_str))
                 }
             });
 
@@ -660,7 +434,7 @@ fn quote_as_expr_closure(
             // }
 
             // closure_logger!(#prefix);   //#start_line, #start_col, #end_line, #end_col);
-            let ret_val = #body; // TODO: Consider logging the ret val unconditionally for closure.
+            let ret_val = #body; // TODO: Refactor to handle `return` in the `body` normally.
 
             // Uncondititonally print what closure returns
             // since if its return type is not specified explicitely
@@ -670,53 +444,10 @@ fn quote_as_expr_closure(
             if let Some(callee_logger) = optional_callee_logger.as_mut() {
                 callee_logger.set_ret_val(ret_val_str);
             }
-
             ret_val
-
-            // #body
         }
     }
 }
-// fn quote_as_closure(closure: ExprClosure, _attr_args: &AttrArgs) -> TokenStream {
-//     let (start_line, start_col) = {
-//         let proc_macro2::LineColumn{ line, column } =
-//             proc_macro2::Span::call_site().start();
-//         (line, column + 1)
-//     };
-//     let (end_line, end_col) = {
-//         let proc_macro2::LineColumn{ line, column } =
-//             // proc_macro2::Span::call_site().end();
-//             closure.body.span().end();
-//         (line, column)
-//     };
-//     let coords = quote!{#start_line, #start_col, #end_line, #end_col};
-//     let output = quote_as_expr_closure(&closure, &coords);
-//     output.into()
-//     // let attrs   = closure.attrs;
-//     // let lifetimes = closure.lifetimes;
-//     // let constness = closure.constness;
-//     // let movability = closure.movability;
-//     // let asyncness = closure.asyncness;
-//     // let capture = closure.capture;
-//     // let or1_token = closure.or1_token;
-//     // let inputs = closure.inputs;
-//     // let or2_token = closure.or2_token;
-//     // let output = closure.output;
-//     // let body = closure.body;
-
-//     // let output = quote! {
-//     //     #(#attrs)*
-//     //     #lifetimes #constness #movability #asyncness #capture
-//     //     #or1_token #inputs #or2_token #output
-//     //     {
-//     //         // The `ClosureLogger` instance:
-//     //         closure_logger!(#start_line, #start_col, #end_line, #end_col);
-//     //         #body
-//     //     }
-//     // };
-//     // output.into()
-// }
-
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
 // fn quote_as_expr_const(expr_const: &ExprConst, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -777,22 +508,6 @@ fn quote_as_expr_for_loop(
     let expr = quote_as_expr(&**expr, None, prefix);
     let body = quote_as_loop_block(body, prefix);
     quote! { #(#attrs)* #label #for_token #pat #in_token #expr #body }
-    // quote!{
-    //     {
-    //         let ret_val = {
-    //             #(#attrs)* #label #for_token #pat #in_token #expr #body
-    //         };
-    //         fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-    //             if thread_logger.borrow_mut().logging_is_on() {
-    //                 thread_logger.borrow_mut().log_loop_end()
-    //             }
-    //         });
-    //         ret_val
-    //     }
-    //     // {
-    //     //     #(#attrs)* #label #for_token #pat #in_token #expr #body
-    //     // }
-    // }
 }
 fn quote_as_expr_group(
     expr_group: &ExprGroup,
@@ -916,6 +631,8 @@ fn quote_as_expr_loop(
     }
     let body = quote_as_loop_block(body, prefix);
     quote! { #(#attrs)* #label #loop_token #body }
+    // TODO: Ret val for `loop`.
+    // TODO: Consider all occurrences of `body` agains `return`.
     // quote!{
     //     {
     //         let ret_val = {
@@ -933,18 +650,6 @@ fn quote_as_expr_loop(
     //     // }
     // }
 }
-// // Likely not applicable for instrumenting the run time functions and
-// // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_macro(expr_macro: &ExprMacro, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-//     let ExprMacro {
-//         attrs, //: Vec<Attribute>,
-//         mac, //: Macro,
-//     } = expr_macro;
-//     // // Likely not applicable for instrumenting the run time functions and
-//     // // closures (as opposed to compile time const functions and closures).
-//     // let mac = quote_as_macro(mac, prefix);
-//     quote!{ #(#attrs)* #mac }
-// }
 fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let Arm {
         attrs,           //: Vec<Attribute>,
@@ -1098,25 +803,6 @@ fn quote_as_expr_paren(
     let expr = quote_as_expr(&**expr, None, prefix);
     quote! { #(#attrs)* ( #expr ) }
 }
-// // Likely not applicable for instrumenting the run time functions and
-// // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_path(expr_path: &ExprPath, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-//     let ExprPath {
-//         attrs, //: Vec<Attribute>,
-//         qself, //: Option<QSelf>,
-//         path, //: Path,
-//     } = expr_path;
-//     // // Likely not applicable for instrumenting the run time functions and
-//     // // closures (as opposed to compile time const functions and closures).
-//     // let qself = match qself {
-//     //     Some(qself) => Some(quote_as_qself(qself, prefix)),
-//     //     _ => qself, // None
-//     // };
-//     // // Likely not applicable for instrumenting the run time functions and
-//     // // closures (as opposed to compile time const functions and closures).
-//     // let path = quote_as_path(path, prefix);
-//     quote!{ #(#attrs)* #qself #path }
-// }
 fn quote_as_expr_path(
     expr_path: &ExprPath,
     is_print_func_name: Option<&mut bool>,
@@ -1289,8 +975,8 @@ fn quote_as_expr_struct(
         }
     }
 
-    // quote!{ #qself }: Error: the trait bound `syn::QSelf: quote::ToTokens` is not satisfied
-    // NOTE: The interpretation of qself and path combination below is questionable.
+    // `quote!{ #qself }`: Error: the trait bound `syn::QSelf: quote::ToTokens` is not satisfied
+    // WARNING: The interpretation of {qself and path} combination below is questionable.
     // https://docs.rs/syn/latest/syn/struct.ExprPath.html#structfield.qself
     // https://docs.rs/syn/latest/syn/struct.QSelf.html
     // https://doc.rust-lang.org/reference/paths.html#qualified-paths
@@ -1461,17 +1147,6 @@ fn quote_as_expr_while(
     let cond = quote_as_expr(&**cond, None, prefix);
     let body = quote_as_loop_block(body, prefix);
     quote! { #(#attrs)* #label #while_token #cond #body }
-    // quote!{
-    //     let ret_val = {
-    //         #(#attrs)* #label #while_token #cond #body
-    //     };
-    //     fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-    //         if thread_logger.borrow_mut().logging_is_on() {
-    //             thread_logger.borrow_mut().log_loop_end()
-    //         }
-    //     });
-    //     ret_val
-    // }
 }
 fn quote_as_expr_yield(
     expr_yield: &ExprYield,
@@ -1489,7 +1164,6 @@ fn quote_as_expr_yield(
             return quote! { #expr_yield };
         }
     }
-    // TODO: Replace other `match expr` with `expr.as_ref().map()`.
     let expr = expr
         .as_ref()
         .map(|ref_boxed_expr| quote_as_expr(&**ref_boxed_expr, None, prefix));
@@ -1526,8 +1200,6 @@ fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, prefix: &pr
         Expr::Let       (expr_let) => { quote_as_expr_let(expr_let, prefix) },
         // Expr::Lit       (expr_lit) => { quote_as_expr_lit(expr_lit, prefix) },
         Expr::Loop      (expr_loop) => { quote_as_expr_loop(expr_loop, prefix) },
-        // // Likely not applicable for instrumenting the run time functions and 
-        // // closures (as opposed to compile time const functions and closures).
         Expr::Macro     (expr_macro) => { quote_as_expr_macro(expr_macro, prefix) },
         Expr::Match     (expr_match) => { quote_as_expr_match(expr_match, prefix) },
         Expr::MethodCall(expr_method_call) => { quote_as_expr_method_call(expr_method_call, prefix) },
@@ -1595,14 +1267,6 @@ fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macr
     let init = init.as_ref().map(|init| quote_as_init(init, prefix));
 
     quote! { #(#attrs)* #let_token #pat #init #semi_token }
-    // let output = quote! {
-    //     #iterated_attrs, //#attrs //: Vec<Attribute>,
-    //     #let_token //: Let,
-    //     #pat //: Pat,
-    //     #init // Option<LocalInit>
-    //     #semi_token //: Semi,
-    // };
-    // output.into()
 }
 
 // // Likely not applicable for instrumenting the run time functions and
@@ -1669,54 +1333,6 @@ fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macr
 //     // let vis = quote_as_vis(vis, prefix);
 //     quote!{ #(#attrs)* #vis #extern_token #crate_token #ident #rename #semi_token }
 // }
-/*
-fn quote_as_trait_item_fn(trait_item_fn: &TraitItemFn, prefix: &proc_macro2::TokenStream) -> TokenStream {
-    let TraitItemFn {
-        attrs, //: Vec<Attribute>,
-        sig, //: Signature,
-        default, //: Option<Block>,
-        semi_token, //: Option<Semi>,
-    } = trait_item_fn;
-    let default = default.as_ref().map(|block| {
-        let Signature {
-            ident, //: Ident,
-            generics, //: Generics,
-            ..
-        } = sig;
-        let func_name = quote!{ #prefix::#ident };
-        let prefix = quote!{ #func_name #generics };
-        let block = quote_as_block(block, &prefix);
-
-        let generics_params_iter = generics.type_params();
-        let generic_params_is_empty = generics.params.is_empty();
-
-        quote!{
-            {
-                let mut generic_func_name = String::with_capacity(64);
-                generic_func_name.push_str(stringify!(#func_name));
-                if !#generic_params_is_empty {
-                    generic_func_name.push_str("<");
-                    let generic_param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-                    for generic_type_name in generic_param_vec {
-                        generic_func_name.push_str(generic_type_name);
-                        generic_func_name.push_str(",");
-                    }
-                    generic_func_name.push_str(">");
-                }
-
-                let mut _logger = None;
-                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                    if logger.borrow_mut().logging_is_on() {
-                        _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-                    }
-                });
-                #block
-            }
-        }
-    });
-    quote!{ #(#attrs)* #sig #default #semi_token }
-} */
-
 trait IsTraverseStopper {
     fn is_traverse_stopper(&self) -> bool;
 }
@@ -1768,13 +1384,12 @@ fn update_param_data_from_pat(
     }
 }
 fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
-    let mut param_format_str = String::new(); //quote!{};
+    let mut param_format_str = String::new();
     let mut param_list = quote! {};
     for fn_param in inputs {
         match fn_param {
             FnArg::Receiver(_receiver) => {
                 param_format_str.push_str("self: {}, ");
-                // param_format_str = quote!{ #param_format_str self: {}, }; // TODO: Consider String to control the spaces between the tokens.
                 param_list = quote! { #param_list self.maybe_print(), };
             }
             FnArg::Typed(pat_type) => {
@@ -1782,7 +1397,6 @@ fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
             }
         }
     }
-    // let param_format_str = param_format_str.to_string();
     if param_format_str.is_empty() {
         quote! { None }
     } else {
@@ -1852,7 +1466,7 @@ fn traversed_block_from_sig(
                     }
                 });
 
-                // NOTE: Running `block` as a closure to handle `return` (in the `block`) correctly.
+                // NOTE: Running `block` as a closure to handle the `return` (in the `block`) correctly.
                 let ret_val = (move || #block )();
 
                 if #returns_something {
@@ -1866,19 +1480,7 @@ fn traversed_block_from_sig(
             }
         }
     };
-    // // If returns something then log the output:
-    // if let ReturnType::Type(..) = output {
-    //     block = quote!{
-    //         {
-    //             let _output = #block;
-    //             let output_str = format!("{}", _output.maybe_print());
-    //             if let Some(function_logger) = _function_logger.as_mut() {
-    //                 function_logger.set_output(output_str);
-    //             }
-    //             _output
-    //         }
-    //     }
-    // }
+
     block
 }
 fn quote_as_item_fn(
@@ -1901,61 +1503,6 @@ fn quote_as_item_fn(
     }
 
     let block = traversed_block_from_sig(block, sig, prefix);
-    // let Signature {
-    //     ident, //: Ident,
-    //     generics, //: Generics,
-    //     inputs, //: Punctuated<FnArg, Comma>,
-    //     ..
-    // } = sig;
-    // let inputs = input_vals(inputs);
-
-    // let block = {
-    //     let func_log_name = {
-    //         if prefix.is_empty() {
-    //             quote!{ #ident }
-    //         }
-    //         else {
-    //             quote!{ #prefix::#ident }
-    //         }
-    //     };
-
-    //     // Instrument the local functions and closures inside of the function body:
-    //     let prefix = quote!{ #func_log_name #generics() };
-    //     // let prefix = quote!{ #func_name #generics };
-    //     let block = quote_as_block(block, &prefix);
-
-    //     // The proc_macros (pre-compile) part of the infrastructure for
-    //     // generic parameters substitution with actual generic arguments. <T, U> -> <char, u8>
-    //     let generics_params_iter = generics.type_params();
-    //     let generic_params_is_empty = generics.params.is_empty();
-
-    //     quote!{
-    //         {
-    //             // The run time part of the infrastructure for
-    //             // generic parameters substitution with actual generic arguments.
-    //             let mut generic_func_name = String::with_capacity(64);
-    //             generic_func_name.push_str(stringify!(#func_log_name));
-    //             if !#generic_params_is_empty {
-    //                 generic_func_name.push_str("<");
-    //                 let generic_arg_names_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-    //                 for generic_arg_name in generic_arg_names_vec {
-    //                     generic_func_name.push_str(generic_arg_name);
-    //                     generic_func_name.push_str(",");
-    //                 }
-    //                 generic_func_name.push_str(">");
-    //             }
-
-    //             let param_val_str = #inputs;
-    //             let mut _logger = None;
-    //             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-    //                 if logger.borrow_mut().logging_is_on() {
-    //                     _logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
-    //                 }
-    //             });
-    //             #block
-    //         }
-    //     }
-    // };
     quote! { #(#attrs)* #vis #sig #block }
 
     // // // Likely not applicable for instrumenting the run time functions and
@@ -2043,85 +1590,8 @@ fn quote_as_impl_item_fn(
         }
     }
     let block = traversed_block_from_sig(block, sig, prefix);
-
-    // // TODO: Dedup below.
-    // let Signature {
-    //     ident, //: Ident,
-    //     generics, //: Generics,
-    //     inputs,
-    //     ..
-    // } = sig;
-    // // let inputs = input_vals(inputs);
-    // let block = {
-    //     let func_log_name = {
-    //         if prefix.is_empty() {
-    //             quote!{ #ident }
-    //         } else {
-    //             quote!{ #prefix::#ident }
-    //         }
-    //     };
-
-    //     // Instrument the local functions and closures inside of the function body:
-    //     let prefix = quote!{ #func_log_name #generics() };
-    //     // let prefix = quote!{ #func_name #generics };
-    //     let block = quote_as_block(block, &prefix);
-
-    //     // The proc_macros (pre-compile) part of the infrastructure for
-    //     // generic parameters substitution with actual generic arguments.
-    //     let generics_params_iter = generics.type_params();
-    //     let generic_params_is_empty = generics.params.is_empty();
-
-    //     quote!{
-    //         {
-    //             // The run time part of the infrastructure for
-    //             // generic parameters substitution with actual generic arguments.
-    //             let mut generic_func_name = String::with_capacity(64);
-    //             generic_func_name.push_str(stringify!(#func_log_name));
-    //             if !#generic_params_is_empty {
-    //                 generic_func_name.push_str("<");
-    //                 let generic_arg_names_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-    //                 for generic_arg_name in generic_arg_names_vec {
-    //                     generic_func_name.push_str(generic_arg_name);
-    //                     generic_func_name.push_str(",");
-    //                 }
-    //                 generic_func_name.push_str(">");
-    //             }
-
-    //             let mut _logger = None;
-    //             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-    //                 if logger.borrow_mut().logging_is_on() {
-    //                     _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-    //                 }
-    //             });
-    //             #block
-    //         }
-    //     }
-    // };
     quote! { #(#attrs)* #vis #defaultness #sig #block }
-
-    // let prefix = quote!{ #prefix::#ident #generics() };
-    // let block = quote_as_block(block, &prefix);
-    // quote!{ #(#attrs)* #vis #defaultness
-    //     #sig {
-    //         #block
-    //     }
-    // }
 }
-/*
-fn quote_as_item_fn(item_fn: &ItemFn, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    let ItemFn {
-        attrs, //: Vec<Attribute>,
-        vis, //: Visibility,
-        sig, //: Signature,
-        block, //: Box<Block>,
-    } = item_fn;
-    let Signature {
-        ident, //: Ident,
-        generics, //: Generics,
-        ..
-    } = sig;
-
- */
 fn quote_as_impl_item(
     impl_item: &ImplItem,
     prefix: &proc_macro2::TokenStream,
@@ -2824,140 +2294,6 @@ fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macr
     quote! { { #stmts } }
 }
 
-// fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -> TokenStream {
-//     let ItemFn {
-//         attrs,
-//         vis,
-//         sig,
-//         block
-//     } = func;
-
-//     // TODO: Handle name and prefix in the same manner for all.
-//     let func_name = match attr_args {
-//         AttrArgs::Name { path, .. } => quote!{ #path },
-//         AttrArgs::Prefix { path, .. } => {
-//             let id = sig.ident.clone();
-//             quote!{ #path::#id }
-//         }
-//         AttrArgs::None => {
-//             let id = sig.ident.clone();
-//             quote!{ #id }
-//         }
-//     };
-//     let traversed_block = quote_as_block(&*block, &func_name);
-
-//     let generics = sig.generics.clone();
-//     let generics_params_iter = generics.type_params();
-//     let generic_params_is_empty = generics.params.is_empty();
-
-//     let output = quote! {
-//         #(#attrs)*
-//         #vis #sig {
-//             let mut generic_func_name = String::with_capacity(64);
-//             generic_func_name.push_str(stringify!(#func_name));
-//             if !#generic_params_is_empty {
-//                 generic_func_name.push_str("<");
-//                 let param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-//                 for type_iter in param_vec {
-//                     generic_func_name.push_str(type_iter);
-//                     generic_func_name.push_str(",");
-//                 }
-//                 generic_func_name.push_str(">");
-//             }
-
-//             let mut _logger = None;
-//             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-//                 if logger.borrow_mut().logging_is_on() {
-//                     _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-//                 }
-//             });
-//             // TODO: Handle body recursively to pass `#[loggable]` to local functions and closures.
-//             // Same for ImplItemFn (associated function).
-//             #block
-//         }
-//         // $( #[$meta] )*
-//         // $vis fn $name ( $( $arg_name : $arg_ty ),* ) $( -> $ret_ty )? {
-//         //     function_logger!($name); // The `FunctionLogger` instance.
-//         //     $($tt)*
-//         // }
-//     };
-//     output.into()
-// }
-
-// fn quote_as_associated_function(func: ImplItemFn, attr_args: &AttrArgs) -> TokenStream {
-//     let attrs = func.attrs;
-//     let vis = func.vis;
-//     let defaultness = func.defaultness;
-//     let signature = func.sig;
-//     // TODO: Dedup func_name for quote_as_associated_function() and quote_as_function().
-//     let func_name = match attr_args {
-//         AttrArgs::Name { path, .. } => quote!{ #path },
-//         AttrArgs::Prefix { path, .. } => {
-//             let id = signature.ident.clone();
-//             quote!{ #path::#id }
-//         }
-//         AttrArgs::None => {
-//             let id = signature.ident.clone();
-//             quote!{ #id }
-//         }
-//     };
-//     // let func_name = if let Some(attr_args) = attr_args {
-//     //     // "MyTrait::my_func"
-//     //     let path = attr_args.name.path.clone();
-//     //     let ret = quote! { #path };
-//     //     ret
-//     // } else {
-//     //     // "my_func"
-//     //     let id = signature.ident.clone();
-//     //     quote! { #id }
-//     // };
-//     let body = func.block;
-//     let output = quote! {
-//         #(#attrs)*
-//         #vis #defaultness #signature {
-//             function_logger!(#func_name); // The `FunctionLogger` instance. TODO: What about `#generics`? Forgotten!
-//             #body
-//         }
-//     };
-//     output.into()
-// }
-
-// fn quote_as_closure(closure: ExprClosure, _attr_args: &AttrArgs) -> TokenStream {
-//     let (start_line, start_col) = {
-//         let proc_macro2::LineColumn{ line, column } =
-//             proc_macro2::Span::call_site().start();
-//         (line, column + 1)
-//     };
-//     let (end_line, end_col) = {
-//         let proc_macro2::LineColumn{ line, column } =
-//             // proc_macro2::Span::call_site().end();
-//             closure.body.span().end();
-//         (line, column)
-//     };
-//     let attrs   = closure.attrs;
-//     let lifetimes = closure.lifetimes;
-//     let constness = closure.constness;
-//     let movability = closure.movability;
-//     let asyncness = closure.asyncness;
-//     let capture = closure.capture;
-//     let or1_token = closure.or1_token;
-//     let inputs = closure.inputs;
-//     let or2_token = closure.or2_token;
-//     let output = closure.output;
-//     let body = closure.body;
-
-//     let output = quote! {
-//         #(#attrs)*
-//         #lifetimes #constness #movability #asyncness #capture
-//         #or1_token #inputs #or2_token #output
-//         {
-//             // The `ClosureLogger` instance:
-//             closure_logger!(#start_line, #start_col, #end_line, #end_col);
-//             #body
-//         }
-//     };
-//     output.into()
-// }
 
 /// Closure with optional trailing comma
 /// (when closure is the last argument of a function):
@@ -3000,7 +2336,9 @@ impl Parse for FclQSelf {
         })
     }
 }
-struct QSelfOrPath {
+
+// TODO: Something is wrong below. Option<Enum> seems more reasonable. Otherwise both can be specified.
+struct QSelfOrPath {    
     qself: Option<FclQSelf>,
     // qself: Option<QSelf>,
     path: Option<Path>,
@@ -3086,53 +2424,3 @@ impl Parse for AttrArgs {
         }
     }
 }
-
-// struct ArgExpr {
-//     name_or_prefix: Ident,
-//     eq: Token![=],
-//     path: ExprPath,
-// }
-// impl Parse for ArgExpr {
-//     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-//         Ok(Self {
-//             name_or_prefix: input.parse()?,
-//             eq: input.parse()?,
-//             path: input.parse()?,
-//             // closure: input.parse()?,
-//             // _optional_comma: input.parse()?
-//         })
-
-//     }
-// }
-
-// struct AttrArgs {
-//     name: ExprPath
-// }
-
-// fn parse_attr_args(attr_args: &TokenStream) -> Option<syn::Result<AttrArgs>> {
-//     if !attr_args.is_empty() {
-//         return Some(syn::parse::<AttrArgs>(attr_args.clone()))
-//         // match syn::parse::<AttrArgs>(attr_args.clone()) {
-//         //     Ok(attr_args) => return Some(attr_args),
-//         //     Err(_err) => {
-//         //         // TODO: Log the attr arg error appropriately.
-//         //         return None
-//         //     }
-//         // }
-
-//         // if let Ok(ArgExpr { name_or_prefix, path, .. } ) = syn::parse::<ArgExpr>(attr_args.clone()) {
-//         // }
-
-//         // if let Ok(id) = syn::parse::<ExprPath>(attr_args.clone()) {
-//         // // if let Ok(id) = syn::parse::<Ident>(attr_args.clone()) {
-//         //     // if let Ok(literal) = syn::parse::<ExprLit>(attr_args.clone()) {
-//         //         // if let Lit::Str(str) = id.lit {
-//         //             return Some(AttrArgs {
-//         //                 name: id
-//         //                 // name: str.value()
-//         //             })
-//         //         // }
-//         //     }
-//     }
-//     None
-// }
