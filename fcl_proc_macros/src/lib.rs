@@ -2194,50 +2194,6 @@ fn quote_as_trait_item_fn(trait_item_fn: &TraitItemFn, prefix: &proc_macro2::Tok
     }
     let default = default.as_ref().map(|block| {
         traversed_block_from_sig(block, sig, prefix)
-        // let block = traversed_block_from_sig(block, sig, prefix);
-        // let Signature {
-        //     ident, //: Ident,
-        //     generics, //: Generics,
-        //     ..
-        // } = sig;
-        // let func_name = {
-        //     if prefix.is_empty() { 
-        //         quote!{ #ident }
-        //     } 
-        //     else { 
-        //         quote!{ #prefix::#ident }
-        //     }
-        // };
-        // // let func_name = quote!{ #prefix::#ident };
-        // let prefix = quote!{ #func_name #generics() };
-        // let block = quote_as_block(block, &prefix);
-
-        // let generics_params_iter = generics.type_params();
-        // let generic_params_is_empty = generics.params.is_empty();
-
-        // quote!{ 
-        //     {
-        //         let mut generic_func_name = String::with_capacity(64);
-        //         generic_func_name.push_str(stringify!(#func_name));
-        //         if !#generic_params_is_empty {
-        //             generic_func_name.push_str("<");
-        //             let generic_param_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-        //             for generic_type_name in generic_param_vec {
-        //                 generic_func_name.push_str(generic_type_name);
-        //                 generic_func_name.push_str(",");
-        //             }
-        //             generic_func_name.push_str(">");
-        //         }
-                
-        //         let mut _logger = None;
-        //         fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-        //             if logger.borrow_mut().logging_is_on() {
-        //                 _logger = Some(fcl::FunctionLogger::new(&generic_func_name))
-        //             }
-        //         }); 
-        //         #block 
-        //     }
-        // }
     });
     quote!{ #(#attrs)* #sig #default #semi_token }
 }
