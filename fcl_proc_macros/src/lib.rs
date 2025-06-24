@@ -714,11 +714,9 @@ fn quote_as_expr_for_loop(expr_for_loop: &ExprForLoop, prefix: &proc_macro2::Tok
             return quote!{ #expr_for_loop }
         }
     }
-    // // Likely not applicable for instrumenting the run time functions and 
-    // // closures (as opposed to compile time const functions and closures).
-    // let pat = quote_as_pat(&**pat, prefix);
     let expr = quote_as_expr(&**expr, None, prefix);
-    let body = quote_as_block(body, prefix);
+    let body = quote_as_loop_block(body, prefix);    
+    // let body = quote_as_block(body, prefix);
     quote!{ #(#attrs)* #label #for_token #pat #in_token #expr #body } 
 }
 fn quote_as_expr_group(expr_group: &ExprGroup, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -826,7 +824,8 @@ fn quote_as_expr_loop(expr_loop: &ExprLoop, prefix: &proc_macro2::TokenStream) -
             return quote!{ #expr_loop }
         }
     }
-    let body = quote_as_block(body, prefix);
+    let body = quote_as_loop_block(body, prefix);    
+    // let body = quote_as_block(body, prefix);
     quote!{ #(#attrs)* #label #loop_token #body } 
 }
 // // Likely not applicable for instrumenting the run time functions and 
@@ -1293,7 +1292,8 @@ fn quote_as_expr_while(expr_while: &ExprWhile, prefix: &proc_macro2::TokenStream
         }
     }
     let cond = quote_as_expr(&**cond, None, prefix);
-    let body = quote_as_block(body, prefix);
+    let body = quote_as_loop_block(body, prefix);
+    // let body = quote_as_block(body, prefix);
     quote!{ #(#attrs)* #label #while_token #cond #body }
 }
 fn quote_as_expr_yield(expr_yield: &ExprYield, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
@@ -2598,8 +2598,40 @@ fn quote_as_stmt(stmt: &Stmt, prefix: &proc_macro2::TokenStream) -> proc_macro2:
         Stmt::Macro(stmt_macro) => quote_as_stmt_macro(stmt_macro, prefix),
     }
 }
+fn quote_as_loop_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let Block {
+        // brace_token, //: Brace,
+        stmts, // Vec<Stmt>
+        .. //brace_token,
+    } = block;
+
+    let stmts = {
+        let mut traversed_stmts = quote!{};
+        for stmt in stmts {
+            let traversed_stmt = quote_as_stmt(stmt, prefix);
+            traversed_stmts = quote!{ #traversed_stmts #traversed_stmt }
+        }
+        traversed_stmts
+    };
+    quote!{ 
+        {
+            // Log the loop body start (if logging is enabled).
+            let mut optional_logger = None;
+            fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+                if thread_logger.borrow_mut().logging_is_on() {
+                    optional_logger =
+                        Some(fcl::LoopbodyLogger::new())
+                }
+            });
+
+            #stmts 
+
+            // Log the loop body end in the destructor of `optional_logger`.
+        } 
+    }
+}
+
 fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-// fn quote_as_block(block: Box<Block>, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let Block {
         // brace_token, //: Brace,
         stmts, // Vec<Stmt>
@@ -2615,24 +2647,6 @@ fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macr
         traversed_stmts
     };
     quote!{ { #stmts } }
-    // // Add macro attribute to the local functions and closures:
-    // let mut traveresed_block = quote! {};
-    // for statement in stmts {
-    //     let traveresed_nested = match statement {
-    //         Stmt::Local(local) => quote_as_local(&local, prefix),
-    //         Stmt::Item(item) => quote_as_item(&item, prefix),
-    //         Stmt::Expr(expr, opt_semicolon) => quote_as_expr(&expr, prefix),
-    //         other => quote!{ #other}
-    //     };
-    //     traveresed_block = quote! { #traveresed_block #traveresed_nested };
-    // }
-
-    // let result = quote! {
-    //     {
-    //         #traveresed_block
-    //     }
-    // };
-    // result.into()
 }
 
 // fn quote_as_function(func: ItemFn, attr_args: &AttrArgs /*&Option<AttrArgs>*/) -> TokenStream {

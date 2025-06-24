@@ -1,6 +1,8 @@
-use std::io::{Write, stdout};
+use std::{
+    io::{Write, stdout},
+};
 
-use code_commons::{CoderunNotifiable, RepeatCountCategory};
+use code_commons::{CoderunNotifiable, ItemKind, RepeatCountCategory};
 // use code_commons::{CalleeName, CoderunNotifiable, RepeatCountCategory};
 use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 
@@ -73,6 +75,8 @@ impl CoderunDecorator for CodeLikeDecorator {
     }
 }
 
+const LOOPBODY_NAME: &str = &"Loop body";
+
 impl CoderunNotifiable for CodeLikeDecorator {
     fn notify_flush(&mut self) {
         if self.line_end_pending {
@@ -107,12 +111,10 @@ impl CoderunNotifiable for CodeLikeDecorator {
         has_nested_calls: bool,
         output: &Option<String>,
     ) {
-        // fn notify_return(&mut self, call_depth: usize, name: &CalleeName, has_nested_calls: bool) {
-        let output_str = output
-            .as_ref()
-            .map_or_else(
-                || "".to_string(), // None -> "".
-                |output| format!(" -> {}", output)); // Some() -> "-> Value".
+        let output_str = output.as_ref().map_or_else(
+            || "".to_string(), // None -> "".
+            |output| format!(" -> {}", output),
+        ); // Some() -> "-> Value".
         if !has_nested_calls && self.line_end_pending {
             decorator_write!(self, "}}{}\n", output_str); // "}\n"
         } else {
@@ -123,7 +125,6 @@ impl CoderunNotifiable for CodeLikeDecorator {
                 self.get_indent_string(call_depth),
                 output_str,
                 name
-                // CommonDecorator::get_callee_name_string(name)
             );
         }
         self.line_end_pending = false;
@@ -131,19 +132,48 @@ impl CoderunNotifiable for CodeLikeDecorator {
     fn notify_repeat_count(
         &mut self,
         call_depth: usize,
-        name: &str,
-        // name: &CalleeName,
+        kind: &ItemKind,
+        // name: &str,
         count: RepeatCountCategory,
     ) {
+        let item_name = match kind {
+            ItemKind::Call { name, .. } => format!("{}()", name),
+            ItemKind::Loopbody { .. } => String::from(LOOPBODY_NAME), //"Loop body"),
+        };
         decorator_write!(
             self,
-            "{}{}// {}() repeats {} time(s).\n", // E.g. "<thread_indent><indent>// sibling() repeats 8 time(s).\n"
+            "{}{}// {} repeats {} time(s).\n", // E.g. "<thread_indent><indent>// sibling() repeats 8 time(s).\n"
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
-            name,
-            // CommonDecorator::get_callee_name_string(name),
+            item_name,
+            // name,
             count.to_string()
         );
+    }
+    fn notify_loopbody_start(&mut self, call_depth: usize) {
+        if self.line_end_pending {
+            decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
+        }
+        decorator_write!(
+            self,
+            "{}{}{{ // {} start.\n",
+            self.common.get_thread_indent(),
+            self.get_indent_string(call_depth),
+            LOOPBODY_NAME,
+        ); // E.g. "<thread_indent><indent>{ // Loop body start."
+        self.line_end_pending = false;
+    }
+    fn notify_loopbody_end(&mut self, call_depth: usize) {
+        decorator_write!(
+            self,
+            "{}{}}} // {} end.\n", // E.g. "<thread_indent><indent>} // Loop body end.\n".
+            // "{}{}}}{} // {}().\n", // E.g. "<thread_indent><indent>} -> RetVal // sibling().\n".
+            self.common.get_thread_indent(),
+            self.get_indent_string(call_depth),
+            // output_str,
+            LOOPBODY_NAME, //name // CommonDecorator::get_callee_name_string(name)
+        );
+        self.line_end_pending = false;
     }
 }
 
@@ -225,21 +255,41 @@ impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_repeat_count(
         &mut self,
         call_depth: usize,
-        name: &str,
-        // name: &CalleeName,
+        kind: &ItemKind,
+        // name: &str,
         count: RepeatCountCategory,
     ) {
+        let item_name = match kind {
+            ItemKind::Call { name, .. } => name.clone(),
+            ItemKind::Loopbody { .. } => String::from(LOOPBODY_NAME), //"Loop body"),
+        };
         decorator_write!(
             self,
             "{}{}{}{} repeats {} time(s).\n", // E.g. "<thread_indent><indent> sibling repeats 8 time(s).\n"
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
             self.indent_step_noncall,
-            name,
-            // CommonDecorator::get_callee_name_string(name),
+            item_name,
+            // name,
             count.to_string()
         );
     }
+    fn notify_loopbody_start(&mut self, call_depth: usize) {
+        decorator_write!(
+            self,
+            "{}{}{}{}\n",
+            self.common.get_thread_indent(),
+            self.get_indent_string(call_depth),
+            self.indent_step_call,
+            LOOPBODY_NAME,
+            // param_vals
+            //     .as_ref()
+            //     .map(|string| string.as_str())
+            //     .unwrap_or(&"") // CommonDecorator::get_callee_name_string(name)
+        ); // E.g."<thread_indent><indent>+-Loop body", "| | | | +-Loop body"
+    }
+
+    // NOTE: Reusing the default behavior of `notify_loopbody_end()` that does nothing.
 }
 
 impl ThreadSpecifics for TreeLikeDecorator {

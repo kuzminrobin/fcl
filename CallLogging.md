@@ -1,5 +1,8 @@
 # TODO:
 * loop start - end (wrapping the repating groups).
+  * Loop completion (ended_the_loop) and ret val.
+  * [Loop varaible logging (sort of iteration number)]
+* quote_as_trait_item_fn(): in FunctionLogger::new() the param vals are missing.
 * Structure-up single-threaded and multithreaded
 * Consider loggin the ret val in the TreeLikeDecorator
 * `closure { 205usize, 14usize : 212usize, 9usize }() {`

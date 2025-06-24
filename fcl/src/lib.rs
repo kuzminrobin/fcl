@@ -70,6 +70,23 @@ impl Drop for FunctionLogger {
     }
 }
 
+pub struct LoopbodyLogger;
+
+impl LoopbodyLogger {
+    pub fn new() -> Self {
+        THREAD_LOGGER.with(|logger| {
+            logger.borrow_mut().log_loopbody_start()
+        });
+        Self
+    }
+}
+impl Drop for LoopbodyLogger {
+    fn drop(&mut self) {
+        THREAD_LOGGER.with(|logger| 
+            logger.borrow_mut().log_loopbody_end());
+    }
+}
+
 // pub struct ClosureLogger {
 //     _dropper: CalleeLogger
 // }

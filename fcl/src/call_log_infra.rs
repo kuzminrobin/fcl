@@ -58,11 +58,10 @@ impl CallLogger for CallLogInfra {
     }
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        // fn log_call(&mut self, name: &CalleeName) {
         self.call_graph.add_call(name, param_vals);
     }
-    fn log_ret(&mut self, output: Option<String>) {
-        self.call_graph.add_ret(output);
+    fn log_ret(&mut self, ret_val: Option<String>) {
+        self.call_graph.add_ret(ret_val);
     }
 
     // TODO: Consider making this impl conditional, for multithreaded case only.
@@ -70,6 +69,13 @@ impl CallLogger for CallLogInfra {
         self.call_graph.flush()
     }
     fn maybe_flush(&mut self) {}
+    fn log_loopbody_start(&mut self) {
+        self.call_graph.add_loopbody_start()
+    }
+    fn log_loopbody_end(&mut self) {
+        self.call_graph.add_loopbody_end()
+    }
+
 }
 
 pub struct CallLoggerArbiter {
@@ -250,7 +256,7 @@ impl CallLoggerArbiter {
                     debug_assert!(false, NO_LOGGER_ERR_STR!());
                 } 
 
-                // Flush the previous (and dcurrent) thread's buffered std output, if any:
+                // Flush the previous (and current) thread's buffered std output, if any:
                 if let Some(redirector) = &mut self.stderr_redirector {
                     redirector.flush()
                 }
@@ -284,7 +290,7 @@ impl CallLoggerArbiter {
                         .read_to_string(&mut stdout_buf_content));
                 }
 
-                // If there was any std output or a full flush, flush the FCL updates:
+                // If there was any std output or a full flush is in progress, flush the FCL updates:
                 if !stderr_buf_content.is_empty() || !stdout_buf_content.is_empty() 
                    || full_flush
                 {
@@ -396,7 +402,7 @@ impl CallLogger for CallLoggerArbiter {
         } 
         self.last_fcl_update_thread = Some(current_thread_id);
     }
-    fn log_ret(&mut self, output: Option<String>) {
+    fn log_ret(&mut self, ret_val: Option<String>) {
         let current_thread_id = thread::current().id();
 
         // TODO: Come up with a more strict terminology regarding the "regular panic handler" as opposed to "(FCL's panic hook)".
@@ -405,19 +411,49 @@ impl CallLogger for CallLoggerArbiter {
         // In that case suppress flushing and {logging the fake returns in the panicking thread}
         // (by removing the thread's logger from the HashMap in the FCL's panic hook 
         // and ignoring the absence of the thread's logger in the code below). 
-        // NOTE: Two `if`s below to work around the double exclusive borrow between `logger` and `self`.
+        // NOTE: Two `if`s below (instead of one `if let`) are to work around the double exclusive borrow between `logger` and `self`.
         if self.get_thread_logger(current_thread_id).is_some() {
             self.sync_fcl_and_std_output(false);
-        } // else (no logger) the stack unwinding of the current thread. Do nothing.
+        } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress flushing).
         if let Some(logger) = self.get_thread_logger(current_thread_id) {
-            logger.log_ret(output);
+            logger.log_ret(ret_val);
             self.last_fcl_update_thread = Some(current_thread_id);
-        } // else (no logger) the stack unwinding of the current thread. Do nothing.
+        } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress 
+        // the fake return logging).
     }
     fn maybe_flush(&mut self) {
         self.sync_fcl_and_std_output(false);
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
+    fn log_loopbody_start(&mut self) {
+        self.sync_fcl_and_std_output(false);
+
+        let current_thread_id = thread::current().id();
+        if let Some(logger) = self.get_thread_logger(current_thread_id) {
+            logger.log_loopbody_start();
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!());
+        } 
+        self.last_fcl_update_thread = Some(current_thread_id);
+
+    }
+    fn log_loopbody_end(&mut self) {
+        let current_thread_id = thread::current().id();
+
+        // Potentially a call (from a `LoopbodyLogger` destructor) during stack unwinding in the regular panic handler.
+        // In that case suppress flushing and {logging the fake loopbody ends in the panicking thread}
+        // (by removing the thread's logger from the HashMap in the FCL's panic hook 
+        // and ignoring the absence of the thread's logger in the code below). 
+        // NOTE: Two `if`s below (instead of one `if let`) are to work around the double exclusive borrow between `logger` and `self`.
+        if self.get_thread_logger(current_thread_id).is_some() {
+            self.sync_fcl_and_std_output(false);
+        } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress flushing).
+        if let Some(logger) = self.get_thread_logger(current_thread_id) {
+            logger.log_loopbody_end();
+            self.last_fcl_update_thread = Some(current_thread_id);
+        } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress 
+        // the fake loopbody end logging).
+    }
 }
 
 // TODO: Remove after the freezing is clarified.
@@ -477,16 +513,21 @@ impl CallLogger for CallLoggerAdapter {
     }
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        // fn log_call(&mut self, name: &CalleeName) {
         self.get_arbiter().log_call(name, param_vals)
     }
-    fn log_ret(&mut self, output: Option<String>) {
-        self.get_arbiter().log_ret(output)
+    fn log_ret(&mut self, ret_val: Option<String>) {
+        self.get_arbiter().log_ret(ret_val)
     }
     fn maybe_flush(&mut self) {
         self.get_arbiter().maybe_flush();
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
+    fn log_loopbody_start(&mut self) {
+        self.get_arbiter().log_loopbody_start()
+    }
+    fn log_loopbody_end(&mut self) {
+        self.get_arbiter().log_loopbody_end()
+    }
 }
 
 // Global data shared by all the threads:

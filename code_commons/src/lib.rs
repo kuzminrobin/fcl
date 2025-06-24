@@ -40,40 +40,77 @@ impl RepeatCountCategory {
     }
 }
 
+#[derive(Clone)]
+pub enum ItemKind {
+    /// Item is a function or a closure.
+    Call {
+        name: String,
+        param_vals: Option<String>,
+    },
+    /// Item is a loop body.
+    Loopbody {
+        /// Flag that tells that the loop has ended (the loop body has ended the loop).  
+        /// Surves for distinguishing
+        /// the last iteration of an earlier loop from the first iteration of an
+        /// immediately following loop. So that the two loops are not logged as one.
+        ended_the_loop: bool,
+    },
+}
+impl ItemKind {
+    pub fn is_call(&self) -> bool {
+        if let Self::Call { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn is_loopbody(&self) -> bool {
+        if let Self::Loopbody { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Trait to be implemented by the instances that need to be notified about the code run events
 /// (such as function or closure calls, returns, etc.).
 pub trait CoderunNotifiable {
     /// Non-cached call happened.
     fn notify_call(&mut self, _call_depth: usize, _name: &str, _param_vals: &Option<String>) {}
-    // fn notify_call(&mut self, _call_depth: usize, _name: &CalleeName) {}
     /// Non-cached return happened.
     fn notify_return(
         &mut self,
         _call_depth: usize,
         _name: &str,
         _has_nested_calls: bool,
-        _output: &Option<String>,
+        _ret_val: &Option<String>,
     ) {
     }
-    // fn notify_return(&mut self, _call_depth: usize, _name: &CalleeName, _has_nested_calls: bool) {}
     /// Repeat count has stopped being cached.
     fn notify_repeat_count(
         &mut self,
         _call_depth: usize,
-        _name: &str,
-        // _name: &CalleeName,
+        _kind: &ItemKind,
+        // _name: &str,
         _count: RepeatCountCategory,
     ) {
     }
 
     /// Flush needed (any output cached by this trait implementor needs to be flushed).
     fn notify_flush(&mut self) {}
+
+    /// Loop body has stopped being cached.
+    fn notify_loopbody_start(&mut self, _call_depth: usize);
+
+    /// Loop body has ended (but not necessarily the whole loop).
+    fn notify_loopbody_end(&mut self, _call_depth: usize) {}
 }
 
 /// The function call repeat count. Consists of the two parts.
 /// * Actual repeat count. Stops incrementing upon reaching `REPEAT_COUNT_MAX` (saturates).
 /// * The flushed part of the actual repeat count. Value less than or equal to the actual repeat count.
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct RepeatCount {
     overall: RepeatCountType,
     flushed: RepeatCountType, // flushed <= overall

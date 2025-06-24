@@ -50,7 +50,7 @@ pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64
     -1.0
 }
 
-// #[loggable]
+#[loggable]
 fn calls() {
     // // If logging is enabled, create the call logger.
     // let mut _l = None;
@@ -165,7 +165,7 @@ fn calls() {
                 // println!("stdout output");
                 // panic!("main(): Testing the panic");
                 eprintln!("Sample stderr output in main()");
-                panic!("main(): Panicking voluntarily")
+                // panic!("main(): Panicking voluntarily")
             }
         }
 
@@ -173,6 +173,49 @@ fn calls() {
             f(i);
         }
         g(20);
+    }
+    {
+        // struct LoopbodyLogger;
+        // impl LoopbodyLogger {
+        //     fn set_retval(&mut self, ) {
+
+        //     }
+        // }
+        #[loggable]
+        fn f() {
+            let loop_retval = {
+                let mut i = 0;
+                {
+                    let _ret_val = loop {
+                    // while i < 3 {
+                    // for i in 0..3 {
+
+                        // Log loopbody start
+
+                        // {
+                            g(i);
+                            h(i);
+                            if i == 2 {
+                                break 5;
+                            }
+                            i += 1;
+                        // };
+
+                        // Log loopbody end
+                    };
+                    _ret_val
+                    // log_exprloop_end(_ret_val)
+                }
+            };
+            println!("stdout: f()::loop -> {}", loop_retval);
+        }
+        fn g(_i: i32) {
+            ifunc();
+        }
+        fn h(_i: i32) {}
+        fn ifunc() {}
+
+        f();
     }
 }
 
@@ -489,9 +532,9 @@ fn thread_func() {
         ff();
     }
 
-    for i in 0..150 {
-        gg(i);
-    }
+    // for i in 0..150 {
+    //     gg(i);
+    // }
 }
 
 
