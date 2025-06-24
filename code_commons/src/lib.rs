@@ -92,7 +92,6 @@ pub trait CoderunNotifiable {
         &mut self,
         _call_depth: usize,
         _kind: &ItemKind,
-        // _name: &str,
         _count: RepeatCountCategory,
     ) {
     }

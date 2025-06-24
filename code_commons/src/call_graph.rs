@@ -11,9 +11,8 @@ type Link = Rc<RefCell<CallNode>>;
 struct CallNode {
     // TODO: Consider -> ItemNode (function, closure, loop)
     kind: ItemKind,
-    // name: String,
-    // param_vals: Option<String>,
-    ret_val: Option<String>, // Function and `loop` can return a value (as opposed to `while` and `for` loops).
+    /// Value returned by a function or `loop` (`while` and `for` loops do not return a value).
+    ret_val: Option<String>,
     children: Vec<Link>,
     repeat_count: RepeatCount,
     /// Flag that tells to flush the item return (like
@@ -28,10 +27,6 @@ impl CallNode {
     fn new(kind: ItemKind) -> Self {
         Self {
             kind: kind,
-            // fn new(name: &str, param_vals: Option<String>) -> Self {
-            //     Self {
-            //         name: name.to_string(),
-            //         param_vals,
             ret_val: None,
             children: Vec::new(),
             repeat_count: RepeatCount::new(),
@@ -54,16 +49,16 @@ impl CallNode {
 // }
 #[rustfmt::skip]
 struct CachingInfo {
-    // kind: CacheKind, // TODO: For a `model_node` or a `node_being_cached`? The former is None for an initial loopbody.
-    model_node  : Option<Link>, // This is None for an initial loopbody in `node_being_cached`.
+    /// The node to compare the `node_being_cached` with.
+    /// This is None for an _initial_ loopbody in `node_being_cached`.
+    model_node  : Option<Link>, 
     node_being_cached: Option<Link>,
     call_depth  : usize,
 }
 impl CachingInfo {
     // #[rustfmt::skip]
-    fn new(/*kind: CacheKind*/) -> Self {
+    fn new() -> Self {
         Self {
-            // kind,
             model_node: None,
             node_being_cached: None,
             call_depth: 0,
@@ -105,7 +100,6 @@ impl CallGraph {
             name: String::from(""),
             param_vals: None,
         })));
-        // Rc::new(RefCell::new(CallNode::new(&CalleeName::Function(String::new()))));
         Self {
             current_node: pseudo_node.clone(),
             call_stack: vec![pseudo_node],
@@ -120,7 +114,7 @@ impl CallGraph {
         // * and the subsequent sibling (with its children) is being added to the call graph (is being cached).
         if let Some(caching_model_node) = self.caching_info.model_node.as_ref() {
             // Log the caching_model_node's repeat count, if non-zero,
-            // Log the subtree of the node bing cached.    // caching_model_node's subsequent sibling.
+            // Log the subtree of the node bing cached.
             // Stop caching (`caching_model_node = None`).
 
             // If the caching model node has a non-flushed repeat count
@@ -137,7 +131,7 @@ impl CallGraph {
                 );
                 caching_model_node.borrow_mut().repeat_count.mark_flushed();
             }
-            // Log the subtree of the (subsequent) node bing cached:    // cached sibling:
+            // Log the subtree of the (subsequent) node bing cached:
             if let Some(cached_sibling) = self.caching_info.node_being_cached.take() {
                 self.flush_tree(&cached_sibling, self.caching_info.call_depth);
             }
@@ -176,8 +170,6 @@ impl CallGraph {
             name: String::from(call_name),
             param_vals: param_vals.clone(),
         })));
-        // name, param_vals)));
-        // let rc_current_sibling = Rc::new(RefCell::new(CallNode::new(&name)));
 
         // While the updates have not been done, prepeare the indo for later use.
         let siblings_call_depth = self.call_depth();
@@ -215,9 +207,6 @@ impl CallGraph {
                 // else
                 //   log the call.
 
-                // // Check if the new_sibling name repeats the previous_sibling name:
-                // let children = &self.current_node.borrow().children; // parent.children
-
                 // If there is a previous_sibling
                 if let Some(previous_sibling) = optional_previous_sibling {
 
@@ -253,50 +242,15 @@ impl CallGraph {
                             &call_name,
                             &param_vals,
                         );
-                        // self.flush();
                     } else {
                         // Otherwise (the previous and the new siblings both are calls with the same name)
                         // begin caching starting with the new sibling.
                         self.caching_info = CachingInfo {
-                            // kind: match previous_sibling.borrow().kind {
-                            //     ItemKind::Call { .. } => CacheKind::Call,
-                            //     ItemKind::Loopbody { .. } => CacheKind::Loopbody {
-                            //         initial: false // To be ignored when flushing the repeat count. // TODO: Consider moving `initial` to a different place, it does not belong to this use case.
-                            //     }
-                            // },
                             model_node: Some(previous_sibling.clone()),
                             node_being_cached: Some(new_sibling.clone()),
                             call_depth: siblings_call_depth,
                         };
                     }
-
-                    // // If new_sibling.name == previous_sibling.name:
-                    // let previous_sibling_name = previous_sibling.borrow().name.clone(); // NOTE: Using `&` instead of `.clone()` conflicts with the subsequent `previous_sibling.borrow_mut()`.
-                    // if previous_sibling_name == call_name { // TODO: Double-check. Comparison of String to &str.
-                    // // if previous_sibling_name == *name {
-                    //     // Mark that the new_sibling (including its children) starts being cached,
-                    //     // and previous_sibling becomes the caching model (for comapring (upon return) new_sibling with,
-                    //     // and detecting the caching end).
-                    //     self.caching_info = CachingInfo {
-                    //         kind: CacheKind::Call,
-                    //         model_node: Some(previous_sibling.clone()),
-                    //         call_depth: self.call_depth(), // The new_sibling is not yet on the call stack, thus the call_depth reflects the new_sibling's indent.
-                    //         node_being_cached: Some(new_sibling.clone()),
-                    //     }
-                    // } else {
-                    //     // Previous sibling has different name. Its repeat_count stops being cached.
-                    //     // Flush (log the previous sibling's repeat count and the new sibling).
-                    //     // (the new_sibling is added to the call tree but not yet to the call stack and not yet made current)
-                    //     self.flush();
-                    //     // if !previous_sibling.borrow().repeat_count.non_flushed_is_empty() {
-                    //     //     self.coderun_notifiable.borrow_mut().notify_repeat_count(
-                    //     //         self.call_depth(),  // The new_sibling is not yet on the call stack, thus the call_depth reflects the current and previous sibling's indent.
-                    //     //         &previous_sibling_name,
-                    //     //         previous_sibling.borrow().repeat_count.non_flushed()
-                    //     //     );
-                    //     //     previous_sibling.borrow_mut().repeat_count.mark_flushed();
-                    //     // } // else (previous_sibling has no non-flushed repeat count) nothing.
-                    // }
                 } else {
                     // (no previous sibling) Log the call.
                     self.coderun_notifiable.borrow_mut().notify_call(
@@ -312,69 +266,16 @@ impl CallGraph {
                 // (with optional intermediate enclosing loopbodies in between)
                 // and that loopbody is initial then flush and stop caching.
                 if self.caching_info.model_node.is_none()
-                //     && let CacheKind::Loopbody { initial } = kind
-                //     && initial
                 {
-                    self.flush(); // TODO: Make sure it also stops caching.
-                    // self.caching_info.clear();
+                    self.flush(); // It also stops caching.
                 }
             }
         }
-        // // Try to detect the caching start:
-        // if !self.caching_is_active() {
-        //     // Check if the new_sibling name repeats the previous_sibling name:
-        //     let children = &self.current_node.borrow().children; // parent.children
-        //     // If there is a previous_sibling
-        //     if let Some(previous_sibling) = children.last() {
-        //         // If new_sibling.name == previous_sibling.name:
-        //         let previous_sibling_name = previous_sibling.borrow().name.clone(); // NOTE: Using `&` instead of `.clone()` conflicts with the subsequent `previous_sibling.borrow_mut()`.
-        //         if previous_sibling_name == name { // TODO: Double-check. Comparison of String to &str.
-        //         // if previous_sibling_name == *name {
-        //             // Mark that the new_sibling (including its children) starts being cached,
-        //             // and previous_sibling becomes the caching model (for comapring (upon return) new_sibling with,
-        //             // and detecting the caching end).
-        //             self.caching_info = CachingInfo {
-        //                 kind: CacheKind::Function,
-        //                 model_node: Some(previous_sibling.clone()),
-        //                 call_depth: self.call_depth(), // The new_sibling is not yet on the call stack, thus the call_depth reflects the new_sibling's indent.
-        //                 node_being_cached: Some(rc_current_sibling.clone()),
-        //             }
-        //         } else {
-        //             // Previous sibling has different name. Its repeat_count stops being cached.
-        //             // Log the previous_sibling.repeat_count, if non-zero.
-        //             if !previous_sibling.borrow().repeat_count.non_flushed_is_empty() {
-        //                 self.coderun_notifiable.borrow_mut().notify_repeat_count(
-        //                     self.call_depth(),  // The new_sibling is not yet on the call stack, thus the call_depth reflects the current and previous sibling's indent.
-        //                     &previous_sibling_name,
-        //                     previous_sibling.borrow().repeat_count.non_flushed()
-        //                 );
-        //                 previous_sibling.borrow_mut().repeat_count.mark_flushed();
-        //             } // else (previous_sibling has no non-flushed repeat count) nothing.
-        //         }
-        //     } // else (no previous sibling) nothing.
-        // }
-
-        // // Add new_sibling to the call tree by adding
-        // // new_sibling node to the parent's list of children:
-        // self.current_node // parent
-        //     .borrow_mut()
-        //     .children
-        //     .push(new_sibling.clone());
-
         // Add new_sibling to the call stack:
         self.call_stack.push(new_sibling.clone()); // [..., parent] -> [..., parent, new_sibling]
 
         // Mark that the subsequent calls will be added as children to the new_sibling:
         self.current_node = new_sibling.clone();
-
-        // // If not caching, log the call:
-        // if !self.caching_is_active() {
-        //     self.coderun_notifiable.borrow_mut()
-        //         .notify_call(
-        //             self.call_depth() - 1, // `- 1`: // The new_sibling is already on the call stack. The call_depth() reflects the indent for new_sibling's children.
-        //             &call_name,
-        //             &new_sibling.borrow().param_vals);
-        // } // else (caching) nothing.
     }
 
     // parent() {
@@ -426,7 +327,6 @@ impl CallGraph {
         if self.current_node.borrow().children.is_empty() {
             // If caching is active and this loopbody was a node being cached
             if self.caching_is_active() {
-                //&& self.caching_info.kind == CacheKind::Loopbody {
                 if let Some(node_being_cached) = self.caching_info.node_being_cached.as_ref()
                     && node_being_cached.as_ptr() == self.current_node.as_ptr()
                 {
@@ -443,9 +343,9 @@ impl CallGraph {
                 debug_assert!(false, "Unexpected bottom of call stack");
             }
         } else {
-            // otherwise (there are nested calls) {
-            // (Here, caching could only start at parent or earlier. Because caching
-            // that began at this loopbody start, has ended upon first-most child())
+            // Otherwise (there are nested calls) {
+            // (Here, caching could only start at a parent or earlier
+            // or the current node can be being cached if the node is not initial loopbody)
 
             let child_call_depth = self.call_depth();
             match self.call_stack.pop() {
@@ -479,10 +379,6 @@ impl CallGraph {
                                     .notify_loopbody_end(self.call_depth());
                                 // Mark loopbody (but not the whole loop) as ended.
                                 self.current_node.borrow_mut().has_ended = true;
-                                // // Remove this loopbody from call stack
-                                // // (already done above with `match self.call_stack.pop()`)
-                                // // and make parent a current node.
-                                // self.current_node = parent_or_pseudo.clone();
                             }
                             // otherwise (caching is active, starting with parent or earlier)
                             //     Do noithing here, continue caching, move on.
@@ -495,7 +391,6 @@ impl CallGraph {
                                 let previous_node_kind = previous_node.borrow().kind.clone();
                                 if let ItemKind::Loopbody { ended_the_loop } =
                                     previous_node_kind
-                                    // previous_node.borrow().kind
                                     && !ended_the_loop
                                 {
                                     // Compare this loopbody to the previous loopbody.
@@ -626,7 +521,6 @@ impl CallGraph {
         let call_depth = self.call_depth();
         let mut previous_sibling_node_info = None;
         if let Some(previous_sibling) = self.current_node.borrow().children.last().clone()
-        // parent.children.last
         {
             previous_sibling_node_info = Some(previous_sibling.clone());
         }
@@ -750,14 +644,6 @@ impl CallGraph {
                     );
                 }
             }
-            // let name = self.current_node.borrow().name.clone();
-            // let has_nested_calls = !self.current_node.borrow().children.is_empty();
-            // self.coderun_notifiable.borrow_mut().notify_return(
-            //     call_depth - 1, // `- 1`: // The returning_sibling is still on the call stack. The call_depth reflects the children's indent.
-            //     &name,
-            //     has_nested_calls,
-            //     self.current_node.borrow().get_ret_val(),
-            // );
 
             self.current_node.borrow_mut().has_ended = true;
 
@@ -793,8 +679,6 @@ impl CallGraph {
                     // i.e. the caching model becomes `None`.
                     if let Some(model_node) = self.caching_info.model_node.as_ref()
                         && model_node.as_ptr() == previous_sibling.as_ptr()
-                    // if self.caching_info.model_node.as_ref().unwrap().as_ptr()
-                    //     == previous_sibling.as_ptr()
                     {
                         self.caching_info.clear();
                     } // else (caching started at a parent level or above) do nothing.
@@ -808,8 +692,6 @@ impl CallGraph {
                     // If the previous_sibling is the caсhing model node then
                     if let Some(model_node) = self.caching_info.model_node.as_ref()
                         && model_node.as_ptr() == previous_sibling.as_ptr()
-                    // if self.caching_info.model_node.as_ref().unwrap().as_ptr()
-                    //     == previous_sibling.as_ptr()
                     {
                         // Log the previous_sibling's repeat count, if non-zero,
                         if !previous_sibling
@@ -847,15 +729,12 @@ impl CallGraph {
     }
 
     pub fn caching_is_active(&self) -> bool {
-        self.caching_info.is_active() //node_being_cached.is_some()   //model_node.is_some()
+        self.caching_info.is_active()
     }
 
     fn trees_are_equal(a: &Link, b: &Link, compare_root_repeat_count: bool) -> bool {
         let a = a.borrow();
         let b = b.borrow();
-        // if a.kind.is_call() && b.kind.is_loopbody() || a.kind.is_loopbody() && b.kind.is_call() {
-        //     return false;
-        // }
         match &a.kind {
             ItemKind::Call { name, .. } => {
                 let a_name = name;
@@ -873,16 +752,6 @@ impl CallGraph {
                 ItemKind::Loopbody { .. } => {}        // Both are Loopbody, continue comparing.
             },
         }
-        // if let ItemKind::Call { name, .. } = &a.kind {
-        //     let a_name = name;
-        //     if let ItemKind::Call { name, .. } = &b.kind {
-        //         if a_name != name {
-        //             return false; // Calls with differnt names.
-        //         }
-        //     } else {
-        //         return false; // a: Call, b: Loopbody.
-        //     }
-        // } else
 
         if a.children.len() != b.children.len() {
             return false;
@@ -915,14 +784,6 @@ impl CallGraph {
                 .borrow_mut()
                 .notify_loopbody_start(call_depth),
         }
-        // let name = &current_node.name;
-
-        // // The call:
-        // self.coderun_notifiable.borrow_mut().notify_call(
-        //     call_depth,
-        //     name,
-        //     &current_node.param_vals,
-        // );
 
         // Traverse children recursively:
         for child in item_children {
@@ -948,14 +809,6 @@ impl CallGraph {
                         .notify_loopbody_end(call_depth) // TODO: call_depth
                 }
             }
-
-            // let has_nested_calls = !item_children.is_empty();
-            // self.coderun_notifiable.borrow_mut().notify_return(
-            //     call_depth,
-            //     name,
-            //     has_nested_calls,
-            //     current_node.get_ret_val(),
-            // );
 
             // The repeat count:
             if !current_node.repeat_count.non_flushed_is_empty() {

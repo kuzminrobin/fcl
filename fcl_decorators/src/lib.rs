@@ -133,7 +133,6 @@ impl CoderunNotifiable for CodeLikeDecorator {
         &mut self,
         call_depth: usize,
         kind: &ItemKind,
-        // name: &str,
         count: RepeatCountCategory,
     ) {
         let item_name = match kind {
@@ -167,11 +166,9 @@ impl CoderunNotifiable for CodeLikeDecorator {
         decorator_write!(
             self,
             "{}{}}} // {} end.\n", // E.g. "<thread_indent><indent>} // Loop body end.\n".
-            // "{}{}}}{} // {}().\n", // E.g. "<thread_indent><indent>} -> RetVal // sibling().\n".
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
-            // output_str,
-            LOOPBODY_NAME, //name // CommonDecorator::get_callee_name_string(name)
+            LOOPBODY_NAME,
         );
         self.line_end_pending = false;
     }
@@ -212,7 +209,6 @@ impl TreeLikeDecorator {
         indent_step_call   : Option<&'static str>,
         indent_step_noncall: Option<&'static str>,
         indent_step_parent : Option<&'static str>,
-        // thread_indent: Option<&'static str>
     ) -> Self {
         Self {
             common: CommonDecorator::new(writer/*, thread_indent */),
@@ -235,7 +231,6 @@ impl CoderunDecorator for TreeLikeDecorator {
 
 impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
-        // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         decorator_write!(
             self,
             "{}{}{}{}({})\n",
@@ -246,7 +241,7 @@ impl CoderunNotifiable for TreeLikeDecorator {
             param_vals
                 .as_ref()
                 .map(|string| string.as_str())
-                .unwrap_or(&"") // CommonDecorator::get_callee_name_string(name)
+                .unwrap_or(&"")
         ); // E.g."<thread_indent><indent>+-sibling", "| | | | +-sibling"
     }
 
@@ -256,7 +251,6 @@ impl CoderunNotifiable for TreeLikeDecorator {
         &mut self,
         call_depth: usize,
         kind: &ItemKind,
-        // name: &str,
         count: RepeatCountCategory,
     ) {
         let item_name = match kind {
@@ -270,7 +264,6 @@ impl CoderunNotifiable for TreeLikeDecorator {
             self.get_indent_string(call_depth),
             self.indent_step_noncall,
             item_name,
-            // name,
             count.to_string()
         );
     }
@@ -282,10 +275,6 @@ impl CoderunNotifiable for TreeLikeDecorator {
             self.get_indent_string(call_depth),
             self.indent_step_call,
             LOOPBODY_NAME,
-            // param_vals
-            //     .as_ref()
-            //     .map(|string| string.as_str())
-            //     .unwrap_or(&"") // CommonDecorator::get_callee_name_string(name)
         ); // E.g."<thread_indent><indent>+-Loop body", "| | | | +-Loop body"
     }
 
