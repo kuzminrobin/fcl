@@ -386,15 +386,17 @@ impl CallGraph {
                             // Mark loopbody (but not the whole loop) as ended.
                             self.current_node.borrow_mut().has_ended = true;
 
-                            // If there is a previous loopbody (previous iteration of the current loop)
+                            // If there is a previous loopbody (previous iteration of the current loop
+                            // or the last iteration of the previous loop ;-)
                             let siblings_count = parent_or_pseudo.borrow().children.len();
                             if siblings_count > 1 {
                                 let previous_node =
                                     parent_or_pseudo.borrow().children[siblings_count - 2].clone();
-                                let previous_node_kind = previous_node.borrow().kind.clone();
-                                if let ItemKind::Loopbody { ended_the_loop } =
-                                    previous_node_kind
-                                    && !ended_the_loop
+                                if previous_node.borrow().kind.is_loopbody()
+                                // let previous_node_kind = previous_node.borrow().kind.clone();
+                                // if let ItemKind::Loopbody { ended_the_loop } =
+                                //     previous_node_kind
+                                //     && !ended_the_loop
                                 {
                                     // Compare this loopbody to the previous loopbody.
                                     // If equal
@@ -551,9 +553,11 @@ impl CallGraph {
         }
 
         // Create the loopbody node,
-        let new_loopbody_node = Rc::new(RefCell::new(CallNode::new(ItemKind::Loopbody {
-            ended_the_loop: false,
-        })));
+        let new_loopbody_node = Rc::new(RefCell::new(CallNode::new(ItemKind::Loopbody 
+            // {
+            //     ended_the_loop: false,
+            // }
+        )));
 
         // add it to the call graph (by adding to the parent's list of children),
         self.current_node // parent
@@ -568,12 +572,14 @@ impl CallGraph {
 
         // If caching is not active {
         if !self.caching_is_active() {
-            // If the previous sibling node exists and is NOT the previous iteration of the current loop, then {
+            // If the previous sibling node exists and is NOT loopbody (NOT the previous iteration of the current loop,
+            // and NOT the last iteration of the previous loop ;-) then {
             if let Some(rc_previous_sibling) = previous_sibling_node_info.as_ref()
-                && match rc_previous_sibling.borrow().kind {
-                    ItemKind::Call { .. } => true, // Function or closure.
-                    ItemKind::Loopbody { ended_the_loop } => ended_the_loop, // Previous (different) loop.
-                }
+                && !rc_previous_sibling.borrow().kind.is_loopbody()
+                // && match rc_previous_sibling.borrow().kind {
+                //     ItemKind::Call { .. } => true, // Function or closure.
+                //     ItemKind::Loopbody { ended_the_loop } => ended_the_loop, // Previous (different) loop.
+                // }
             {
                 // Log the repeat count, if non-zero, of the previous sibling-level node.
                 let mut previous_sibling = rc_previous_sibling.borrow_mut();
@@ -592,12 +598,17 @@ impl CallGraph {
             // or the previous loopbodies/iterations had no nested function calls and have been removed)
             let previous_iteration_loopbody =
                 previous_sibling_node_info.and_then(|previous_sibling| {
-                    let kind = previous_sibling.borrow().kind.clone();
-                    match kind {
-                        ItemKind::Call { .. } => None, // Function or closure.
-                        ItemKind::Loopbody { ended_the_loop } if ended_the_loop => None, // Previous loop.
-                        ItemKind::Loopbody { .. } => Some(previous_sibling), // Previous iteration of the current loop.
+                    if previous_sibling.borrow().kind.is_loopbody() {
+                        Some(previous_sibling)
+                    } else {
+                        None
                     }
+                    // let kind = previous_sibling.borrow().kind.clone();
+                    // match kind {
+                    //     ItemKind::Call { .. } => None, // Function or closure.
+                    //     ItemKind::Loopbody { ended_the_loop } if ended_the_loop => None, // Previous loop.
+                    //     ItemKind::Loopbody { .. } => Some(previous_sibling), // Previous iteration of the current loop.
+                    // }
                 });
             // then the caching info
             //     * gets NO model_node (new loopbody node marked as initial),

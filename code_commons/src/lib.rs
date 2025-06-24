@@ -48,13 +48,14 @@ pub enum ItemKind {
         param_vals: Option<String>,
     },
     /// Item is a loop body.
-    Loopbody {
-        /// Flag that tells that the loop has ended (the loop body has ended the loop).  
-        /// Surves for distinguishing
-        /// the last iteration of an earlier loop from the first iteration of an
-        /// immediately following loop. So that the two loops are not logged as one.
-        ended_the_loop: bool,
-    },
+    Loopbody 
+    // {
+    //     /// Flag that tells that the loop has ended (the loop body has ended the loop).  
+    //     /// Surves for distinguishing
+    //     /// the last iteration of an earlier loop from the first iteration of an
+    //     /// immediately following loop. So that the two loops are not logged as one.
+    //     ended_the_loop: bool,
+    // },
 }
 impl ItemKind {
     pub fn is_call(&self) -> bool {
