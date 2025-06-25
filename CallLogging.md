@@ -1,9 +1,5 @@
 # TODO:
-* Shrink function name paths. 
-  * Consider making `prefix` a `&str` or `String`.
-  * `closure{205usize,14usize:212usize,9usize}` as a prefix.
-* Consider all occurrences of `body` agains `return`.
-* Consider restructuring `struct QSelfOrPath`
+* Consider all occurrences of `body` against `return`.
 * Structure-up single-threaded and multithreaded
 * [Consider loggin the ret val in the TreeLikeDecorator]
 * Remove spaces inside of paths/names. Consider making `prefix` a `String`.
@@ -1050,3 +1046,6 @@ Let me know if you want a complete working example with both `stdout` and `stder
   * in FunctionLogger::new() the param vals are missing.
   * `LoggableStruct :: next()` does not log the ret_val, ret_val logging is missing?
 * Logging the ret val for functions having `return`.
+* Shrink function name paths. 
+  * Consider making `prefix` a `&str` or `String`.
+* Consider restructuring `struct QSelfOrPath`.

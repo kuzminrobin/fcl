@@ -1,28 +1,6 @@
 use quote::quote;
 use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, *};
 
-// // TODO: Likely out-of-date since doesn't handle generics properly.
-// // TODO: Consider moving to closure_logger and making it also a decl macro.
-// // Creates the `FunctionLogger` instance.
-// #[proc_macro]
-// pub fn function_logger(name: TokenStream) -> TokenStream {
-//     // Assert that the name is exactly one id (probably fully qualified like `MyStruct::method`). TODO: As opposed to what?
-//     let ts: proc_macro2::TokenStream = name.into();
-//     let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
-//     // TODO: Consider
-//     // * let func_name: ? = syn::parse(name);
-//     // * let func_name = syn::parse_macro_input!(name as String);
-//     quote! {
-//         let mut _logger = None;
-//         fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-//             if logger.borrow_mut().logging_is_on() {
-//                 _logger = Some(FunctionLogger::new(#func_name))
-//             }
-//         });
-//     }
-//     .into()
-// }
-
 #[proc_macro_attribute]
 pub fn non_loggable(
     _attr_args: proc_macro::TokenStream,
@@ -35,7 +13,6 @@ fn remove_spaces(s: &str) -> String {
     // Preserve spaces in fragments like `<MyType as MyTrait>`.
     let tmp_str: String = s.replace(" as ", "$as$").chars().filter(|ch| *ch != ' ').collect();
     tmp_str.replace("$as$", " as ")
-    // s.chars().filter(|ch| *ch != ' ').collect()
 }
 #[proc_macro_attribute]
 pub fn loggable(
@@ -43,7 +20,7 @@ pub fn loggable(
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
-    let mut prefix = quote! {}; // String::new(); 
+    let mut prefix = quote! {};
     if let AttrArgs::Prefix {
         qself_or_path,
         .. // _prefix_token, _eq_token 
@@ -52,48 +29,12 @@ pub fn loggable(
         if let Some(q_self_or_path) = qself_or_path.0 {
             match q_self_or_path {
                 LogPrefix::QSelf(qself) => 
-                    prefix = quote!{ #qself },    // prefix.push_str(&quote!{ qself }.to_string()),
+                    prefix = quote!{ #qself },
                 LogPrefix::Path(path) => 
-                    prefix = quote!{ #path },   // prefix.push_str(&quote!{ path }.to_string()),
+                    prefix = quote!{ #path },
             }
-            // prefix = remove_spaces(&prefix);
         }
-        // let QSelfOrPath {
-        //     qself, //: Option<FclQSelf>,
-        //     path,  //: Option<Path>,
-        // } = qself_or_path;
-        // if let Some(qself) = qself {
-        //     let FclQSelf {
-        //         lt_token, //: Lt,
-        //         ty,       //: Box<Type>,
-        //         as_token, //: Token![as],
-        //         path,     //: Path,
-        //         gt_token, //: Gt,
-        //     } = qself;
-        //     prefix = quote! { #lt_token #ty #as_token #path #gt_token };
-        // } // TODO: Something is wrong here. `else` seems reasonable here.
-        // if let Some(path) = path {
-        //     prefix = quote! { #path };
-        // }
-        // // prefix = quote!{ #qself #path };
     }
-    /*
-    enum AttrArgs {
-        // // TODO: Dedup or remove `eq_token` and `path`.
-        // Name{
-        //     _name_token: kw::name,
-        //     _eq_token: Token![=],
-        //     path: ExprPath
-        // },
-        Prefix{
-            _prefix_token: kw::prefix,
-            _eq_token: Token![=],
-            qself_or_path: QSelfOrPath
-            // path: ExprPath
-        },
-        None
-    }
-     */
     let output = {
         if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
             quote_as_item(&item, &prefix)
@@ -106,26 +47,6 @@ pub fn loggable(
     };
     output.into()
 }
-
-/*
-// Creates the `ClosureLogger` instance.
-#[proc_macro]
-pub fn closure_logger(name: TokenStream) -> TokenStream {
-    let ts: proc_macro2::TokenStream = name.into();
-    let func_name = ts.to_string(); // TODO: Should be something stringifyable of `syn`'s type.
-    quote! {
-        let mut _l = None;
-        fcl::call_log_infra::CALL_LOG_INFRA.with(|infra| {
-            if infra.borrow_mut().logging_is_on() {
-                _l = Some(ClosureLogger::new(#func_name))
-            }
-        })
-    }
-    .into()
-}
-
-*/
-
 
 fn quote_as_expr_array(
     expr_array: &ExprArray,
@@ -1464,7 +1385,6 @@ fn traversed_block_from_sig(
                 // generic parameters substitution with actual generic arguments.
                 let mut generic_func_name = String::with_capacity(64);
                 generic_func_name.push_str(#func_log_name);
-                // generic_func_name.push_str(stringify!(#func_log_name));
                 if !#generic_params_is_empty {
                     generic_func_name.push_str("<");
                     let generic_arg_names_vec: Vec<&'static str> = 
@@ -2345,9 +2265,11 @@ struct FclQSelf {
 }
 impl quote::ToTokens for FclQSelf {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        // NOTE: The shortcut below causes an endless recursion.
         // *tokens = quote!{ #self };
+
+        // <T as U::V>
         let FclQSelf {
-            // <T as U::V>
             // lt_token, // : Token![<],
             ty, // : Box<Type>,
             // as_token, // : Token![as],
@@ -2375,78 +2297,22 @@ enum LogPrefix {
     QSelf(FclQSelf),
     Path(syn::Path)
 }
-// TODO: Something is wrong below. Option<Enum> seems more reasonable. Otherwise both can be specified.
 struct QSelfOrPath(Option<LogPrefix>);
-// struct QSelfOrPath {    
-//     q_self_or_path: Option<LogPrefix>
-//     // qself: Option<FclQSelf>,
-//     // // qself: Option<QSelf>,
-//     // path: Option<Path>,
-// }
+
 impl Parse for QSelfOrPath {
     fn parse(input: parse::ParseStream) -> Result<Self> {
         let mut result = Self(None);
-        // let mut result = Self {
-        //     q_self_or_path: None
-        //     // qself: None,
-        //     // path: None,
-        // };
         if input.is_empty() {
             Ok(result)
         } else {
             let lookahead = input.lookahead1();
             if lookahead.peek(Token![<]) {
                 result = Self(Some(LogPrefix::QSelf(input.parse()?,))); // <T as U::V>
-                // result = Self {
-                //     q_self_or_path: Some(LogPrefix::QSelf(
-
-                //         // <T as U::V>
-                //         input.parse()?,
-                //         // FclQSelf {
-                //         //     // <T as U::V>
-                //         //     lt_token: input.parse()?,
-                //         //     ty: input.parse()?,
-                //         //     as_token: input.parse()?,
-                //         //     path: input.parse()?,
-                //         //     gt_token: input.parse()?,
-                //         // }
-                //     ))
-                // );
-                // result.qself = Some(FclQSelf {
-                //     // <T as U::V>
-                //     lt_token: input.parse()?,
-                //     ty: input.parse()?,
-                //     as_token: input.parse()?,
-                //     path: input.parse()?,
-                //     gt_token: input.parse()?,
-                // });
             } else {
-                result = Self(Some(LogPrefix::Path(input.parse()?)));
-                // result = Self {
-                //     q_self_or_path: Some(LogPrefix::Path(
-                //         // syn::Path {
-                //             input.parse()?
-                //         // }
-                //     ))};
-            // if lookahead.peek(Token![::]) || lookahead.peek(Ident) {
-            //     result.path = Some(input.parse()?);
-            //     // let mut path: Path = input.parse()?;
+                result = Self(Some(LogPrefix::Path(input.parse()?))); // U::V
             }
 
-            // // let mut path: Path;
-            // let mut leading_colon = None;
-            // if lookahead.peek(Token![::]) {//|| lookahead.peek(Ident) {
-            //     // path.leading_colon = Some(input.parse()?);
-
-            //     leading_colon/*: Token![::]*/ = Some(input.parse()?);
-
-            //     let mut path: Path = input.parse()?;
-            //     path.leading_colon = Some(leading_colon);
-            //     result.path = Some(path);
-            // }
-
             Ok(result)
-            // Ok(Self { qself: Some(input.parse()?), path: Some(input.parse()?) })
         }
     }
 }
@@ -2460,7 +2326,7 @@ enum AttrArgs {
     Prefix {
         _prefix_token: kw::prefix,
         _eq_token: Token![=],
-        qself_or_path: QSelfOrPath, // path: ExprPath
+        qself_or_path: QSelfOrPath,
     },
     None,
 }
