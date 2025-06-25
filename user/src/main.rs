@@ -145,8 +145,6 @@ fn calls() {
         impl MyPureTrait for MyStruct {
             // #[loggable(prefix=MyStruct)]
             #[loggable(prefix=<MyStruct as MyPureTrait>)]
-            // #[loggable(MyStruct::as::MyPureTrait::pure_method)]
-            // #[loggable((MyStruct as MyPureTrait)::pure_method)]
             // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
             // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
             // Consider `#[loggable((MyStruct as MyPureTrait)::pure_method)]`. Doesn't work. Results in `pure_method`.
@@ -357,11 +355,6 @@ fn thread_func() {
         #[loggable]
         impl MyPureTrait for MyStruct {
             #[loggable(prefix = <MyStruct as MyPureTrait>)] // OK.
-            // #[loggable(prefix = <MyStruct as MyPureTrait>::MyType)]    // Not OK
-
-            // #[loggable(prefix = <MyStruct as MyPureTrait>::pure_method)]    // Not OK
-            // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
-            // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
             fn pure_method(&self) {}
         }
         MyStruct.pure_method();

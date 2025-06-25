@@ -22,6 +22,8 @@
   indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
   The same with color in the HTML decorator adapter.
 * ---
+* Suboptimal Pefix: `closure{81usize,14usize:90usize,9usize}::closure{87,21:87,26}(v: true, ) {} -> false`
+* In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]
   * [Log the `loop` return value]
   * [Loop varaible logging (sort of iteration number)]

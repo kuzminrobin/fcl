@@ -31,36 +31,51 @@ pub fn non_loggable(
     attributed_item
 }
 
+fn remove_spaces(s: &str) -> String {
+    // Preserve spaces in fragments like `<MyType as MyTrait>`.
+    let tmp_str: String = s.replace(" as ", "$as$").chars().filter(|ch| *ch != ' ').collect();
+    tmp_str.replace("$as$", " as ")
+    // s.chars().filter(|ch| *ch != ' ').collect()
+}
 #[proc_macro_attribute]
 pub fn loggable(
     attr_args: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
-    let mut prefix = quote! {};
+    let mut prefix = quote! {}; // String::new(); 
     if let AttrArgs::Prefix {
-        /*_prefix_token, _eq_token,*/ qself_or_path,
-        ..
+        qself_or_path,
+        .. // _prefix_token, _eq_token 
     } = attr_args
     {
-        let QSelfOrPath {
-            qself, //: Option<FclQSelf>,
-            path,  //: Option<Path>,
-        } = qself_or_path;
-        if let Some(qself) = qself {
-            let FclQSelf {
-                lt_token, //: Lt,
-                ty,       //: Box<Type>,
-                as_token, //: Token![as],
-                path,     //: Path,
-                gt_token, //: Gt,
-            } = qself;
-            prefix = quote! { #lt_token #ty #as_token #path #gt_token };
-        } // TODO: Something is wrong here. `else` seems reasonable here.
-        if let Some(path) = path {
-            prefix = quote! { #path };
+        if let Some(q_self_or_path) = qself_or_path.0 {
+            match q_self_or_path {
+                LogPrefix::QSelf(qself) => 
+                    prefix = quote!{ #qself },    // prefix.push_str(&quote!{ qself }.to_string()),
+                LogPrefix::Path(path) => 
+                    prefix = quote!{ #path },   // prefix.push_str(&quote!{ path }.to_string()),
+            }
+            // prefix = remove_spaces(&prefix);
         }
-        // prefix = quote!{ #qself #path };
+        // let QSelfOrPath {
+        //     qself, //: Option<FclQSelf>,
+        //     path,  //: Option<Path>,
+        // } = qself_or_path;
+        // if let Some(qself) = qself {
+        //     let FclQSelf {
+        //         lt_token, //: Lt,
+        //         ty,       //: Box<Type>,
+        //         as_token, //: Token![as],
+        //         path,     //: Path,
+        //         gt_token, //: Gt,
+        //     } = qself;
+        //     prefix = quote! { #lt_token #ty #as_token #path #gt_token };
+        // } // TODO: Something is wrong here. `else` seems reasonable here.
+        // if let Some(path) = path {
+        //     prefix = quote! { #path };
+        // }
+        // // prefix = quote!{ #qself #path };
     }
     /*
     enum AttrArgs {
@@ -391,6 +406,7 @@ fn quote_as_expr_closure(
         if !prefix.is_empty() {
             closure_name = format!("{}::{}", prefix, closure_name);
         }
+        closure_name = remove_spaces(&closure_name);
         closure_name
     };
     let log_closure_name = {
@@ -1441,15 +1457,18 @@ fn traversed_block_from_sig(
         let generics_params_iter = generics.type_params();
         let generic_params_is_empty = generics.params.is_empty();
 
+        let func_log_name = remove_spaces(&func_log_name.to_string());
         quote! {
             {
                 // The run time part of the infrastructure for
                 // generic parameters substitution with actual generic arguments.
                 let mut generic_func_name = String::with_capacity(64);
-                generic_func_name.push_str(stringify!(#func_log_name));
+                generic_func_name.push_str(#func_log_name);
+                // generic_func_name.push_str(stringify!(#func_log_name));
                 if !#generic_params_is_empty {
                     generic_func_name.push_str("<");
-                    let generic_arg_names_vec: Vec<&'static str> = vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+                    let generic_arg_names_vec: Vec<&'static str> = 
+                        vec![#(std::any::type_name::< #generics_params_iter >(),)*];
                     for generic_arg_name in generic_arg_names_vec {
                         generic_func_name.push_str(generic_arg_name);
                         generic_func_name.push_str(",");
@@ -1462,7 +1481,8 @@ fn traversed_block_from_sig(
                 let mut optional_callee_logger = None;
                 fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
                     if thread_logger.borrow_mut().logging_is_on() {
-                        optional_callee_logger = Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                        optional_callee_logger = Some(
+                            fcl::FunctionLogger::new(&generic_func_name, param_val_str))
                     }
                 });
 
@@ -2315,57 +2335,102 @@ mod kw {
     syn::custom_keyword!(prefix);
 }
 
-// #[derive(quote::to_tokens::ToTokens)]
 struct FclQSelf {
     // <T as U::V>
-    lt_token: Token![<],
+    _lt_token: Token![<],
     ty: Box<Type>,
-    as_token: Token![as],
+    _as_token: Token![as],
     path: Path,
-    gt_token: Token![>],
+    _gt_token: Token![>],
+}
+impl quote::ToTokens for FclQSelf {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        // *tokens = quote!{ #self };
+        let FclQSelf {
+            // <T as U::V>
+            // lt_token, // : Token![<],
+            ty, // : Box<Type>,
+            // as_token, // : Token![as],
+            path, // : Path,
+            // gt_token, // : Token![>],
+            ..
+        } = self;
+        *tokens = quote!{ < #ty as #path > };
+    }
 }
 impl Parse for FclQSelf {
     fn parse(input: parse::ParseStream) -> Result<Self> {
         Ok(Self {
-            lt_token: input.parse()?,
+            _lt_token: input.parse()?,
             ty: input.parse()?,
-            as_token: input.parse()?,
+            _as_token: input.parse()?,
             path: input.parse()?,
             // as_clause: Some((input.parse()?, input.parse()?)),
-            gt_token: input.parse()?,
+            _gt_token: input.parse()?,
         })
     }
 }
 
-// TODO: Something is wrong below. Option<Enum> seems more reasonable. Otherwise both can be specified.
-struct QSelfOrPath {    
-    qself: Option<FclQSelf>,
-    // qself: Option<QSelf>,
-    path: Option<Path>,
+enum LogPrefix {
+    QSelf(FclQSelf),
+    Path(syn::Path)
 }
+// TODO: Something is wrong below. Option<Enum> seems more reasonable. Otherwise both can be specified.
+struct QSelfOrPath(Option<LogPrefix>);
+// struct QSelfOrPath {    
+//     q_self_or_path: Option<LogPrefix>
+//     // qself: Option<FclQSelf>,
+//     // // qself: Option<QSelf>,
+//     // path: Option<Path>,
+// }
 impl Parse for QSelfOrPath {
     fn parse(input: parse::ParseStream) -> Result<Self> {
-        let mut result = Self {
-            qself: None,
-            path: None,
-        };
+        let mut result = Self(None);
+        // let mut result = Self {
+        //     q_self_or_path: None
+        //     // qself: None,
+        //     // path: None,
+        // };
         if input.is_empty() {
             Ok(result)
         } else {
             let lookahead = input.lookahead1();
             if lookahead.peek(Token![<]) {
-                result.qself = Some(FclQSelf {
-                    // <T as U::V>
-                    lt_token: input.parse()?,
-                    ty: input.parse()?,
-                    as_token: input.parse()?,
-                    path: input.parse()?,
-                    gt_token: input.parse()?,
-                });
-            }
-            if lookahead.peek(Token![::]) || lookahead.peek(Ident) {
-                result.path = Some(input.parse()?);
-                // let mut path: Path = input.parse()?;
+                result = Self(Some(LogPrefix::QSelf(input.parse()?,))); // <T as U::V>
+                // result = Self {
+                //     q_self_or_path: Some(LogPrefix::QSelf(
+
+                //         // <T as U::V>
+                //         input.parse()?,
+                //         // FclQSelf {
+                //         //     // <T as U::V>
+                //         //     lt_token: input.parse()?,
+                //         //     ty: input.parse()?,
+                //         //     as_token: input.parse()?,
+                //         //     path: input.parse()?,
+                //         //     gt_token: input.parse()?,
+                //         // }
+                //     ))
+                // );
+                // result.qself = Some(FclQSelf {
+                //     // <T as U::V>
+                //     lt_token: input.parse()?,
+                //     ty: input.parse()?,
+                //     as_token: input.parse()?,
+                //     path: input.parse()?,
+                //     gt_token: input.parse()?,
+                // });
+            } else {
+                result = Self(Some(LogPrefix::Path(input.parse()?)));
+                // result = Self {
+                //     q_self_or_path: Some(LogPrefix::Path(
+                //         // syn::Path {
+                //             input.parse()?
+                //         // }
+                //     ))};
+            // if lookahead.peek(Token![::]) || lookahead.peek(Ident) {
+            //     result.path = Some(input.parse()?);
+            //     // let mut path: Path = input.parse()?;
             }
 
             // // let mut path: Path;
