@@ -36,8 +36,8 @@ impl FunctionLogger {
             ret_val_str: None,
         }
     }
-    pub fn set_ret_val(&mut self, output: String) {
-        self.ret_val_str = Some(output);
+    pub fn set_ret_val(&mut self, ret_val_str: String) {
+        self.ret_val_str = Some(ret_val_str);
     }
 }
 impl Drop for FunctionLogger {

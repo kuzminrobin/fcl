@@ -30,4 +30,5 @@ pub trait CallLogger {
     fn log_loopbody_start(&mut self);
     fn log_loopbody_end(&mut self);
     // fn log_loop_end(&mut self);
+    // fn set_loop_ret_val(&mut self, ret_val: String);
 }

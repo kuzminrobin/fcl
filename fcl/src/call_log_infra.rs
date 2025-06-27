@@ -80,6 +80,8 @@ impl CallLogger for CallLogInfra {
     }
     // fn log_loop_end(&mut self) {
     //     self.call_graph.add_loop_end()
+    // fn set_loop_ret_val(&mut self, ret_val: String) {
+    //     self.call_graph.set_loop_ret_val(ret_val)
     // }
 }
 
@@ -527,6 +529,15 @@ impl CallLogger for CallLoggerArbiter {
     //     }
     //     self.last_fcl_update_thread = Some(current_thread_id);
     // }
+
+    // fn set_loop_ret_val(&mut self, ret_val: String) {
+    //     let current_thread_id = thread::current().id();
+    //     if let Some(logger) = self.get_thread_logger(current_thread_id) {
+    //         logger.set_loop_ret_val(ret_val)
+    //     } else {
+    //         debug_assert!(false, "FCL Internal Error: Unexpected lack of a thread logger");
+    //     }
+    // }
 }
 
 // TODO: Remove after the freezing is clarified.
@@ -606,6 +617,9 @@ impl CallLogger for CallLoggerAdapter {
     }
     // fn log_loop_end(&mut self) {
     //     self.get_arbiter().log_loop_end()
+    // }
+    // fn set_loop_ret_val(&mut self, ret_val: String) {
+    //     self.get_arbiter().set_loop_ret_val(ret_val)
     // }
 }
 

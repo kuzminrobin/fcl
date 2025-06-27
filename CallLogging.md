@@ -1,24 +1,25 @@
 # TODO:
-* Suboptimal Pefix: `closure{81usize,14usize:90usize,9usize}::closure{87,21:87,26}(v: true, ) {} -> false`
+* Structure-up single-threaded and multithreaded
 * Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
   indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
   The same with color in the HTML decorator adapter.
-* Structure-up single-threaded and multithreaded
-* [Consider loggin the ret val in the TreeLikeDecorator]
-* Clean-up:
-  * Remove commented code.
-* Consider moving the thread_local use deeper into the call.
-  Such that a {Call|Closure}Logger is created unconditionally.
 * Finalize the user's use
   * All the globals and thread_locals to separate macros.
   * Structure-up single-threaded and multithreaded
     * Make separate macros
     * Make separate examples and/or tests.
+* Consider moving the thread_local use deeper into the call.
+  Such that a {Call|Closure}Logger is created unconditionally.
+* Clean-up:
+  * Remove commented code.
 * ---
+* Consider recursive type params.
+* Consider a raw pointer param. Probably requires `unsafe` for printing the param.
 * In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]
   * [Log the `loop` return value]
   * [Loop varaible logging (sort of iteration number)]
+* [Consider loggin the ret val in the TreeLikeDecorator]
 * Document that sequential loops can be logged as a single loop (if the iterations are equal).
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
@@ -58,6 +59,28 @@
 * Rust Conf Talk
   * RustCon Video to YT
 * ---
+* TACTICS
+  * Develop
+  * Test against real code/projects
+  * Write tests
+  * DocComment the code (write the Code Documentation)
+  * Write the documentation
+    * ReadMe.md
+      * User Manual
+    * mdBook "Practicing Rust with FCL"
+      * While writing, develop again from scratch
+  * Publish 
+    * The crate
+    * The code documentation
+  * Videos
+    * Intro
+    * User Manual
+    * Video Course (Learning/Practicing)    
+* STRATEGY
+  * FCL
+  * C-to-Rust (| Rust-to-C)
+  * Code Coverage
+  * Code Profiling
 * Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
 * User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Reader practice:
@@ -1049,3 +1072,6 @@ Let me know if you want a complete working example with both `stdout` and `stder
   * `generic_func < T, U >() {}` remove spaces.
   * `MyStruct :: new() {}` remove spaces.
 * Consider all occurrences of `body` against `return`.
+* Suboptimal Pefix: `closure{81usize,14usize:90usize,9usize}::closure{87,21:87,26}(v: true, ) {} -> false`
+* [Log the `loop` return value]
+  Has been deprioritized. But still document it. Reader practice.

@@ -550,9 +550,21 @@ fn quote_as_expr_loop(
         }
     }
     let body = quote_as_loop_block(body, prefix);
-    quote! { #(#attrs)* #label #loop_token #body }
-    // TODO: Ret val for `loop`.
-    // TODO: Consider all occurrences of `body` agains `return`.
+    quote! {
+        // // Ret val for `loop` has been deprioritized since it requires extra 
+        // // refactoring for the case of empty (removed) loopbody.
+        // {
+        //     let ret_val = 
+                #(#attrs)* #label #loop_token #body 
+        //     ;
+
+        //     let ret_val_str = format!("{}", ret_val.maybe_print());
+        //     fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+        //         thread_logger.borrow_mut().set_loop_ret_val(ret_val_str);
+        //     });
+        //     ret_val
+        // }
+    }
     // quote!{
     //     {
     //         let ret_val = {
@@ -565,9 +577,6 @@ fn quote_as_expr_loop(
     //         });
     //         ret_val
     //     }
-    //     // {
-    //     //     #(#attrs)* #label #loop_token #body
-    //     // }
     // }
 }
 fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {

@@ -276,6 +276,20 @@ impl CallGraph {
         self.current_node = new_sibling.clone();
     }
 
+    // // parent() { // `current`. `call_stack`: [..., parent].
+    // //      . . .
+    // //      { // Loop body start.   
+    // //          . . .
+    // //          [child() { ... }
+    // //          [// child() repeats 3 time(s).]]
+    // //      } // Loop body end.
+    // fn set_loop_ret_val(&mut self, ret_val: String) {
+    //     // Reservation for the possible future extension.
+    //     // If the last loop iteration had no nested calls then the loopbody is removed without a trace.
+    //     // Logging the return value for such an iteration requires extra refatoring.
+    //     // Lowering down the priority of `loop` ret val logging.
+    // }
+
     // parent() {
     //      . . .
     //      [{ // Loop body start.   // Possible previous iterations of the current loop.
