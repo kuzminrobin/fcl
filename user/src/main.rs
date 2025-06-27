@@ -75,8 +75,7 @@ fn calls() {
     // let _ = _s.method();
 
     let _b = Some(true).map(
-        #[loggable]
-
+        // #[loggable]
         // #[rustfmt::skip]
         move |b| -> bool {
             /*println!("Lambda"); */

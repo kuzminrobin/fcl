@@ -1,10 +1,10 @@
 # TODO:
-* Consider all occurrences of `body` against `return`.
+* Suboptimal Pefix: `closure{81usize,14usize:90usize,9usize}::closure{87,21:87,26}(v: true, ) {} -> false`
+* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
+  indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
+  The same with color in the HTML decorator adapter.
 * Structure-up single-threaded and multithreaded
 * [Consider loggin the ret val in the TreeLikeDecorator]
-* Remove spaces inside of paths/names. Consider making `prefix` a `String`.
-  * `generic_func < T, U >() {}` remove spaces.
-  * `MyStruct :: new() {}` remove spaces.
 * Clean-up:
   * Remove commented code.
 * Consider moving the thread_local use deeper into the call.
@@ -14,11 +14,7 @@
   * Structure-up single-threaded and multithreaded
     * Make separate macros
     * Make separate examples and/or tests.
-* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
-  indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
-  The same with color in the HTML decorator adapter.
 * ---
-* Suboptimal Pefix: `closure{81usize,14usize:90usize,9usize}::closure{87,21:87,26}(v: true, ) {} -> false`
 * In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]
   * [Log the `loop` return value]
@@ -1049,3 +1045,7 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Shrink function name paths. 
   * Consider making `prefix` a `&str` or `String`.
 * Consider restructuring `struct QSelfOrPath`.
+* Remove spaces inside of paths/names. Consider making `prefix` a `String`.
+  * `generic_func < T, U >() {}` remove spaces.
+  * `MyStruct :: new() {}` remove spaces.
+* Consider all occurrences of `body` against `return`.
