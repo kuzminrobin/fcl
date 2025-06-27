@@ -7,7 +7,6 @@ use std::thread;
 use std::time::Duration;
 
 use fcl::call_log_infra::THREAD_LOGGER;
-// use fcl::{ClosureLogger, closure_logger};
 use fcl_proc_macros::{loggable, non_loggable};
 
 fn main() {

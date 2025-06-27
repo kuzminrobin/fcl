@@ -21,26 +21,6 @@ impl<T: std::fmt::Debug> MaybePrint for T {
     }
 }
 
-// #[macro_export]
-// macro_rules! closure_logger {
-//     ($start_line:expr, $start_col:expr, $end_line:expr, $end_col:expr) => {
-//         let mut _logger = None;
-//         fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-//             if logger.borrow_mut().logging_is_on() {
-//                 _logger = Some(ClosureLogger::new($start_line, $start_col, $end_line, $end_col))
-//             }
-//         });
-//     }
-// }
-
-// struct CalleeLogger; // TODO: Merge with FunctionLogger.
-// impl Drop for CalleeLogger {
-//     fn drop(&mut self) {
-//         THREAD_LOGGER.with(|logger|
-//             logger.borrow_mut().log_ret(self.output));
-//     }
-// }
-
 pub struct FunctionLogger {
     // _dropper: CalleeLogger,
     ret_val_str: Option<String>,

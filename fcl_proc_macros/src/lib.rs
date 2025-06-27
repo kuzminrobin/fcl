@@ -335,49 +335,6 @@ fn quote_as_expr_closure(
         log_closure_name_ts = quote! { #prefix::#log_closure_name_ts }
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
-
-    // let log_closure_name_str = {
-    //     let mut closure_name =
-    //         format!("closure{{{},{}:{},{}}}",
-    //             start_line, start_col, end_line, end_col);
-
-    //     if !prefix.is_empty() {
-    //         // fn to_string_tokenized(tt: &TokenTree) -> String {
-    //         //     let mut ret_val = String::new();
-    //         //     for t in tt.into_token_stream() {
-    //         //         ret_val = format!("{} {}", ret_val, t);
-    //         //     }
-    //         //     ret_val
-    //         // }
-    //         // let mut prefix_str = String::with_capacity(32);
-    //         // for token in prefix.clone().into_iter() {
-    //         //     // prefix_str = format!("{}_{}", prefix_str, to_string_tokenized(&token));
-    //         //     prefix_str = format!("{} {}", prefix_str, token);
-    //         //     // prefix_str.push_str(&token.to_string());
-    //         //     // prefix_str.push_str(&" ");
-    //         // }
-    //         // closure_name = format!("{}::{}", prefix_str, closure_name);
-    //         closure_name = format!("{}::{}", prefix, closure_name);
-    //     }
-
-    //     closure_name = remove_spaces(&closure_name);
-    //     closure_name
-    // };
-    // let log_closure_name_ts = {
-    //     if prefix.is_empty() {
-    //         quote! { closure{#start_line,#start_col:#end_line,#end_col} }
-    //     } else {
-    //         let coords_ts_res = proc_macro2::TokenStream::from_str(&coords_str);
-    //         match coords_ts_res {
-    //             Ok(ts) => quote! { #prefix::closure{#ts} },
-    //             Err(_lex_err) => quote! { #prefix::closure #coords_str }
-    //         }
-    //         // quote! { #prefix::closure #coords_str }
-    //         // quote! { #prefix::#log_closure_name_str }
-    //         // quote! { #prefix::closure #start_line , #start_col : #end_line , #end_col }
-    //         // quote! { #prefix::closure{ #start_line _,_ #start_col : #end_line , #end_col } }
-    //     }
-    // };
     let prefix = &log_closure_name_ts;
 
     let body = { quote_as_expr(&**body, None, prefix) };
@@ -397,21 +354,6 @@ fn quote_as_expr_closure(
                 }
             });
 
-            // TODO: Consider removign `closure_logger()` macro.
-
-            // The `ClosureLogger` instance:
-            // macro_rules! closure_logger {
-            //     ($start_line:expr, $start_col:expr, $end_line:expr, $end_col:expr) => {
-            //         let mut _logger = None;
-            //         fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-            //             if logger.borrow_mut().logging_is_on() {
-            //                 _logger = Some(ClosureLogger::new($start_line, $start_col, $end_line, $end_col))
-            //             }
-            //         });
-            //     }
-            // }
-
-            // closure_logger!(#prefix);   //#start_line, #start_col, #end_line, #end_col);
             let ret_val = (move || { #body })();
 
             // Uncondititonally print what closure returns
