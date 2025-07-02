@@ -120,8 +120,8 @@ impl ThreadIndents {
     }
 }
 pub struct CallLoggerArbiter {
-    thread_shared_writer: ThreadSharedWriterPtr, // = Arc<RefCell<ThreadSharedWriter>>
-    /// Per-thread collection of loggers and thread indent IDs used by the corresponding logger.
+    thread_shared_writer: ThreadSharedWriterPtr,
+    /// Collection of per-thread loggers and thread indent IDs used by the corresponding logger.
     thread_loggers: HashMap<thread::ThreadId, (Box<dyn CallLogger>, usize)>,
     last_fcl_update_thread: Option<thread::ThreadId>,
     stderr_redirector: Option<StdOutputRedirector>,
@@ -486,15 +486,13 @@ impl CallLogger for CallLoggerArbiter {
         }
     }
 
-    // NOTE: Reuses the traits `set_thread_indent()` that does nothing.
-    
-    // fn set_thread_indent(&mut self, thread_indent: String) {
-    //     if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
-    //         logger.set_thread_indent(thread_indent);
-    //     } else {
-    //         debug_assert!(false, NO_LOGGER_ERR_STR!());
-    //     }
-    // }
+    fn set_thread_indent(&mut self, thread_indent: String) {
+        if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
+            logger.set_thread_indent(thread_indent);
+        } else {
+            debug_assert!(false, NO_LOGGER_ERR_STR!());
+        }
+    }
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>) {
         self.sync_fcl_and_std_output(false);
@@ -705,23 +703,9 @@ thread_local! {
                                         None))))))
                         }
                         Err(e) => {
-                            // println!("CallLoggerAdapter creation panic: '{:?}'", e); // TODO: Remove after the freezing is clarified.
                             debug_assert!(false, "Unexpected mutex lock failure: '{:?}'", e);
                         }
                     }
-                    // if let Ok(mut guard) = (*CALL_LOGGER_ARBITER).lock() {
-                    //     guard.add_thread_logger(Box::new(
-                    //         CallLogInfra::new(Rc::new(RefCell::new(
-                    //             // fcl_decorators::TreeLikeDecorator::new(
-                    //             //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                    //             //     None, None, None))))))
-                    //             fcl_decorators::CodeLikeDecorator::new(
-                    //                 Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                    //                 None))))))
-                    // } else {
-                    //     println!("CallLoggerAdapter creation panic");
-                    //     panic!("Unexpected mutex lock failure")
-                    // }
                 }
                 let call_logger_arbiter;
                 unsafe {

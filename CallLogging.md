@@ -1,12 +1,10 @@
 # TODO:
-* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
-  indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
-  The same with color in the HTML decorator adapter.
 * Structure-up single-threaded and multithreaded
   * `fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {`  
     `// TODO: In a single-threaded case consider canceling the std output buffering.`
-* Consider recursive type params.
+* Consider {recursive type} params (lists) when logging the params.
 * Consider a raw pointer param. Probably requires `unsafe` for printing the param.
+* Restructure to a minimal set of crates (fcl, proc_macros, commons).
 * Finalize the user's use
   * All the globals and thread_locals to separate macros.
   * Structure-up single-threaded and multithreaded
@@ -75,6 +73,8 @@
   * C-to-Rust (| Rust-to-C)
   * Code Coverage
   * Code Profiling
+* Reader Practice: Thread name prefix (on the left of the thread indent).
+* Automatic color in the HTML decorator adapter.
 * Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
 * User practice: HTML-decorator (code-like, tree-like), XML-decorator.
 * Reader practice:
@@ -1077,3 +1077,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
   Or try logging oneself and see how it works.
   Preliminary result: Causes sophisticated circular dependencies.  
   Possible workaround: Create a copy with different name and use the copy to log the original.  
+* Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
+  indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
