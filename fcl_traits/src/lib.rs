@@ -6,7 +6,7 @@ pub trait ThreadSpecifics {
     /// one thread's output can be logged in the left half of the console,
     /// and the other thread's output can be logged in the right half, 
     /// or _indented_ by half of the console width.
-    fn set_thread_indent(&mut self, thread_indent: &'static str);
+    fn set_thread_indent(&mut self, thread_indent: String);
 }
 
 pub trait CoderunThreadSpecificNotifyable: CoderunNotifiable + ThreadSpecifics {}
@@ -21,7 +21,7 @@ pub trait CallLogger {
     fn logging_is_on(&self) -> bool;
     fn set_logging_is_on(&mut self, is_on: bool);
 
-    fn set_thread_indent(&mut self, thread_indent: &'static str);
+    fn set_thread_indent(&mut self, _thread_indent: String) {}
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>);
     fn log_ret(&mut self, ret_val: Option<String>);

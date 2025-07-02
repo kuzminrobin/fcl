@@ -235,46 +235,20 @@ fn calls() {
 
 #[loggable]
 fn thread_func() {
-    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
-    // CALL_LOG_INFRA.with(|infra| infra.borrow_mut().set_is_on(true)); // Turn logging on.
-
-    THREAD_LOGGER.with(|logger| {
-        logger
-            .borrow_mut()
-            .set_thread_indent(&"                                  ")
-    });
-    // CALL_LOG_INFRA.with(|infra| {
-    //     infra
+    // THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
+    // THREAD_LOGGER.with(|logger| {
+    //     logger
     //         .borrow_mut()
-    //         .set_thread_indent(&"                                  ")
+    //         .set_thread_indent(String::from("                                  ")); //&"                                  ")
     // });
-
-    // // If logging is enabled, create the call logger.
-    // let mut _l = None;
-    // CALL_LOG_INFRA.with(|infra| {
-    //     if infra.borrow_mut().logging_is_on() {
-    //         _l = Some(FunctionLogger::new("main"))
-    //     }
-    // });
-    // // let _l = FunctionLogger::new("main");
-
-    // println!("thread_func() starts");
 
     #[loggable]
     fn f2() {
-        // use fcl::call_log_infra::CALL_LOG_INFRA;
-        // let mut _logger = None;
-        // CALL_LOG_INFRA.with(|infra| {
-        //     if infra.borrow_mut().logging_is_on() {
-        //         _logger = Some(FunctionLogger::new("f2"))
-        //     }
-        // });
     }
 
     for _ in 0..10 {
         f2();
     }
-    // println!("thread_func() called f2()");
 
     g();
     ff();

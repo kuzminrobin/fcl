@@ -14,13 +14,13 @@ use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecif
 
 struct CommonDecorator {
     writer: Box<dyn Write>,
-    thread_indent: &'static str,
+    thread_indent: String,
 }
 impl CommonDecorator {
     fn new(writer: Option<Box<dyn Write>>) -> Self {
         Self {
             writer: writer.unwrap_or(Box::new(stdout())),
-            thread_indent: &"",
+            thread_indent: String::from(""),
         }
     }
     // fn get_callee_name_string(name: &CalleeName) -> String {
@@ -32,12 +32,12 @@ impl CommonDecorator {
     //         )),
     //     }
     // }
-    fn set_thread_indent(&mut self, thread_indent: &'static str) {
+    fn set_thread_indent(&mut self, thread_indent: String) {
         self.thread_indent = thread_indent;
     }
 
-    fn get_thread_indent(&self) -> &'static str {
-        self.thread_indent
+    fn get_thread_indent(&self) -> String {
+        self.thread_indent.clone()
     }
 }
 
@@ -45,7 +45,6 @@ impl CommonDecorator {
 macro_rules! decorator_write {
     ($self:ident, $($arg:tt)*) => {{
         let _result = write!($self.common.writer, $($arg)*);
-        // $crate::io::_print($crate::format_args_nl!($($arg)*));
     }};
 }
 
@@ -175,7 +174,7 @@ impl CoderunNotifiable for CodeLikeDecorator {
 }
 
 impl ThreadSpecifics for CodeLikeDecorator {
-    fn set_thread_indent(&mut self, thread_indent: &'static str) {
+    fn set_thread_indent(&mut self, thread_indent: String) {
         self.common.set_thread_indent(thread_indent);
     }
 }
@@ -282,7 +281,7 @@ impl CoderunNotifiable for TreeLikeDecorator {
 }
 
 impl ThreadSpecifics for TreeLikeDecorator {
-    fn set_thread_indent(&mut self, thread_indent: &'static str) {
+    fn set_thread_indent(&mut self, thread_indent: String) {
         self.common.set_thread_indent(thread_indent);
     }
 }

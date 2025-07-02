@@ -1,63 +1,43 @@
 # TODO:
-* Structure-up single-threaded and multithreaded
 * Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
   indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
   The same with color in the HTML decorator adapter.
+* Structure-up single-threaded and multithreaded
+  * `fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {`  
+    `// TODO: In a single-threaded case consider canceling the std output buffering.`
+* Consider recursive type params.
+* Consider a raw pointer param. Probably requires `unsafe` for printing the param.
 * Finalize the user's use
   * All the globals and thread_locals to separate macros.
   * Structure-up single-threaded and multithreaded
     * Make separate macros
     * Make separate examples and/or tests.
+  * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
+    log thread func or not).
 * Consider moving the thread_local use deeper into the call.
   Such that a {Call|Closure}Logger is created unconditionally.
-* Clean-up:
-  * Remove commented code.
 * ---
-* Consider recursive type params.
-* Consider a raw pointer param. Probably requires `unsafe` for printing the param.
 * In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]
-  * [Log the `loop` return value]
   * [Loop varaible logging (sort of iteration number)]
 * [Consider loggin the ret val in the TreeLikeDecorator]
-* Document that sequential loops can be logged as a single loop (if the iterations are equal).
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
-* Enabling or disabling logging upon infra creation (log `main()` or not, log thread func or not).
-* `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
-  `#[loggable(MyPureTrait::pure_method)]`.  
-  Undesirable. Either work-around or document it.
 * Consider removing all the occurrences of `unwrap()`.
 * Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`
 * Test
+  * Test with the existing projects.
+    * Update the instructions, how to enable func call logging in your project.
   * Testing
     * Log to string/Vector and compare.
     * Basics (from user/main.rs).
     * Output 
     * enable/disable.
     * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
-  * Test the logging by logging oneself.  
-    Or try logging oneself and see how it works.
-    Preliminary result: Causes sophisticated circular dependencies.  
-    Possible workaround: Create a copy with different name and use the copy to log the original.  
-    Also: Test with the existing projects.
-    * Update the instructions, how to enable func call logging in your project.
 * Overall clean-up.
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
-* Doc-comments.  
-* Documenting checklist
-  * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
-  * Doc comments
-  * .md
-  * Book 
-  * [toolchain stable or document why inachievable]
-* [Crates.io publication]
-* Video
-  * YT
-* SRUG talk.
-  * SRUG Video to YT
-* Rust Conf Talk
-  * RustCon Video to YT
+* Clean-up:
+  * Remove commented code.
 * ---
 * TACTICS
   * Develop
@@ -67,15 +47,29 @@
   * Write the documentation
     * ReadMe.md
       * User Manual
+        * Document that sequential loops can be logged as a single loop (if the iterations are equal).
+        * Document that loop ret val loggign has been deprioritized.
     * mdBook "Practicing Rust with FCL"
       * While writing, develop again from scratch
+      * Document that sequential loops can be logged as a single loop (if the iterations are equal).
+      * Document that loop ret val loggign has been deprioritized.
+    * Documenting checklist
+      * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
+      * Doc comments
+      * .md
+      * mdBook 
+      * [toolchain stable or document why inachievable]
   * Publish 
-    * The crate
+    * The crate. Crates.io
     * The code documentation
   * Videos
     * Intro
     * User Manual
     * Video Course (Learning/Practicing)    
+  * SRUG talk.
+    * SRUG Video to YT
+  * Rust Conf Talk
+    * RustCon Video to YT
 * STRATEGY
   * FCL
   * C-to-Rust (| Rust-to-C)
@@ -1075,3 +1069,11 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Suboptimal Pefix: `closure{81usize,14usize:90usize,9usize}::closure{87,21:87,26}(v: true, ) {} -> false`
 * [Log the `loop` return value]
   Has been deprioritized. But still document it. Reader practice.
+* `#[loggable(<MyStruct as MyPureTrait>::pure_method)]` is the same as  
+  `#[loggable(MyPureTrait::pure_method)]`.  
+  Undesirable. Either work-around or document it.
+* (Canceled. To cause std output redirection conflicts)  
+  Test the logging by logging oneself.  
+  Or try logging oneself and see how it works.
+  Preliminary result: Causes sophisticated circular dependencies.  
+  Possible workaround: Create a copy with different name and use the copy to log the original.  
