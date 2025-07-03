@@ -30,31 +30,60 @@ mod root {
             h();
         }
     }
-    fn f() {} 
-    fn g() {
+    pub fn f() {} 
+    pub fn g() {
         m::i();
     }
-    pub fn main() {
-        // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
-        f();
-        g();
+    // // #[fcl_proc_macros::loggable]
+    // pub fn main() {
+    //     fcl/*::call_log_infra */::_single_threaded_otimization!();
+    //     // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
+    //     let _a = Some(0);
+    //     f();
+    //     g();
 
-        {
-            use crate::*;
-            crate::S.d();  // Expected: S::d()
-            // crate::<S as Tr>.d();  // Expected: S::d()
-            crate::S2.d(); // Expected: Tr::d()
-            crate::S2.e();
+    //     {
+    //         use crate::*;
+    //         crate::S.d();  // Expected: S::d()
+    //         // crate::<S as Tr>.d();  // Expected: S::d()
+    //         crate::S2.d(); // Expected: Tr::d()
+    //         crate::S2.e();
 
-            let s = S;
-            let s2 = S2;
-            let a: Vec<&dyn Tr> = vec![ &s, &s2 ];
-            a[0].d();   // Expected: S::d()
-            a[1].d();   // Expected: Tr::d()
-        }
+    //         let s = S;
+    //         let s2 = S2;
+    //         let a: Vec<&dyn Tr> = vec![ &s, &s2 ];
+    //         a[0].d();   // Expected: S::d()
+    //         a[1].d();   // Expected: Tr::d()
+    //     }
+    // }
+}
+// pub use root::*;
+
+#[fcl_proc_macros::loggable]
+pub fn main() {
+    fcl/*::call_log_infra */::_single_threaded_otimization!();
+    // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
+    let _a = Some(0);
+
+    use root::*;
+    f();
+    g();
+
+    {
+        use crate::*;
+        crate::S.d();  // Expected: S::d()
+        // crate::<S as Tr>.d();  // Expected: S::d()
+        crate::S2.d(); // Expected: Tr::d()
+        crate::S2.e();
+
+        let s = S;
+        let s2 = S2;
+        let a: Vec<&dyn Tr> = vec![ &s, &s2 ];
+        a[0].d();   // Expected: S::d()
+        a[1].d();   // Expected: Tr::d()
     }
 }
-pub use root::*;
+
 
 #[fcl_proc_macros::loggable]
 trait Tr {

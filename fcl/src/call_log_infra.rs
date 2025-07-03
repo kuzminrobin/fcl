@@ -662,7 +662,7 @@ static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new
 });
 // TODO: Considedr `Rc` instead of `Arc`.
 // TODO: Make CALL_LOGGER_ARBITER visible to the panic hook and ThreadGatekeeper only.
-static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> = LazyLock::new(|| {
+pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> = LazyLock::new(|| {
     Rc::new(RefCell::new({
         let mut arbiter = unsafe { CallLoggerArbiter::new((*THREAD_SHARED_WRITER).clone()) };
         arbiter.set_std_output_sync();
@@ -718,3 +718,41 @@ thread_local! {
             }))))
     };
 }
+
+pub struct _ThreadLoggerPImplRecoverer(Option<ThreadLoggerPImpl>);
+impl _ThreadLoggerPImplRecoverer {
+    pub fn new(recoveree: Option<ThreadLoggerPImpl>) -> Self {
+        Self(recoveree)
+    }
+}
+impl Drop for _ThreadLoggerPImplRecoverer {
+    fn drop(&mut self) {
+        if let Some(logger_pimpl) = self.0.take() {
+            THREAD_LOGGER.replace(logger_pimpl);
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! _single_threaded_otimization {
+    () => {
+        // 1
+        let _old = fcl::call_log_infra::_ThreadLoggerPImplRecoverer::new(Some(unsafe {
+            fcl::call_log_infra::THREAD_LOGGER.replace(
+                fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
+                    (*fcl::call_log_infra::CALL_LOGGER_ARBITER).clone(),
+                ),
+            )
+        }));
+    };
+}
+// fn tmp() {
+//     let _old = _ThreadLoggerPImplRecoverer(Some(unsafe {
+//         THREAD_LOGGER.replace(ThreadLoggerPImpl::Singlethreaded((*CALL_LOGGER_ARBITER).clone()))
+//     }));
+// }
+// macro_rules! _a {
+//     () => 
+//         1
+//     };
+// }

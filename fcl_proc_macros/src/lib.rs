@@ -237,8 +237,9 @@ fn quote_as_expr_call(
         }
         traversed_args
     };
-    let maybe_flush_call = if is_print_func_name {
-        quote! {
+    let mut ret_val = quote!{ #(#attrs)* #func ( #args ) };
+    /*let maybe_flush_call = */if is_print_func_name {
+        ret_val = quote! {
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
                 use fcl_traits::CallLogger;
                 match &mut *logger.borrow_mut() {
@@ -251,17 +252,19 @@ fn quote_as_expr_call(
             // fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
             //     logger.borrow_mut().maybe_flush();
             // })
+            #ret_val
         }
-    } else {
-        quote! {}
+    // } else {
+    //     quote! {}
     };
+    ret_val
 
-    quote! {
-        {
-            #maybe_flush_call;
-            #(#attrs)* #func ( #args )
-        }
-    }
+    // quote! {
+    //     {
+    //         #maybe_flush_call;
+    //         #(#attrs)* #func ( #args )
+    //     }
+    // }
 }
 fn quote_as_expr_cast(
     expr_cast: &ExprCast,
@@ -2192,10 +2195,10 @@ fn quote_as_stmt_macro(
     let mut maybe_flush_invocation = quote! {};
     let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, prefix);
     quote! {
-        {
+        // {
             #maybe_flush_invocation;
             #(#attrs)* #mac #semi_token
-        }
+        // }
     }
 }
 fn quote_as_stmt(stmt: &Stmt, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
