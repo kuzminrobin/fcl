@@ -85,6 +85,59 @@ impl CallLogger for CallLogInfra {
     // }
 }
 
+struct ThreadGatekeeper {
+    call_logger_arbiter: Arc<RefCell<CallLoggerArbiter>>
+}
+impl ThreadGatekeeper {
+    pub fn new(call_logger_arbiter: Arc<RefCell<CallLoggerArbiter>>) -> Self {
+        Self {
+            call_logger_arbiter
+        }
+    }
+    pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
+        self.call_logger_arbiter.borrow_mut().add_thread_logger(thread_logger)
+    }
+    pub fn remove_thread_logger(&mut self) {
+        self.call_logger_arbiter.borrow_mut().remove_thread_logger()
+    }
+}
+impl CallLogger for ThreadGatekeeper {
+    fn push_logging_is_on(&mut self, is_on: bool) {
+        self.call_logger_arbiter.borrow_mut().push_logging_is_on(is_on)
+    }
+    fn pop_logging_is_on(&mut self) {
+        self.call_logger_arbiter.borrow_mut().pop_logging_is_on()
+    }
+    fn logging_is_on(&self) -> bool {
+        self.call_logger_arbiter.borrow_mut().logging_is_on()
+    }
+    fn set_logging_is_on(&mut self, is_on: bool) {
+        self.call_logger_arbiter.borrow_mut().set_logging_is_on(is_on)
+    }
+    fn set_thread_indent(&mut self, _thread_indent: String) {
+        self.call_logger_arbiter.borrow_mut().set_thread_indent(_thread_indent)
+    }
+    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
+        self.call_logger_arbiter.borrow_mut().log_call(name, param_vals)
+    }
+    fn log_ret(&mut self, ret_val: Option<String>) {
+        self.call_logger_arbiter.borrow_mut().log_ret(ret_val)
+    }
+    fn flush(&mut self) {
+        self.call_logger_arbiter.borrow_mut().flush()
+    }
+    fn maybe_flush(&mut self) {
+        self.call_logger_arbiter.borrow_mut().maybe_flush()
+    }
+    fn log_loopbody_start(&mut self) {
+        self.call_logger_arbiter.borrow_mut().log_loopbody_start()
+    }
+    fn log_loopbody_end(&mut self) {
+        self.call_logger_arbiter.borrow_mut().log_loopbody_end()
+    }
+    // fn log_loop_end(&mut self);
+    // fn set_loop_ret_val(&mut self, ret_val: String);
+}
 struct ThreadIndents {
     indents_taken: Vec<bool>,
     thread_indent_step: String,
@@ -146,80 +199,114 @@ impl CallLoggerArbiter {
     fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {
         // TODO: In a single-threaded case consider canceling the std output buffering.
         unsafe {
-            let mut guard = None;
-            match (*CALL_LOGGER_ARBITER).try_lock() {
-                Ok(ok_guard) => {
-                    guard = Some(ok_guard);
-                }
-                Err(std::sync::TryLockError::WouldBlock) => {
+            let mut arbiter = None;
+            match (*CALL_LOGGER_ARBITER).try_borrow_mut() {
+                Ok(_arbiter) => arbiter = Some(_arbiter),
+                Err(e) => {
                     let _ignore_write_error = writeln!(
                         (*THREAD_SHARED_WRITER).borrow_mut(),
-                        "{}{}",
-                        "FCL's internal panic detected. Flushing the cache and buffers will likely deadlock below. ",
-                        "Attach the debugger in that case to see the panic details.",
+                        "{}{} ({}). {}",
+                        "Panic occurred while FCL was busy. ",
+                        "Could not flush the FCL's cache and buffers before panic report below",
+                        e,
+                        "If the panic report is not shown, attach the debugger to see the panic details"
+                        // "FCL's internal error detected. Flushing the cache and buffers will likely deadlock below. ",
+                        // "Attach the debugger in that case to see the panic details.",
                     );
                 }
-                Err(std::sync::TryLockError::Poisoned(poison_error)) => {
-                    let _ignore_write_error = writeln!(
-                        (*THREAD_SHARED_WRITER).borrow_mut(),
-                        "{}: '{}'.\n{}{}",
-                        "FCL's internal panic detected. An FCL's thread has panicked while holding a mutex",
-                        poison_error,
-                        "Will try to flush the cache and buffers with the poisoned mutex. ",
-                        "If a deadlock happens, attach the debugger to see the panic details. "
-                    );
-                    guard = Some(poison_error.into_inner());
-                }
             }
-            if guard.is_none() {
-                guard = match (*CALL_LOGGER_ARBITER).lock() {
-                    Ok(guard) => Some(guard),
-                    Err(_e) => {
-                        let _ignore_write_error = writeln!(
-                            (*THREAD_SHARED_WRITER).borrow_mut(),
-                            "Mutex lock failure in FCL's panic_hook(): '{:?}'",
-                            _e
-                        );
-                        None
-                    }
-                }
-            }
-            if let Some(mut guard) = guard {
-                guard.sync_fcl_and_std_output(true);
-                guard.remove_thread_logger();
-                if thread::current().id() == guard.main_thread_id {
+            if let Some(mut arbiter) = arbiter {
+                arbiter.sync_fcl_and_std_output(true);
+                arbiter.remove_thread_logger();
+                if thread::current().id() == arbiter.main_thread_id {
+                    // TODO: Comment is out-of-date.
                     // The main() thread is panicking.
                     // Lower down the probability of unclear sporadic freezing (deadlock?),
                     // by flushing the buffered std output and not buffering any more.
-                    guard.stderr_redirector = None;
-                    guard.stdout_redirector = None;
+                    arbiter.stderr_redirector = None;
+                    arbiter.stdout_redirector = None;
                 }
             }
-            // match (*CALL_LOGGER_ARBITER).lock() {
-            //     Ok(mut guard) => {
-            //         guard.sync_fcl_and_std_output(true);
-            //         guard.remove_thread_logger();
-            //         if thread::current().id() == guard.main_thread_id {
-            //             // The main() thread is panicking.
-            //             // Lower down the probability of unclear sporadic freezing (deadlock?),
-            //             // by flushing the buffered std output and not buffering any more.
-            //             guard.stderr_redirector = None;
-            //             guard.stdout_redirector = None;
-            //         }
-
-            //         // TODO: In a single-threaded case cancel the std output buffering.
-            //     }
-            //     Err(_e) => {
-            //         println!(
-            //             "Internal Error: Unexpected mutex lock failure in panic_hook(): '{:?}'",
-            //             _e
-            //         );
-            //     }
-            // }
             (*ORIGINAL_PANIC_HOOK)
                 .borrow()
                 .as_ref()
                 .map(|hook| hook(panic_hook_info));
+
+
+            // let mut guard = None;
+            // match (*CALL_LOGGER_ARBITER).try_lock() {
+            //     Ok(ok_guard) => {
+            //         guard = Some(ok_guard);
+            //     }
+            //     Err(std::sync::TryLockError::WouldBlock) => {
+            //         let _ignore_write_error = writeln!(
+            //             (*THREAD_SHARED_WRITER).borrow_mut(),
+            //             "{}{}",
+            //             "FCL's internal panic detected. Flushing the cache and buffers will likely deadlock below. ",
+            //             "Attach the debugger in that case to see the panic details.",
+            //         );
+            //     }
+            //     Err(std::sync::TryLockError::Poisoned(poison_error)) => {
+            //         let _ignore_write_error = writeln!(
+            //             (*THREAD_SHARED_WRITER).borrow_mut(),
+            //             "{}: '{}'.\n{}{}",
+            //             "FCL's internal panic detected. An FCL's thread has panicked while holding a mutex",
+            //             poison_error,
+            //             "Will try to flush the cache and buffers with the poisoned mutex. ",
+            //             "If a deadlock happens, attach the debugger to see the panic details. "
+            //         );
+            //         guard = Some(poison_error.into_inner());
+            //     }
+            // }
+            // if guard.is_none() {
+            //     guard = match (*CALL_LOGGER_ARBITER).lock() {
+            //         Ok(guard) => Some(guard),
+            //         Err(_e) => {
+            //             let _ignore_write_error = writeln!(
+            //                 (*THREAD_SHARED_WRITER).borrow_mut(),
+            //                 "Mutex lock failure in FCL's panic_hook(): '{:?}'",
+            //                 _e
+            //             );
+            //             None
+            //         }
+            //     }
+            // }
+            // if let Some(mut guard) = guard {
+            //     guard.sync_fcl_and_std_output(true);
+            //     guard.remove_thread_logger();
+            //     if thread::current().id() == guard.main_thread_id {
+            //         // The main() thread is panicking.
+            //         // Lower down the probability of unclear sporadic freezing (deadlock?),
+            //         // by flushing the buffered std output and not buffering any more.
+            //         guard.stderr_redirector = None;
+            //         guard.stdout_redirector = None;
+            //     }
+            // }
+            // // match (*CALL_LOGGER_ARBITER).lock() {
+            // //     Ok(mut guard) => {
+            // //         guard.sync_fcl_and_std_output(true);
+            // //         guard.remove_thread_logger();
+            // //         if thread::current().id() == guard.main_thread_id {
+            // //             // The main() thread is panicking.
+            // //             // Lower down the probability of unclear sporadic freezing (deadlock?),
+            // //             // by flushing the buffered std output and not buffering any more.
+            // //             guard.stderr_redirector = None;
+            // //             guard.stdout_redirector = None;
+            // //         }
+
+            // //         // TODO: In a single-threaded case cancel the std output buffering.
+            // //     }
+            // //     Err(_e) => {
+            // //         println!(
+            // //             "Internal Error: Unexpected mutex lock failure in panic_hook(): '{:?}'",
+            // //             _e
+            // //         );
+            // //     }
+            // // }
+            // (*ORIGINAL_PANIC_HOOK)
+            //     .borrow()
+            //     .as_ref()
+            //     .map(|hook| hook(panic_hook_info));
         }
     }
 
@@ -230,7 +317,7 @@ impl CallLoggerArbiter {
         std::panic::set_hook(Box::new(Self::panic_hook))
     }
 
-    pub fn set_stdx_sync(
+    fn set_stdx_sync(
         &mut self,
         writer_kind: WriterKind,
         stdx_redirector_result: std::io::Result<StdOutputRedirector>,
@@ -578,22 +665,27 @@ impl CallLogger for CallLoggerArbiter {
     // }
 }
 
-// TODO: Remove after the freezing is clarified.
-impl Drop for CallLoggerArbiter {
-    fn drop(&mut self) {
-        println!("<CallLoggerArbiter as Drop>::drop()");
-    }
-}
+// // TODO: Remove after the freezing is clarified.
+// impl Drop for CallLoggerArbiter {
+//     fn drop(&mut self) {
+//         println!("<CallLoggerArbiter as Drop>::drop()");
+//     }
+// }
 
-struct CallLoggerAdapter {
-    arbiter: Arc<Mutex<CallLoggerArbiter>>,
+struct ThreadGateAdapter {
+    gatekeeper: Arc<Mutex<ThreadGatekeeper>>
+    // arbiter: Arc<Mutex<CallLoggerArbiter>>,
 }
-impl CallLoggerAdapter {
-    fn new(arbiter: Arc<Mutex<CallLoggerArbiter>>) -> Self {
-        Self { arbiter }
+impl ThreadGateAdapter {
+    fn new(gatekeeper: Arc<Mutex<ThreadGatekeeper>>) -> Self {
+    // fn new(arbiter: Arc<Mutex<CallLoggerArbiter>>) -> Self {
+        Self { gatekeeper }
+        // Self { arbiter }
     }
-    fn get_arbiter(&self) -> MutexGuard<'_, CallLoggerArbiter> {
-        match self.arbiter.lock() {
+    fn get_gatekeeper(&self) -> MutexGuard<'_, ThreadGatekeeper> {
+    // fn get_arbiter(&self) -> MutexGuard<'_, CallLoggerArbiter> {
+        match self.gatekeeper.lock() {
+        // match self.arbiter.lock() {
             // TODO: Revert after the freezing is clarified.
             Ok(guard) => {
                 return guard;
@@ -614,44 +706,55 @@ impl CallLoggerAdapter {
         // }
     }
 }
-impl Drop for CallLoggerAdapter {
+impl Drop for ThreadGateAdapter {
     fn drop(&mut self) {
-        self.get_arbiter().remove_thread_logger();
+        self.get_gatekeeper().remove_thread_logger();
+        // self.get_arbiter().remove_thread_logger();
     }
 }
-impl CallLogger for CallLoggerAdapter {
+impl CallLogger for ThreadGateAdapter {
     fn push_logging_is_on(&mut self, is_on: bool) {
-        self.get_arbiter().push_logging_is_on(is_on);
+        self.get_gatekeeper().push_logging_is_on(is_on);
+        // self.get_arbiter().push_logging_is_on(is_on);
     }
     fn pop_logging_is_on(&mut self) {
-        self.get_arbiter().pop_logging_is_on();
+        self.get_gatekeeper().pop_logging_is_on();
+        // self.get_arbiter().pop_logging_is_on();
     }
     fn logging_is_on(&self) -> bool {
-        self.get_arbiter().logging_is_on()
+        self.get_gatekeeper().logging_is_on()
+        // self.get_arbiter().logging_is_on()
     }
     fn set_logging_is_on(&mut self, is_on: bool) {
-        self.get_arbiter().set_logging_is_on(is_on)
+        self.get_gatekeeper().set_logging_is_on(is_on)
+        // self.get_arbiter().set_logging_is_on(is_on)
     }
 
     fn set_thread_indent(&mut self, thread_indent: String) {
-        self.get_arbiter().set_thread_indent(thread_indent)
+        self.get_gatekeeper().set_thread_indent(thread_indent)
+        // self.get_arbiter().set_thread_indent(thread_indent)
     }
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        self.get_arbiter().log_call(name, param_vals)
+        self.get_gatekeeper().log_call(name, param_vals)
+        // self.get_arbiter().log_call(name, param_vals)
     }
     fn log_ret(&mut self, ret_val: Option<String>) {
-        self.get_arbiter().log_ret(ret_val)
+        self.get_gatekeeper().log_ret(ret_val)
+        // self.get_arbiter().log_ret(ret_val)
     }
     fn maybe_flush(&mut self) {
-        self.get_arbiter().maybe_flush();
+        self.get_gatekeeper().maybe_flush();
+        // self.get_arbiter().maybe_flush();
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
     fn log_loopbody_start(&mut self) {
-        self.get_arbiter().log_loopbody_start()
+        self.get_gatekeeper().log_loopbody_start()
+        // self.get_arbiter().log_loopbody_start()
     }
     fn log_loopbody_end(&mut self) {
-        self.get_arbiter().log_loopbody_end()
+        self.get_gatekeeper().log_loopbody_end()
+        // self.get_arbiter().log_loopbody_end()
     }
     // fn log_loop_end(&mut self) {
     //     self.get_arbiter().log_loop_end()
@@ -670,13 +773,20 @@ static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new
         // Some(Box::new(std::io::stderr /*stdout*/())), /*None*/
     )))
 });
-static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> = LazyLock::new(|| {
-    Arc::new(Mutex::new({
+static mut CALL_LOGGER_ARBITER: LazyLock<Arc<RefCell<CallLoggerArbiter>>> = LazyLock::new(|| {
+    Arc::new(RefCell::new({
+// static mut CALL_LOGGER_ARBITER: LazyLock<Arc<Mutex<CallLoggerArbiter>>> = LazyLock::new(|| {
+    // Arc::new(Mutex::new({
         let mut arbiter = unsafe { CallLoggerArbiter::new((*THREAD_SHARED_WRITER).clone()) };
         arbiter.set_std_output_sync();
         arbiter.set_panic_sync();
         arbiter
     }))
+});
+static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = LazyLock::new(|| {
+    unsafe {
+        Arc::new(Mutex::new(ThreadGatekeeper::new((*CALL_LOGGER_ARBITER).clone())))
+    }
 });
 
 // TODO: COnsider removing `LazyLock<RefCell<>>`.
@@ -688,10 +798,11 @@ static mut ORIGINAL_PANIC_HOOK: LazyLock<
 // These data are initialized first upon thread start, and destroyed last upon thread termination.
 thread_local! {
     pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = {
-        RefCell::new(Box::new(CallLoggerAdapter::new(
+        RefCell::new(Box::new(ThreadGateAdapter::new(
             {
                 unsafe {
-                    match (*CALL_LOGGER_ARBITER).lock() {
+                    match (*THREAD_GATEKEEPER).lock() {
+                    // match (*CALL_LOGGER_ARBITER).lock() {
                         Ok(mut guard) => {
                             guard.add_thread_logger(Box::new(
                                 CallLogInfra::new(Rc::new(RefCell::new(
@@ -707,11 +818,16 @@ thread_local! {
                         }
                     }
                 }
-                let call_logger_arbiter;
+                let thread_gatekeeper;
                 unsafe {
-                    call_logger_arbiter = (*CALL_LOGGER_ARBITER).clone();
+                    thread_gatekeeper = (*THREAD_GATEKEEPER).clone();
                 }
-                call_logger_arbiter
+                thread_gatekeeper
+                // let call_logger_arbiter;
+                // unsafe {
+                //     call_logger_arbiter = (*CALL_LOGGER_ARBITER).clone();
+                // }
+                // call_logger_arbiter
             })))
     };
 }

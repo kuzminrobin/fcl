@@ -9,10 +9,10 @@ use std::time::Duration;
 use fcl::call_log_infra::THREAD_LOGGER;
 use fcl_proc_macros::{loggable, non_loggable};
 
+#[loggable]
 fn main() {
     // TODO: -> macro, or simplify otherwise.
-    // set_is_on(true);
-    THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
+    // THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
 
     let result = thread::Builder::new().name("T1".into()).spawn(thread_func); // T1 thread.
     calls(); // main() thread.
