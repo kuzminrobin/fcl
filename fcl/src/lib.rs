@@ -1,10 +1,12 @@
 #![feature(specialization)]
 
 pub mod call_log_infra; // TODO: Really `pub`?
-pub mod writer; // TODO: Really `pub`?
 mod output_sync;
+pub mod writer; // TODO: Really `pub`?
 
+use crate::call_log_infra::ThreadLoggerPImpl;
 use call_log_infra::THREAD_LOGGER;
+use fcl_traits::CallLogger;
 
 pub trait MaybePrint {
     fn maybe_print(&self) -> String;
@@ -29,7 +31,13 @@ pub struct FunctionLogger {
 impl FunctionLogger {
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         THREAD_LOGGER.with(|logger| {
-            logger.borrow_mut().log_call(func_name, param_vals)
+            match &mut *logger.borrow_mut() {
+                ThreadLoggerPImpl::Multithreaded(logger) => logger.log_call(func_name, param_vals),
+                ThreadLoggerPImpl::Singlethreaded(
+                    logger,
+                ) => logger.borrow_mut().log_call(func_name, param_vals),
+            }
+            // logger.borrow_mut().log_call(func_name, param_vals)
         });
         Self {
             // _dropper: CalleeLogger,
@@ -42,8 +50,15 @@ impl FunctionLogger {
 }
 impl Drop for FunctionLogger {
     fn drop(&mut self) {
-        THREAD_LOGGER.with(|logger| 
-            logger.borrow_mut().log_ret(self.ret_val_str.take()));
+        THREAD_LOGGER.with(|logger| {
+            match &mut *logger.borrow_mut() {
+                ThreadLoggerPImpl::Multithreaded(logger) => logger.log_ret(self.ret_val_str.take()),
+                ThreadLoggerPImpl::Singlethreaded(
+                    logger,
+                ) => logger.borrow_mut().log_ret(self.ret_val_str.take()),
+            }
+        });
+        // THREAD_LOGGER.with(|logger| logger.borrow_mut().log_ret(self.ret_val_str.take()));
     }
 }
 
@@ -52,15 +67,28 @@ pub struct LoopbodyLogger;
 impl LoopbodyLogger {
     pub fn new() -> Self {
         THREAD_LOGGER.with(|logger| {
-            logger.borrow_mut().log_loopbody_start()
+            match &mut *logger.borrow_mut() {
+                ThreadLoggerPImpl::Multithreaded(logger) => logger.log_loopbody_start(),
+                ThreadLoggerPImpl::Singlethreaded(
+                    logger,
+                ) => logger.borrow_mut().log_loopbody_start(),
+            }
         });
+        // THREAD_LOGGER.with(|logger| logger.borrow_mut().log_loopbody_start());
         Self
     }
 }
 impl Drop for LoopbodyLogger {
     fn drop(&mut self) {
-        THREAD_LOGGER.with(|logger| 
-            logger.borrow_mut().log_loopbody_end());
+        THREAD_LOGGER.with(|logger| {
+            match &mut *logger.borrow_mut() {
+                ThreadLoggerPImpl::Multithreaded(logger) => logger.log_loopbody_end(),
+                ThreadLoggerPImpl::Singlethreaded(
+                    logger,
+                ) => logger.borrow_mut().log_loopbody_end(),
+            }
+        });
+        // THREAD_LOGGER.with(|logger| logger.borrow_mut().log_loopbody_end());
     }
 }
 

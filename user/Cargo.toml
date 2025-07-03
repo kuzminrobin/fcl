@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+fcl_traits = { path = "../fcl_traits" }
 fcl = { path = "../fcl" }
 fcl_proc_macros = { path = "../fcl_proc_macros" }
 # gag = "1.0"

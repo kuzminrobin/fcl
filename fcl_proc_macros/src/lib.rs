@@ -240,8 +240,17 @@ fn quote_as_expr_call(
     let maybe_flush_call = if is_print_func_name {
         quote! {
             fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                logger.borrow_mut().maybe_flush();
-            })
+                use fcl_traits::CallLogger;
+                match &mut *logger.borrow_mut() {
+                    fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
+                    fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
+                        logger,
+                    ) => logger.borrow_mut().maybe_flush(),
+                }
+            });
+            // fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+            //     logger.borrow_mut().maybe_flush();
+            // })
         }
     } else {
         quote! {}
@@ -347,12 +356,23 @@ fn quote_as_expr_closure(
             use fcl::MaybePrint;
             let param_val_str = #input_vals;
             let mut optional_callee_logger = None;
-            fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-                if thread_logger.borrow_mut().logging_is_on() {
+            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+                use fcl_traits::CallLogger;
+                if match &mut *logger.borrow_mut() {
+                    fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+                    fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+                } {
                     optional_callee_logger = Some(fcl::FunctionLogger::new(
                         #log_closure_name_str, param_val_str))
                 }
             });
+
+            // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+            //     if thread_logger.borrow_mut().logging_is_on() {
+            //         optional_callee_logger = Some(fcl::FunctionLogger::new(
+            //             #log_closure_name_str, param_val_str))
+            //     }
+            // });
 
             let ret_val = (move || { #body })();
 
@@ -624,9 +644,16 @@ fn quote_as_macro(
             || &macro_name.ident.to_string() == &"eprint"
         {
             *maybe_flush_invocation = quote! {
-                THREAD_LOGGER.with(|logger| {
-                    logger.borrow_mut().maybe_flush();
+                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+                    use fcl_traits::CallLogger;
+                    match &mut *logger.borrow_mut() {
+                        fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
+                        fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().maybe_flush(),
+                    }
                 });
+                // THREAD_LOGGER.with(|logger| {
+                //     logger.borrow_mut().maybe_flush();
+                // });
             }
         }
     }
@@ -1391,12 +1418,22 @@ fn traversed_block_from_sig(
                 use fcl::MaybePrint;
                 let param_val_str = #inputs;
                 let mut optional_callee_logger = None;
-                fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-                    if thread_logger.borrow_mut().logging_is_on() {
-                        optional_callee_logger = Some(
-                            fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+                    use fcl_traits::CallLogger;
+                    if match &mut *logger.borrow_mut() {
+                        fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+                        fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+                    } {
+                        optional_callee_logger = Some(fcl::FunctionLogger::new(
+                            &generic_func_name, param_val_str))
                     }
                 });
+                // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+                //     if thread_logger.borrow_mut().logging_is_on() {
+                //         optional_callee_logger = Some(
+                //             fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                //     }
+                // });
 
                 // NOTE: Running `block` as a closure to handle the `return` (in the `block`) correctly.
                 let ret_val = (move || #block )();
@@ -2194,12 +2231,22 @@ fn quote_as_loop_block(
         {
             // Log the loop body start (if logging is enabled).
             let mut optional_logger = None;
-            fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-                if thread_logger.borrow_mut().logging_is_on() {
+            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+                use fcl_traits::CallLogger;
+                if match &mut *logger.borrow_mut() {
+                    fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+                    fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+                } {
                     optional_logger =
                         Some(fcl::LoopbodyLogger::new())
                 }
             });
+            // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+            //     if thread_logger.borrow_mut().logging_is_on() {
+            //         optional_logger =
+            //             Some(fcl::LoopbodyLogger::new())
+            //     }
+            // });
 
             #stmts
 
