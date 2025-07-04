@@ -746,13 +746,3 @@ macro_rules! _single_threaded_otimization {
         }));
     };
 }
-// fn tmp() {
-//     let _old = _ThreadLoggerPImplRecoverer(Some(unsafe {
-//         THREAD_LOGGER.replace(ThreadLoggerPImpl::Singlethreaded((*CALL_LOGGER_ARBITER).clone()))
-//     }));
-// }
-// macro_rules! _a {
-//     () => 
-//         1
-//     };
-// }

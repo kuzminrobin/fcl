@@ -14,6 +14,29 @@
     log thread func or not).
 * Consider moving the thread_local use deeper into the call.
   Such that a {Call|Closure}Logger is created unconditionally.
+* Bug: `f2()`
+  ```cpp
+  thread_func() {
+    { // Loop body start.
+      f2() {  // Unexpected '\n'.
+      } // f2(). 
+    } // Loop body end.
+    // Loop body repeats 9 time(s).
+  ```
+  Source:
+  ```rs
+  #[loggable]
+  fn thread_func() {
+      #[loggable]
+      fn f2() {
+      }
+
+      for _ in 0..10 {
+          f2();
+      }
+
+      g();
+  ```
 * ---
 * In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]

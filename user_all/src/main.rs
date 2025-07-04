@@ -61,7 +61,7 @@ mod root {
 
 #[fcl_proc_macros::loggable]
 pub fn main() {
-    fcl/*::call_log_infra */::_single_threaded_otimization!();
+    fcl::_single_threaded_otimization!();
     // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
     let _a = Some(0);
 
