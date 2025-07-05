@@ -86,26 +86,6 @@ mod root {
 }
 // pub use root::*;
 
-// thread_local! {
-//     static _FCL_TMP: ()/*InfraCleaner*/ = THREAD_LOGGER_.with(|logger| {
-//         // use fcl::call_log_infra::ThreadLoggerPImpl;
-//         unsafe {
-//             *logger.borrow_mut() = Some(fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded((*fcl::call_log_infra::CALL_LOGGER_ARBITER).clone()));
-//             (*fcl::call_log_infra::CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(
-//                 Box::new(fcl::call_log_infra::CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
-//                     // fcl_decorators::TreeLikeDecorator::new(
-//                     //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-//                     //     None, None, None))))))
-//                     fcl_decorators::CodeLikeDecorator::new(
-//                         Some(Box::new(fcl::writer::WriterAdapter::new((*fcl::call_log_infra::THREAD_SHARED_WRITER).clone()))),
-//                         None)))))                            
-//                 // logging_infra
-//             );
-//         }
-//         // InfraCleaner
-//     });
-// }
-
 
 #[fcl_proc_macros::loggable]
 trait Tr {

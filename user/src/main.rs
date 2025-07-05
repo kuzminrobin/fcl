@@ -2,7 +2,7 @@
 #![feature(stmt_expr_attributes)] // Loggable closures.
 #![feature(proc_macro_hygiene)] // Loggable closures.
 // #![feature(min_specialization)]
-
+ 
 use std::thread;
 use std::time::Duration;
 
@@ -19,70 +19,6 @@ fn main() {
     calls(); // main() thread.
     let _ = result.unwrap().join();
 }
-// fn main() {
-//     let mut generic_func_name = String::with_capacity(64);
-//     generic_func_name.push_str("main");
-//     if !true {
-//         generic_func_name.push_str("<");
-//         let generic_arg_names_vec: Vec<&'static str> = /*alloc::vec::*/Vec::new();
-//         for generic_arg_name in generic_arg_names_vec {
-//             generic_func_name.push_str(generic_arg_name);
-//             generic_func_name.push_str(",");
-//         }
-//         generic_func_name.push_str(">");
-//     }
-//     use fcl::MaybePrint;
-//     let param_val_str = None;
-//     let mut optional_callee_logger = None;
-//     fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
-//         let logging_is_on = if let Some(logger) = &*logger.borrow() {
-//             use fcl_traits::CallLogger;
-//             match logger {
-//                 fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => {
-//                     logger.logging_is_on()
-//                 }
-//                 fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => {
-//                     logger.borrow_mut().logging_is_on()
-//                 }
-//             }
-//         } else {
-//             debug_assert!(false, "Internal error: Unexpected lack of logger");
-//             // if true {
-//             //     {
-//             //         if !(false) {
-//             //             {
-//             //                 core::panicking::panic_fmt(core::const_format_args!(
-//             //                     "Internal error: Unexpected lack of logger"
-//             //                 ));
-//             //             };
-//             //         }
-//             //     };
-//             // };
-//             false
-//         };
-//         if logging_is_on {
-//             optional_callee_logger =
-//                 Some(fcl::FunctionLogger::new(&generic_func_name, param_val_str))
-//         }
-//     });
-//     let ret_val = (move || {
-//         let _ = fcl::call_log_infra::THREAD_LOGGER_REDIRECTION.with(|_| {}); //|val| val);
-//         let result = thread::Builder::new().name("T1".into()).spawn(thread_func);
-//         calls();
-//         let _ = result.unwrap().join();
-//     })();
-//     // if false {
-//     //     let ret_val_str = alloc::__export::must_use({
-//     //         let res =
-//     //             alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()));
-//     //         res
-//     //     });
-//     //     if let Some(callee_logger) = optional_callee_logger.as_mut() {
-//     //         callee_logger.set_ret_val(ret_val_str);
-//     //     }
-//     // }
-//     ret_val
-// }
 
 #[loggable]
 fn f() {

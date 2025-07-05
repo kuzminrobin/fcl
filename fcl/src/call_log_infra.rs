@@ -122,7 +122,6 @@ impl CallLogger for ThreadGatekeeper {
     }
     fn logging_is_on(&self) -> bool {
         self.call_logger_arbiter.borrow().logging_is_on()
-        // self.call_logger_arbiter.borrow_mut().logging_is_on()
     }
     fn set_logging_is_on(&mut self, is_on: bool) {
         self.call_logger_arbiter
@@ -336,14 +335,6 @@ impl CallLoggerArbiter {
                             );
                         }
                     }
-                    // let _ignore_write_error = writeln!(
-                    //     (*THREAD_SHARED_WRITER).borrow_mut(),  // TODO: Consider `try_borrow()` otherwise it cases another panic in the panic handler (silent death).
-                    //     "{}. {} ({}). {}",
-                    //     "Panic occurred while FCL was busy",
-                    //     "Could not flush the FCL's cache and buffers before panic report below",
-                    //     e,
-                    //     "If the panic report is not shown, attach the debugger to see the panic details"
-                    // );
                 }
             }
             if let Some(mut arbiter) = arbiter {
@@ -699,13 +690,12 @@ impl CallLogger for ThreadGateAdapter {
 
 // Global data shared by all the threads:
 // TODO: Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+// TODO: Consider removing `pub`.
 pub static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
     Arc::new(RefCell::new(ThreadSharedWriter::new(Some(
         crate::writer::FclWriter::Stdout,
     ))))
 });
-// TODO: Considedr `Rc` instead of `Arc`.
-// TODO: Make CALL_LOGGER_ARBITER visible to the panic hook and ThreadGatekeeper only.
 pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
     LazyLock::new(|| {
         Rc::new(RefCell::new({
@@ -715,38 +705,23 @@ pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
             arbiter
         }))
     });
-// static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = LazyLock::new(|| unsafe {
-//     Arc::new(Mutex::new(ThreadGatekeeper::new(
-//         (*CALL_LOGGER_ARBITER).clone(),
-//     )))
-// });
 
 // TODO: COnsider removing `LazyLock<RefCell<>>`.
 static mut ORIGINAL_PANIC_HANDLER: LazyLock<
     RefCell<Option<Box<dyn Fn(&std::panic::PanicHookInfo<'_>)>>>,
 > = LazyLock::new(|| RefCell::new(None));
 
-// pub enum ThreadLoggerPImpl {
-//     Multithreaded(Box<dyn CallLogger>),
-//     Singlethreaded(Rc<RefCell<CallLoggerArbiter>>),
-// }
-// impl Drop for ThreadLoggerPImpl {
-//     fn drop(&mut self) {
-//         unsafe { (*CALL_LOGGER_ARBITER).borrow_mut().remove_thread_logger() }
-//     }
-// }
-
 #[cfg(feature = "singlethreaded")]
 pub mod instances {
     use super::*;
     thread_local! {
         pub static THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
-            let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
+            let logging_infra = Box::new(CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // fcl_decorators::TreeLikeDecorator::new(
                 //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                 //     None, None, None))))))
                 fcl_decorators::CodeLikeDecorator::new(
-                    Some(Box::new(/*fcl::writer::*/WriterAdapter::new((*/*fcl::call_log_infra::*/THREAD_SHARED_WRITER).clone()))),
+                    Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                     None)))));
             (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
 
@@ -754,6 +729,8 @@ pub mod instances {
         };
     }
 }
+
+// TODO: Consider renaming ThreadGatekeeper to ThreadGate.
 #[cfg(not(feature = "singlethreaded"))]
 pub mod instances {
     use super::*;
@@ -780,220 +757,7 @@ pub mod instances {
                     debug_assert!(false, "FCL Internal Error: Thread panicked while holding a mutex ({}).", e);
                 }
             }
-            // (*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra); // NOTE: Triggers the 'already borrowed' panic for a starting thread.
             RefCell::new(Box::new(ThreadGateAdapter::new((*THREAD_GATEKEEPER__).clone())))
         };
-
-        // pub static THREAD_LOGGER_: LazyLock<RefCell<Option<ThreadLoggerPImpl>>> = LazyLock::new(|| { RefCell::new(unsafe { // TODO: Consider removing `Option` in `RefCell<Option<ThreadLoggerPImpl`.
-        //     let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
-        //         // fcl_decorators::TreeLikeDecorator::new(
-        //         //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-        //         //     None, None, None))))))
-        //         fcl_decorators::CodeLikeDecorator::new(
-        //             Some(Box::new(/*fcl::writer::*/WriterAdapter::new((*/*fcl::call_log_infra::*/THREAD_SHARED_WRITER).clone()))),
-        //             None)))));
-        //     (*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
-        //     Some(/*fcl::call_log_infra::*/ThreadLoggerPImpl::Singlethreaded((*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).clone()))
-        // })});
-
-    //     pub static THREAD_LOGGER_REDIRECTION: Option<ThreadLoggerPImpl> //()/*LazyLock<()>*/ /*ThreadGateAdapter*/
-    //         = /*LazyLock::new(|| {*/ unsafe {
-    //             THREAD_LOGGER_.with(|logger| {
-    //             // TMP.with(|logger| {
-    //                 logger.borrow_mut().replace(ThreadLoggerPImpl::Multithreaded(
-    //                     Box::new(
-    //                         ThreadGateAdapter::new((*THREAD_GATEKEEPER).clone())
-    //                     )
-    //                 ))
-    //             })
-    //         }/*} )*/;
     }
 }
-
-// fn tmp() {
-
-    // struct InfraCleaner;
-    // impl Drop for InfraCleaner {
-    //     fn drop(&mut self) {
-    //         unsafe {
-    //             (*fcl::call_log_infra::CALL_LOGGER_ARBITER).borrow_mut().remove_thread_logger()
-    //         }
-    //     }
-    // }
-
-    //     thread_local! {
-    //         static _FCL_TMP_ST: () = THREAD_LOGGER_.with(|logger| {
-    //             unsafe {
-    //                 *logger.borrow_mut() = Some(ThreadLoggerPImpl::Singlethreaded((*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).clone()))
-    //             }
-    //         });
-
-    //         static _FCL_TMP: () = THREAD_LOGGER_.with(|logger| {
-    //             *logger.borrow_mut() = Some(ThreadLoggerPImpl::Multithreaded(Box::new(ThreadGateAdapter::new(
-    //                 {
-    //                     unsafe {
-    //                         match (*THREAD_GATEKEEPER).lock() {
-    //                             Ok(mut guard) => {
-    //                                 guard.add_thread_logger(Box::new(
-    //                                     CallLogInfra::new(Rc::new(RefCell::new(
-    //                                         // fcl_decorators::TreeLikeDecorator::new(
-    //                                         //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-    //                                         //     None, None, None))))))
-    //                                         fcl_decorators::CodeLikeDecorator::new(
-    //                                             Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-    //                                             None))))))
-    //                             }
-    //                             Err(e) => {
-    //                                 debug_assert!(false, "Unexpected mutex lock failure: '{:?}'", e);
-    //                             }
-    //                         }
-    //                     }
-    //                     let thread_gatekeeper;
-    //                     unsafe {
-    //                         thread_gatekeeper = (*THREAD_GATEKEEPER).clone();
-    //                     }
-    //                     thread_gatekeeper
-    //                 }
-    //             ))))
-    //         });
-    //     }
-// }
-
-// struct InfraCleaner;
-// impl Drop for InfraCleaner {
-//     fn drop(&mut self) {
-//         unsafe {
-//             (*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).borrow_mut().remove_thread_logger()
-//         }
-//     }
-// }
-
-// thread_local! {
-//     static _FCL_TMP: InfraCleaner = THREAD_LOGGER_.with(|logger| {
-//         unsafe {
-//             *logger.borrow_mut() = Some(ThreadLoggerPImpl::Singlethreaded((*fcl::call_log_infra::CALL_LOGGER_ARBITER).clone()))
-//             (*fcl::call_log_infra::CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(#logging_infra)
-//         }
-//         InfraCleaner
-//     });
-// }
-
-// // Global data per thread. Each thread has its own copy of these data.
-// // These data are initialized first upon thread start, and destroyed last upon thread termination.
-// thread_local! {
-//     // pub static TMP: LazyLock<RefCell<Option<ThreadLoggerPImpl>> > = LazyLock::new(||
-//     //     {
-//     //         RefCell::new(None)
-//     //     }
-//     // )
-//     // ;
-
-//     pub static THREAD_LOGGER_: LazyLock<RefCell<Option<ThreadLoggerPImpl>>> = LazyLock::new(|| { RefCell::new(unsafe { // TODO: Consider removing `Option` in `RefCell<Option<ThreadLoggerPImpl`.
-//         let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
-//             // fcl_decorators::TreeLikeDecorator::new(
-//             //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-//             //     None, None, None))))))
-//             fcl_decorators::CodeLikeDecorator::new(
-//                 Some(Box::new(/*fcl::writer::*/WriterAdapter::new((*/*fcl::call_log_infra::*/THREAD_SHARED_WRITER).clone()))),
-//                 None)))));
-//         (*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
-//         Some(/*fcl::call_log_infra::*/ThreadLoggerPImpl::Singlethreaded((*/*fcl::call_log_infra::*/CALL_LOGGER_ARBITER).clone()))
-//     })});
-// }
-// // TMP {
-//         static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = LazyLock::new(|| unsafe {
-//             Arc::new(Mutex::new(ThreadGatekeeper::new(
-//                 (*CALL_LOGGER_ARBITER).clone(),
-//             )))
-//         });
-//         thread_local! {
-//             pub static THREAD_LOGGER_REDIRECTION: Option<ThreadLoggerPImpl> //()/*LazyLock<()>*/ /*ThreadGateAdapter*/
-//                 = /*LazyLock::new(|| {*/ unsafe {
-//                     THREAD_LOGGER_.with(|logger| {
-//                     // TMP.with(|logger| {
-//                         logger.borrow_mut().replace(ThreadLoggerPImpl::Multithreaded(
-//                             Box::new(
-//                                 ThreadGateAdapter::new((*THREAD_GATEKEEPER).clone())
-//                             )
-//                         ))
-//                     })
-//                 }/*} )*/;
-
-//             //     let tmp = THREAD_LOGGER_
-//             //    .with(|logger|
-//             // //         logger.replace(
-//             // //              Some(
-//             // //                  ThreadLoggerPImpl::Multithreaded(
-//             // //                      Box::new(
-//             // //                          ThreadGateAdapter::new((*THREAD_GATEKEEPER).clone())
-//             // //                      )
-//             // //                  )
-//             // //              )
-//             // //          );
-//             //     );
-//             //     ()
-//             // }/*} )*/;
-//         }
-
-// // } TMP
-
-// pub static THREAD_LOGGER_: RefCell<Option<ThreadLoggerPImpl>> = RefCell::new(None);
-
-// pub static THREAD_LOGGER: RefCell<ThreadLoggerPImpl> = {
-// // pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = {
-//     RefCell::new(ThreadLoggerPImpl::Multithreaded(Box::new(ThreadGateAdapter::new(
-//     // RefCell::new(Box::new(ThreadGateAdapter::new(
-//         {
-//             unsafe {
-//                 match (*THREAD_GATEKEEPER).lock() {
-//                     Ok(mut guard) => {
-//                         guard.add_thread_logger(Box::new(
-//                             CallLogInfra::new(Rc::new(RefCell::new(
-//                                 // fcl_decorators::TreeLikeDecorator::new(
-//                                 //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-//                                 //     None, None, None))))))
-//                                 fcl_decorators::CodeLikeDecorator::new(
-//                                     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-//                                     None))))))
-//                     }
-//                     Err(e) => {
-//                         debug_assert!(false, "Unexpected mutex lock failure: '{:?}'", e);
-//                     }
-//                 }
-//             }
-//             let thread_gatekeeper;
-//             unsafe {
-//                 thread_gatekeeper = (*THREAD_GATEKEEPER).clone();
-//             }
-//             thread_gatekeeper
-//         }))))
-// };
-// }
-
-// pub struct _ThreadLoggerPImplRecoverer(Option<ThreadLoggerPImpl>);
-// impl _ThreadLoggerPImplRecoverer {
-//     pub fn new(recoveree: Option<ThreadLoggerPImpl>) -> Self {
-//         Self(recoveree)
-//     }
-// }
-// impl Drop for _ThreadLoggerPImplRecoverer {
-//     fn drop(&mut self) {
-//         if let Some(logger_pimpl) = self.0.take() {
-//             THREAD_LOGGER.replace(logger_pimpl);
-//         }
-//     }
-// }
-
-// #[macro_export]
-// macro_rules! _single_threaded_otimization {
-//     () => {
-//         // 1
-//         let _old = fcl::call_log_infra::_ThreadLoggerPImplRecoverer::new(Some(unsafe {
-//             fcl::call_log_infra::THREAD_LOGGER.replace(
-//                 fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
-//                     (*fcl::call_log_infra::CALL_LOGGER_ARBITER).clone(),
-//                 ),
-//             )
-//         }));
-//     };
-// }

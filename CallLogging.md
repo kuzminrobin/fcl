@@ -106,6 +106,11 @@
       * User Manual
         * Document that sequential loops can be logged as a single loop (if the iterations are equal).
         * Document that loop ret val loggign has been deprioritized.
+        * If there are multiple binary crates in the workspace and one library crate with features 
+          (like "singlethreaded"), then
+          using a feature in one binary crate affects also the other binary create. Or in other words
+          the feature in the lib crate is either on for both bin crates or off for both bin crates.
+          This looks like an inconsistency on the Rust toolchain side.
     * mdBook "Practicing Rust with FCL"
       * While writing, develop again from scratch
       * Document that sequential loops can be logged as a single loop (if the iterations are equal).
