@@ -299,7 +299,6 @@ impl CallLoggerArbiter {
         });
     }
     fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {
-        // TODO: In a single-threaded case consider canceling the std output buffering.
         unsafe {
             let mut arbiter = None;
             match (*CALL_LOGGER_ARBITER).try_borrow_mut() {

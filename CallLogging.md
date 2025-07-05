@@ -1,28 +1,5 @@
 # TODO:
-* Structure-up single-threaded and multithreaded
-  * Consider controlling the multithreadedness with a FCL crate feature. THe user uses that crate with a feature.
-    Like (see `features`):
-    ```
-    [dependencies]
-    proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
-    syn = { version = "2.0", features = ["full"] }
-    ```
-  * `fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {`  
-    `// TODO: In a single-threaded case consider canceling the std output buffering.`
-* Consider merging all the FCL crates into a single proc_macro crate.
-* Consider {recursive type} params (lists) when logging the params.
-* Consider a raw pointer param. Probably requires `unsafe` for printing the param.
-* Restructure to a minimal set of crates (fcl, proc_macros, commons).
-* Finalize the user's use
-  * All the globals and thread_locals to separate macros.
-  * Structure-up single-threaded and multithreaded
-    * Make separate macros
-    * Make separate examples and/or tests.
-  * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
-    log thread func or not).
-* Consider moving the thread_local use deeper into the call.
-  Such that a {Call|Closure}Logger is created unconditionally.
-* Consider extracting all the multithreading items to a `mod mutithreading` (with `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
+* In the log remove trailing commas.
 * Bug: `f2()`
   ```cpp
   thread_func() {
@@ -46,7 +23,39 @@
 
       g();
   ```
-* Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
+* Consider extracting all the multithreading items to a `mod mutithreading` (with 
+  `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
+* Consider a raw pointer param amd ret_val. Probably requires `unsafe` for printing the param (and warning 
+  suppression if `unsafe` is redundant).
+* In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
+* Consider {recursive type} params (lists) when logging the params.
+* Explore the behavior upon patterns among the params: `fn my_fn(MyPoint{x, y}) {}`. Is it logged like `fn my_fn(x: 1, y: -2}) {}`?
+  Shouldn't it be logged like this: `fn my_fn(MyPoint{x: 1, y: -2}) {}`?
+  Or are pattern-params not parsed?
+* Consider using LazyCell instead of LazyLock wherever possible.  
+* Finalize the user's use
+  * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
+    log thread func or not).
+* Consider merging all the FCL crates into a single proc_macro crate.
+  * Restructure to a minimal set of crates (fcl, proc_macros, commons).
+* Overall clean-up.
+  * Remove commented code.
+  * Move privates down, publics up (in file).
+  * Refactor long functions (especially the CallGraph).
+  * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
+* Consider toolchain stable or document why inachievable.
+* Test
+  * Testing
+    * Log to string/Vector and compare.
+    * Basics (from user/main.rs).
+    * std output and panic sync.
+    * Enable/disable.
+    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+  * Test with the existing projects.
+    * Update the instructions, how to enable func call logging in your project.
+* Consider moving the thread_local use deeper into the call.
+  Such that a {Call|Closure}Logger is created unconditionally.
+* (Low priority) Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
   in both threads, has `main()` destructors reporting the returns during stack unwinding:
   ```
   main() {
@@ -72,35 +81,19 @@
   } // main().
   error: process didn't exit successfully: `target\debug\user.exe` (exit code: 101)  
   ```
-* Consider using LazyCell instead of LazyLock wherever possible.  
 * ---
-* In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]
-  * [Loop varaible logging (sort of iteration number)]
+  * [Loop varaible logging (sort of iteration number)] `{ // Loop body start. for_loop_var: 0`
 * [Consider loggin the ret val in the TreeLikeDecorator]
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Consider removing all the occurrences of `unwrap()`.
-* Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`
-* Test
-  * Test with the existing projects.
-    * Update the instructions, how to enable func call logging in your project.
-  * Testing
-    * Log to string/Vector and compare.
-    * Basics (from user/main.rs).
-    * Output 
-    * enable/disable.
-    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
-* Overall clean-up.
-  * Refactor long functions (especially the CallGraph).
-  * Move privates down, publics up (in file).
-* Clean-up:
-  * Remove commented code.
 * ---
 * TACTICS
   * Develop
-  * Test against real code/projects
   * Write tests
+  * Test against real code/projects
   * DocComment the code (write the Code Documentation)
+    * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
   * Write the documentation
     * ReadMe.md
       * User Manual
@@ -115,15 +108,44 @@
       * While writing, develop again from scratch
       * Document that sequential loops can be logged as a single loop (if the iterations are equal).
       * Document that loop ret val loggign has been deprioritized.
+      * If there are multiple binary crates in the workspace and one library crate with features 
+        (like "singlethreaded"), then
+        using a feature in one binary crate affects also the other binary create. Or in other words
+        the feature in the lib crate is either on for both bin crates or off for both bin crates.
+        This looks like an inconsistency on the Rust toolchain side.
     * Documenting checklist
       * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
       * Doc comments
       * .md
       * mdBook 
       * [toolchain stable or document why inachievable]
+      * FCL Limitations
+        * Reader practice:
+          ```rs
+          #[loggable]
+          fn f<F: FnOnce()>(fun: F, _b: bool) { // `F: FnOnce()`: Error: associated item constraints are not allowed here.
+          ```
+          The [Struct Generics](https://docs.rs/syn/latest/syn/struct.Generics.html) does not support `: FnOnce()` there,
+          only in `where` clause.
+      * {Reader Practice: ?} Logging the async funcs.
+      * Document the `NOTE: Curious trick`.  
+        What's the diff between `Rc::clone(&rc)` and `rc.clone()`? The latter works when casting `Rc<dyn SuperTrait>` to `Rc<dyn Trait>`?  
+        ```rs
+        trait MyTraitA {}
+        trait MyTraitB {}
+        trait SuperTrait: MyTraitA + MyTraitB {}
+        struct S;
+        impl SuperTrait for S;
+        let sup: Rc<dyn SuperTrait> = Rc::new(S::new());
+        let rca: Rc<dyn MyTraitA> = sup.clone(); // `Rc::clone(&sup)` fails.
+        let rcb: Rc<dyn MyTraitB> = sup.clone(); // `Rc::clone(&sup)` fails.
+        ```
+        * `rc.cone()` -> `Rc::clone(&rc)`. Works not always, see the curious trick. Document it.
+        * [Graph clearing (upon allocation failure?). User practice]
+  * Request for comments about the doc-n
   * Publish 
-    * The crate. Crates.io
     * The code documentation
+    * The crate. Crates.io
   * Videos
     * "Any feedback write in the comments to the video".
     * Intro
@@ -132,16 +154,16 @@
   * SRUG talk.
     * SRUG Video to YT
   * Rust Conf Talk
-    * RustCon Video to YT
+    * RustConf Video to YT
 * STRATEGY
   * FCL
   * C-to-Rust (| Rust-to-C)
   * Code Coverage
   * Code Profiling
-* Reader Practice: Thread name prefix (on the left of the thread indent).
-* Automatic color in the HTML decorator adapter.
-* Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
+* Reader Practice: Thread name prefix in the log (on the left of the thread indent).
 * User practice: HTML-decorator (code-like, tree-like), XML-decorator.
+  * Automatic color in the HTML decorator adapter.
+* Macro that glues string literals together like in C: merge!("abc", "def") -> "abcdef"
 * Reader practice:
   ```rs
   #[loggable]
@@ -176,7 +198,9 @@
       f() {}
     } // g().
   ```
-* [Graph clearing]
+* [Graph clearing (upon allocation failure?). User practice]
+
+# Notes
 * Macro
   * [Decl Macro](https://veykril.github.io/tlborm/decl-macros/building-blocks/parsing.html#function)
   * Attr Proc-Macro.
@@ -234,10 +258,10 @@ f() {
 }
 h() {}
 ```
-This infomation is not a tree but is a sequence of subtrees `[f, h]`.
+This infomation is not a tree but is a sequence of subtrees `[f(), h()]`.
 To unify the functionality, the code turns the call graph to a tree
 by initializing the graph with a pseudo-node that will serve as a call tree root,
-and the subsequent calls `f`, `h`, and on will be added as nested calls (children) of that pseudo-node.
+and the subsequent calls `f()`, `h()`, and on will be added as nested calls (children) to that pseudo-node.
 The actual information stored in the call graph will be
 ```c++
 pseudo_node {
@@ -279,7 +303,7 @@ Moment | The information after that moment, contained
      3 | }                   | [p]
      4 | h() {               | [p, h]
      5 |     i() {           | [p, h, i]
-     6 |          }          | [p, i]
+     6 |          }          | [p, h]
      7 | }                   | [p]
 ```
 
@@ -529,10 +553,10 @@ fn f(x: i32, y: i32, flag: bool) -> usize {
 ```
 
 # Known Issues
-* Output outpaces the cached log
+* (N/A after std output sync) std Output outpaces the cached log
 * Logging attempt for `const` functions results in a compile error:  
   `cannot call non-const method ``..::with`` in constant functions`
-* Currently the function names in `impl` blocks are not prefixed with `MyStruct::`.
+* (N/A) Currently the function names in `impl` blocks are not prefixed with `MyStruct::`.
 
 # What is Missing or Wrong in Rust
 
@@ -1144,3 +1168,18 @@ Let me know if you want a complete working example with both `stdout` and `stder
   Possible workaround: Create a copy with different name and use the copy to log the original.  
 * Automatic thread indent, global warehouse of thread indents. The thread-local infras get the thread 
   indent and check back in upon thread-local destruction. Then that thread indent is reused later, given again to a new thread.
+* Structure-up single-threaded and multithreaded
+  * Consider controlling the multithreadedness with a FCL crate feature. THe user uses that crate with a feature.
+    Like (see `features`):
+    ```
+    [dependencies]
+    proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
+    syn = { version = "2.0", features = ["full"] }
+    ```
+  * `fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {`  
+    `// (Unclear what was meant. Nothing is done about it) TODO: In a single-threaded case consider canceling the std output buffering.`
+* Finalize the user's use
+  * (N/A) All the globals and thread_locals to separate macros.
+  * (Done) Structure-up single-threaded and multithreaded
+    * Make separate macros
+    * Make separate examples and/or tests.
