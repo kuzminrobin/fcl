@@ -213,6 +213,7 @@ name = "user_all"
 version = "0.1.0"
 dependencies = [
  "fcl",
+ "fcl_decorators",
  "fcl_proc_macros",
  "fcl_traits",
 ]

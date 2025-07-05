@@ -1,3 +1,30 @@
+#[fcl_proc_macros::loggable]
+// #[fcl_proc_macros::loggable(singlethreaded)]
+pub fn main() {
+    // fcl::_single_threaded_otimization!();
+    // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
+    let _a = Some(0);
+
+    use root::*;
+    f();
+    g();
+
+    {
+        use crate::*;
+        crate::S.d();  // Expected: S::d()
+        // crate::<S as Tr>.d();  // Expected: S::d()
+        crate::S2.d(); // Expected: Tr::d()
+        crate::S2.e();
+
+        let s = S;
+        let s2 = S2;
+        let a: Vec<&dyn Tr> = vec![ &s, &s2 ];
+        a[0].d();   // Expected: S::d()
+        a[1].d();   // Expected: Tr::d()
+    }
+}
+
+
 // use fcl_proc_macros::loggable;
 #[fcl_proc_macros::loggable]
 mod root {
@@ -21,7 +48,7 @@ mod root {
     // mod m0; // Compiler Error: non-inline modules in proc macro input are unstable. see issue #54727
     mod m1 {}
 
-    mod m {
+    mod m { 
         // use fcl_proc_macros::loggable;
         // use fcl::FunctionLogger;
 
@@ -59,30 +86,25 @@ mod root {
 }
 // pub use root::*;
 
-#[fcl_proc_macros::loggable]
-pub fn main() {
-    fcl::_single_threaded_otimization!();
-    // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
-    let _a = Some(0);
-
-    use root::*;
-    f();
-    g();
-
-    {
-        use crate::*;
-        crate::S.d();  // Expected: S::d()
-        // crate::<S as Tr>.d();  // Expected: S::d()
-        crate::S2.d(); // Expected: Tr::d()
-        crate::S2.e();
-
-        let s = S;
-        let s2 = S2;
-        let a: Vec<&dyn Tr> = vec![ &s, &s2 ];
-        a[0].d();   // Expected: S::d()
-        a[1].d();   // Expected: Tr::d()
-    }
-}
+// thread_local! {
+//     static _FCL_TMP: ()/*InfraCleaner*/ = THREAD_LOGGER_.with(|logger| {
+//         // use fcl::call_log_infra::ThreadLoggerPImpl;
+//         unsafe {
+//             *logger.borrow_mut() = Some(fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded((*fcl::call_log_infra::CALL_LOGGER_ARBITER).clone()));
+//             (*fcl::call_log_infra::CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(
+//                 Box::new(fcl::call_log_infra::CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
+//                     // fcl_decorators::TreeLikeDecorator::new(
+//                     //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+//                     //     None, None, None))))))
+//                     fcl_decorators::CodeLikeDecorator::new(
+//                         Some(Box::new(fcl::writer::WriterAdapter::new((*fcl::call_log_infra::THREAD_SHARED_WRITER).clone()))),
+//                         None)))))                            
+//                 // logging_infra
+//             );
+//         }
+//         // InfraCleaner
+//     });
+// }
 
 
 #[fcl_proc_macros::loggable]

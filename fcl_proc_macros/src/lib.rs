@@ -13,7 +13,11 @@ pub fn non_loggable(
 
 fn remove_spaces(s: &str) -> String {
     // Preserve spaces in fragments like `<MyType as MyTrait>`.
-    let tmp_str: String = s.replace(" as ", "$as$").chars().filter(|ch| *ch != ' ').collect();
+    let tmp_str: String = s
+        .replace(" as ", "$as$")
+        .chars()
+        .filter(|ch| *ch != ' ')
+        .collect();
     tmp_str.replace("$as$", " as ")
 }
 #[proc_macro_attribute]
@@ -21,22 +25,34 @@ pub fn loggable(
     attr_args: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
+    let attr_args_ = parse_macro_input!(attr_args as AttrArgs_); // Handles the compilation errors appropriately.
     let mut prefix = quote! {};
-    if let AttrArgs::Prefix {
-        qself_or_path,
-        .. // _prefix_token, _eq_token 
-    } = attr_args
+    if let AttrArgs_ {
+        prefix: QSelfOrPath(Some(q_self_or_path)),
+        ..
+    } = attr_args_
     {
-        if let Some(q_self_or_path) = qself_or_path.0 {
-            match q_self_or_path {
-                LogPrefix::QSelf(qself) => 
-                    prefix = quote!{ #qself },
-                LogPrefix::Path(path) => 
-                    prefix = quote!{ #path },
-            }
+        match q_self_or_path {
+            LogPrefix::QSelf(qself) => prefix = quote! { #qself },
+            LogPrefix::Path(path) => prefix = quote! { #path },
         }
     }
+    // let attr_args = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
+    // let mut prefix = quote! {};
+    // if let AttrArgs::Prefix {
+    //     qself_or_path,
+    //     .. // _prefix_token, _eq_token
+    // } = attr_args
+    // {
+    //     if let Some(q_self_or_path) = qself_or_path.0 {
+    //         match q_self_or_path {
+    //             LogPrefix::QSelf(qself) =>
+    //                 prefix = quote!{ #qself },
+    //             LogPrefix::Path(path) =>
+    //                 prefix = quote!{ #path },
+    //         }
+    //     }
+    // }
     let output = {
         if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
             quote_as_item(&item, &prefix)
@@ -47,7 +63,129 @@ pub fn loggable(
             quote_as_expr_closure(&closure_w_opt_comma.closure, &prefix)
         }
     };
-    output.into()
+    // let logging_infra = quote! {
+    //     Box::new(fcl::call_log_infra::CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
+    //         // fcl_decorators::TreeLikeDecorator::new(
+    //         //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+    //         //     None, None, None))))))
+    //         fcl_decorators::CodeLikeDecorator::new(
+    //             Some(Box::new(fcl::writer::WriterAdapter::new((*fcl::call_log_infra::THREAD_SHARED_WRITER).clone()))),
+    //             None)))))
+    // };
+    // let infra_cleaner = quote!{
+    //     struct InfraCleaner;
+    //     impl Drop for InfraCleaner {
+    //         fn drop(&mut self) {
+    //             unsafe {
+    //                 (*fcl::call_log_infra::CALL_LOGGER_ARBITER).borrow_mut().remove_thread_logger()
+    //             }
+    //         }
+    //     }
+    // };
+    // let multithreaded_amendment = if attr_args_.multithreaded {
+    //     quote!{
+    //         static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = LazyLock::new(|| unsafe {
+    //             Arc::new(Mutex::new(ThreadGatekeeper::new(
+    //                 (*CALL_LOGGER_ARBITER).clone(),
+    //             )))
+    //         });
+    //         thread_local! {
+    //             // pub static THREAD_LOGGER_: RefCell<Option<ThreadLoggerPImpl>> =
+    //             static THREAD_GATEAD_APTER: ThreadGateAdapter = {
+    //                 THREAD_LOGGER_.borrow_mut().replace(Some(ThreadLoggerPImpl::Multithreaded(
+    //                     Box::new(ThreadGateAdapter::new((*THREAD_GATEKEEPER).clone())))))
+    //                 ;
+    //             };
+    //         }
+    //     }
+    // } else {
+    //     quote!{}
+    // };
+    // let logging_thread_dependent_structs = if attr_args_.singlethreaded {
+    //     quote! {
+    //         // thread_local! {
+    //         //     static _FCL_TMP: ()/*InfraCleaner*/ = THREAD_LOGGER_.with(|logger| {
+    //         //         // use fcl::call_log_infra::ThreadLoggerPImpl;
+    //         //         unsafe {
+    //         //             *logger.borrow_mut() = Some(fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded((*fcl::call_log_infra::CALL_LOGGER_ARBITER).clone()));
+    //         //             (*fcl::call_log_infra::CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(#logging_infra);
+    //         //         }
+    //         //         // InfraCleaner
+    //         //     });
+    //         // }
+    //     }
+    // } else {
+    //     quote! {
+    //         use std::sync::lazy_lock::{LazyLock, Arc, Mutex};
+    //         use fcl::call_log_infra::{ThreadGatekeeper, THREAD_LOGGER_, CALL_LOGGER_ARBITER, ThreadLoggerPImpl};
+
+    //         static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = LazyLock::new(|| unsafe {
+    //             Arc::new(Mutex::new(ThreadGatekeeper::new(
+    //                 (*CALL_LOGGER_ARBITER).clone(),
+    //             )))
+    //         });
+    //         thread_local! {
+    //             static _FCL_TMP: ()/*InfraCleaner*/ = THREAD_LOGGER_.with(|logger| {
+    //                 *logger.borrow_mut() = Some(ThreadLoggerPImpl::Multithreaded(Box::new(ThreadGateAdapter::new(
+    //                     {
+    //                         unsafe {
+    //                             match (*THREAD_GATEKEEPER).lock() {
+    //                                 Ok(mut guard) => {
+    //                                     // guard.add_thread_logger(#logging_infra)
+    //                                 }
+    //                                 Err(e) => {
+    //                                     debug_assert!(false, "Unexpected mutex lock failure: '{:?}'", e);
+    //                                 }
+    //                             }
+    //                         }
+    //                         let thread_gatekeeper = unsafe { (*THREAD_GATEKEEPER).clone() };
+    //                         // let thread_gatekeeper;
+    //                         // unsafe {
+    //                         //     thread_gatekeeper = (*THREAD_GATEKEEPER).clone();
+    //                         // }
+    //                         thread_gatekeeper
+    //                     }
+    //                 ))));
+    //                 // InfraCleaner
+    //             });
+
+    //             //     // pub static THREAD_LOGGER_: Option<RefCell<Box<dyn CallLogger>>> = None;
+
+    //             //     pub static THREAD_LOGGER: RefCell<ThreadLoggerPImpl> = {
+    //             //     // pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = {
+    //             //         RefCell::new(ThreadLoggerPImpl::Multithreaded(Box::new(ThreadGateAdapter::new(
+    //             //         // RefCell::new(Box::new(ThreadGateAdapter::new(
+    //             //             {
+    //             //                 unsafe {
+    //             //                     match (*THREAD_GATEKEEPER).lock() {
+    //             //                         Ok(mut guard) => {
+    //             //                             guard.add_thread_logger(Box::new(
+    //             //                                 CallLogInfra::new(Rc::new(RefCell::new(
+    //             //                                     // fcl_decorators::TreeLikeDecorator::new(
+    //             //                                     //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+    //             //                                     //     None, None, None))))))
+    //             //                                     fcl_decorators::CodeLikeDecorator::new(
+    //             //                                         Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+    //             //                                         None))))))
+    //             //                         }
+    //             //                         Err(e) => {
+    //             //                             debug_assert!(false, "Unexpected mutex lock failure: '{:?}'", e);
+    //             //                         }
+    //             //                     }
+    //             //                 }
+    //             //                 let thread_gatekeeper;
+    //             //                 unsafe {
+    //             //                     thread_gatekeeper = (*THREAD_GATEKEEPER).clone();
+    //             //                 }
+    //             //                 thread_gatekeeper
+    //             //             }))))
+    //             //     };
+    //         }
+    //     }
+    // };
+    let ret_val = quote! { /*#infra_cleaner*/ /*#logging_thread_dependent_structs */ #output };
+    ret_val.into()
+    // output.into()
 }
 
 fn quote_as_expr_array(
@@ -237,21 +375,56 @@ fn quote_as_expr_call(
         }
         traversed_args
     };
-    let mut ret_val = quote!{ #(#attrs)* #func ( #args ) };
+    let mut ret_val = quote! { #(#attrs)* #func ( #args ) };
     if is_print_func_name {
+        // THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>>
+        #[cfg(feature = "singlethreaded")]
+        let thread_logger_access = quote!{
+            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                logger.borrow_mut().borrow_mut().maybe_flush();
+            })
+        };
+        // THREAD_LOGGER__: RefCell<Box<dyn CallLogger>>
+        #[cfg(not(feature = "singlethreaded"))]
+        let thread_logger_access = quote!{
+            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                logger.borrow_mut().maybe_flush();
+            })
+        };
         ret_val = quote! {
-            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                use fcl_traits::CallLogger;
-                match &mut *logger.borrow_mut() {
-                    fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
-                    fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
-                        logger,
-                    ) => logger.borrow_mut().maybe_flush(),
-                }
-            });
-            // fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+            #thread_logger_access;
+            // fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
             //     logger.borrow_mut().maybe_flush();
             // })
+
+            // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            // //     if let Some(logger) = logger {
+            // //         logger.borrow_mut().maybe_flush()
+            // //     }
+            // // });
+            // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            //     if let Some(logger) = &mut *logger.borrow_mut() {
+            //         use fcl_traits::CallLogger;
+            //         match logger {
+            //             fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
+            //             fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
+            //                 logger,
+            //             ) => logger.borrow_mut().maybe_flush(),
+            //         }
+            //     }
+            // });
+            // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            // //     use fcl_traits::CallLogger;
+            // //     match &mut *logger.borrow_mut() {
+            // //         fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
+            // //         fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
+            // //             logger,
+            // //         ) => logger.borrow_mut().maybe_flush(),
+            // //     }
+            // // });
+            // // // fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
+            // // //     logger.borrow_mut().maybe_flush();
+            // // // })
             #ret_val
         }
     };
@@ -330,11 +503,11 @@ fn quote_as_expr_closure(
         let to_ts_res = proc_macro2::TokenStream::from_str(&coords_str);
         match to_ts_res {
             Ok(ts) => quote! { #ts },
-            Err(_lex_err) => quote! { #coords_str }
+            Err(_lex_err) => quote! { #coords_str },
         }
     };
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
-    if ! prefix.is_empty() {
+    if !prefix.is_empty() {
         log_closure_name_ts = quote! { #prefix::#log_closure_name_ts }
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
@@ -342,31 +515,85 @@ fn quote_as_expr_closure(
 
     let body = { quote_as_expr(&**body, None, prefix) };
 
+    // THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>>
+    #[cfg(feature = "singlethreaded")]
+    let thread_logger_access = quote!{
+        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            if logger.borrow().borrow().logging_is_on() {
+                optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str))
+            }
+        })
+    };
+    // THREAD_LOGGER__: RefCell<Box<dyn CallLogger>>
+    #[cfg(not(feature = "singlethreaded"))]
+    let thread_logger_access = quote!{
+        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            if logger.borrow().logging_is_on() {
+                optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str))
+            }
+        })
+    };
     quote! {
         #(#attrs)*
         #lifetimes #constness #movability #asyncness #capture
         #or1_token #inputs #or2_token #output
         {
             use fcl::MaybePrint;
+            use fcl_traits::CallLogger;
             let param_val_str = #input_vals;
             let mut optional_callee_logger = None;
-            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                use fcl_traits::CallLogger;
-                if match &mut *logger.borrow_mut() {
-                    fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
-                    fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
-                } {
-                    optional_callee_logger = Some(fcl::FunctionLogger::new(
-                        #log_closure_name_str, param_val_str))
-                }
-            });
 
-            // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-            //     if thread_logger.borrow_mut().logging_is_on() {
+            #thread_logger_access;
+            // fcl::call_log_infra::instances::THREAD_LOGGER__.with(|thread_logger| {
+            //     if thread_logger.borrow().logging_is_on() {
             //         optional_callee_logger = Some(fcl::FunctionLogger::new(
             //             #log_closure_name_str, param_val_str))
             //     }
             // });
+
+            // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            // //     if let Some(logger) = logger {
+            // //         if logger.borrow_mut().logging_is_on() {
+            // //             optional_callee_logger = Some(fcl::FunctionLogger::new(
+            // //                 #log_closure_name_str, param_val_str))
+            // //         }
+            // //     }
+            // // });
+            // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            //     let logging_is_on = if let Some(logger) = &*logger.borrow() {
+            //         use fcl_traits::CallLogger;
+            //         match logger {
+            //             fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+            //             fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+            //         }
+            //     } else {
+            //         debug_assert!(false, "Internal error: Unexpected lack of logger");
+            //         false
+            //     };
+            //     if logging_is_on {
+            //         optional_callee_logger = Some(fcl::FunctionLogger::new(
+            //             #log_closure_name_str, param_val_str))
+            //     }
+            // });
+            // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            // //     use fcl_traits::CallLogger;
+            // //     if match &/*mut*/ *logger.borrow_mut() {
+            // //         fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+            // //         fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+            // //     } {
+            // //         optional_callee_logger = Some(fcl::FunctionLogger::new(
+            // //             #log_closure_name_str, param_val_str))
+            // //     }
+            // // });
+
+            // // // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+            // // //     if thread_logger.borrow_mut().logging_is_on() {
+            // // //         optional_callee_logger = Some(fcl::FunctionLogger::new(
+            // // //             #log_closure_name_str, param_val_str))
+            // // //     }
+            // // // });
 
             let ret_val = (move || { #body })();
 
@@ -565,11 +792,11 @@ fn quote_as_expr_loop(
     }
     let body = quote_as_loop_block(body, prefix);
     quote! {
-        // // Ret val for `loop` has been deprioritized since it requires extra 
+        // // Ret val for `loop` has been deprioritized since it requires extra
         // // refactoring for the case of empty (removed) loopbody.
         // {
-        //     let ret_val = 
-                #(#attrs)* #label #loop_token #body 
+        //     let ret_val =
+                #(#attrs)* #label #loop_token #body
         //     ;
 
         //     let ret_val_str = format!("{}", ret_val.maybe_print());
@@ -637,17 +864,53 @@ fn quote_as_macro(
             || &macro_name.ident.to_string() == &"eprintln"
             || &macro_name.ident.to_string() == &"eprint"
         {
+            // THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>>
+            #[cfg(feature = "singlethreaded")]
+            let thread_logger_access = quote!{
+                fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                    logger.borrow_mut().borrow_mut().maybe_flush();
+                })
+            };
+            // THREAD_LOGGER__: RefCell<Box<dyn CallLogger>>
+            #[cfg(not(feature = "singlethreaded"))]
+            let thread_logger_access = quote!{
+                fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                    logger.borrow_mut().maybe_flush();
+                })
+            };
+
             *maybe_flush_invocation = quote! {
-                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                    use fcl_traits::CallLogger;
-                    match &mut *logger.borrow_mut() {
-                        fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
-                        fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().maybe_flush(),
-                    }
-                });
-                // THREAD_LOGGER.with(|logger| {
+                #thread_logger_access;
+                // fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
                 //     logger.borrow_mut().maybe_flush();
                 // });
+
+                // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+                // //     if let Some(logger) = logger {
+                // //         logger.borrow_mut().maybe_flush();
+                // //     }
+                // // });
+                // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+                //     if let Some(logger) = &mut *logger.borrow_mut() {
+                //         use fcl_traits::CallLogger;
+                //         match logger {
+                //             fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
+                //             fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(
+                //                 logger,
+                //             ) => logger.borrow_mut().maybe_flush(),
+                //         }
+                //     }
+                // });
+                // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+                // //     use fcl_traits::CallLogger;
+                // //     match &mut *logger.borrow_mut() {
+                // //         fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.maybe_flush(),
+                // //         fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().maybe_flush(),
+                // //     }
+                // // });
+                // // // THREAD_LOGGER.with(|logger| {
+                // // //     logger.borrow_mut().maybe_flush();
+                // // // });
             }
         }
     }
@@ -1392,6 +1655,28 @@ fn traversed_block_from_sig(
         let generic_params_is_empty = generics.params.is_empty();
 
         let func_log_name = remove_spaces(&func_log_name.to_string());
+
+        // THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>>
+        #[cfg(feature = "singlethreaded")]
+        let thread_logger_access = quote!{
+            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                if logger.borrow().borrow().logging_is_on() {
+                    optional_callee_logger = Some(
+                        fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                }
+            })
+        };
+        // THREAD_LOGGER__: RefCell<Box<dyn CallLogger>>
+        #[cfg(not(feature = "singlethreaded"))]
+        let thread_logger_access = quote!{
+            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                if logger.borrow().logging_is_on() {
+                    optional_callee_logger = Some(
+                        fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                }
+            })
+        };
+
         quote! {
             {
                 // The run time part of the infrastructure for
@@ -1400,7 +1685,7 @@ fn traversed_block_from_sig(
                 generic_func_name.push_str(#func_log_name);
                 if !#generic_params_is_empty {
                     generic_func_name.push_str("<");
-                    let generic_arg_names_vec: Vec<&'static str> = 
+                    let generic_arg_names_vec: Vec<&'static str> =
                         vec![#(std::any::type_name::< #generics_params_iter >(),)*];
                     for generic_arg_name in generic_arg_names_vec {
                         generic_func_name.push_str(generic_arg_name);
@@ -1410,24 +1695,58 @@ fn traversed_block_from_sig(
                 }
 
                 use fcl::MaybePrint;
+                use fcl_traits::CallLogger;
                 let param_val_str = #inputs;
                 let mut optional_callee_logger = None;
-                fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                    use fcl_traits::CallLogger;
-                    if match &mut *logger.borrow_mut() {
-                        fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
-                        fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
-                    } {
-                        optional_callee_logger = Some(fcl::FunctionLogger::new(
-                            &generic_func_name, param_val_str))
-                    }
-                });
-                // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-                //     if thread_logger.borrow_mut().logging_is_on() {
+
+                #thread_logger_access;
+                // fcl::call_log_infra::instances::THREAD_LOGGER__.with(|thread_logger| {
+                //     if thread_logger.borrow().logging_is_on() {
                 //         optional_callee_logger = Some(
                 //             fcl::FunctionLogger::new(&generic_func_name, param_val_str))
                 //     }
                 // });
+
+                // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+                // //     if let Some(logger) = logger {
+                // //         if logger.borrow_mut().logging_is_on() {
+                // //             optional_callee_logger = Some(
+                // //                 fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                // //         }
+                // //     }
+                // // });
+                // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+                //     let logging_is_on = if let Some(logger) = &*logger.borrow() {
+                //         use fcl_traits::CallLogger;
+                //         match logger {
+                //             fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+                //             fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+                //         } 
+                //     } else {
+                //         debug_assert!(false, "Internal error: Unexpected lack of logger");
+                //         false
+                //     };
+                //     if logging_is_on {
+                //         optional_callee_logger = Some(fcl::FunctionLogger::new(
+                //             &generic_func_name, param_val_str))
+                //     }
+                // });
+                // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+                // //     use fcl_traits::CallLogger;
+                // //     if match &/*mut*/ *logger.borrow_mut() {
+                // //         fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+                // //         fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+                // //     } {
+                // //         optional_callee_logger = Some(fcl::FunctionLogger::new(
+                // //             &generic_func_name, param_val_str))
+                // //     }
+                // // });
+                // // // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+                // // //     if thread_logger.borrow_mut().logging_is_on() {
+                // // //         optional_callee_logger = Some(
+                // // //             fcl::FunctionLogger::new(&generic_func_name, param_val_str))
+                // // //     }
+                // // // });
 
                 // NOTE: Running `block` as a closure to handle the `return` (in the `block`) correctly.
                 let ret_val = (move || #block )();
@@ -2187,10 +2506,10 @@ fn quote_as_stmt_macro(
     let mut maybe_flush_invocation = quote! {};
     let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, prefix);
 
-    let mut ret_val = quote!{ #(#attrs)* #mac #semi_token };
+    let mut ret_val = quote! { #(#attrs)* #mac #semi_token };
 
     if !maybe_flush_invocation.is_empty() {
-        ret_val = quote!{ 
+        ret_val = quote! {
             {
                 #maybe_flush_invocation;
                 #ret_val
@@ -2228,26 +2547,84 @@ fn quote_as_loop_block(
         }
         traversed_stmts
     };
+
+    // TODO: Dedup.
+    // THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>>
+    #[cfg(feature = "singlethreaded")]
+    let thread_logger_access = quote!{
+        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            if logger.borrow().borrow().logging_is_on() {
+                optional_logger =
+                    Some(fcl::LoopbodyLogger::new())
+            }
+        })
+    };
+    // THREAD_LOGGER__: RefCell<Box<dyn CallLogger>>
+    #[cfg(not(feature = "singlethreaded"))]
+    let thread_logger_access = quote!{
+        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            if logger.borrow().logging_is_on() {
+                optional_logger =
+                    Some(fcl::LoopbodyLogger::new())
+            }
+        })
+    };
+
     quote! {
         {
+            use fcl_traits::CallLogger;
+
             // Log the loop body start (if logging is enabled).
             let mut optional_logger = None;
-            fcl::call_log_infra::THREAD_LOGGER.with(|logger| {
-                use fcl_traits::CallLogger;
-                if match &mut *logger.borrow_mut() {
-                    fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
-                    fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
-                } {
-                    optional_logger =
-                        Some(fcl::LoopbodyLogger::new())
-                }
-            });
-            // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-            //     if thread_logger.borrow_mut().logging_is_on() {
+
+            #thread_logger_access;
+            // fcl::call_log_infra::instances::THREAD_LOGGER__.with(|thread_logger| {
+            //     if thread_logger.borrow().logging_is_on() {
             //         optional_logger =
             //             Some(fcl::LoopbodyLogger::new())
             //     }
             // });
+
+            // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            // //     if let Some(logger) = logger {
+            // //         if logger.borrow_mut().logging_is_on() {
+            // //             optional_logger =
+            // //                 Some(fcl::LoopbodyLogger::new())
+            // //         }
+            // //     }
+            // // });
+            // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            //     let logging_is_on = if let Some(logger) = &*logger.borrow() {
+            //         use fcl_traits::CallLogger;
+            //         match logger {
+            //             fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+            //             fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+            //         } 
+            //     } else {
+            //         debug_assert!(false, "Internal error: Unexpected lack of logger");
+            //         false
+            //     };
+            //     if logging_is_on {
+            //         optional_logger =
+            //             Some(fcl::LoopbodyLogger::new())
+            //     }
+            // });
+            // // fcl::call_log_infra::THREAD_LOGGER_.with(|logger| {
+            // //     use fcl_traits::CallLogger;
+            // //     if match &/*mut*/ *logger.borrow_mut() {
+            // //         fcl::call_log_infra::ThreadLoggerPImpl::Multithreaded(logger) => logger.logging_is_on(),
+            // //         fcl::call_log_infra::ThreadLoggerPImpl::Singlethreaded(logger) => logger.borrow_mut().logging_is_on(),
+            // //     } {
+            // //         optional_logger =
+            // //             Some(fcl::LoopbodyLogger::new())
+            // //     }
+            // // });
+            // // // fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
+            // // //     if thread_logger.borrow_mut().logging_is_on() {
+            // // //         optional_logger =
+            // // //             Some(fcl::LoopbodyLogger::new())
+            // // //     }
+            // // // });
 
             #stmts
 
@@ -2274,7 +2651,6 @@ fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macr
     quote! { { #stmts } }
 }
 
-
 /// Closure with optional trailing comma
 /// (when closure is the last argument of a function):
 struct ExprClosureWOptComma {
@@ -2293,6 +2669,8 @@ impl Parse for ExprClosureWOptComma {
 mod kw {
     // syn::custom_keyword!(name);
     syn::custom_keyword!(prefix);
+    syn::custom_keyword!(multithreaded); // TODO: Remove.
+    // syn::custom_keyword!(singlethreaded);
 }
 
 struct FclQSelf {
@@ -2314,10 +2692,10 @@ impl quote::ToTokens for FclQSelf {
             ty, // : Box<Type>,
             // as_token, // : Token![as],
             path, // : Path,
-            // gt_token, // : Token![>],
+                  // gt_token, // : Token![>],
             ..
         } = self;
-        *tokens = quote!{ < #ty as #path > };
+        *tokens = quote! { < #ty as #path > };
     }
 }
 impl Parse for FclQSelf {
@@ -2335,7 +2713,7 @@ impl Parse for FclQSelf {
 
 enum LogPrefix {
     QSelf(FclQSelf),
-    Path(syn::Path)
+    Path(syn::Path),
 }
 struct QSelfOrPath(Option<LogPrefix>);
 
@@ -2347,7 +2725,7 @@ impl Parse for QSelfOrPath {
         } else {
             let lookahead = input.lookahead1();
             if lookahead.peek(Token![<]) {
-                result = Self(Some(LogPrefix::QSelf(input.parse()?,))); // <T as U::V>
+                result = Self(Some(LogPrefix::QSelf(input.parse()?))); // <T as U::V>
             } else {
                 result = Self(Some(LogPrefix::Path(input.parse()?))); // U::V
             }
@@ -2356,25 +2734,30 @@ impl Parse for QSelfOrPath {
         }
     }
 }
-enum AttrArgs {
-    // // TODO: Dedup or remove `eq_token` and `path`.
-    // Name{
-    //     _name_token: kw::name,
-    //     _eq_token: Token![=],
-    //     path: ExprPath
-    // },
-    Prefix {
-        _prefix_token: kw::prefix,
-        _eq_token: Token![=],
-        qself_or_path: QSelfOrPath,
-    },
-    None,
-}
+// struct Prefix {
+//     _prefix_token: kw::prefix,
+//     _eq_token: Token![=],
+//     qself_or_path: QSelfOrPath,
+// }
 
-impl Parse for AttrArgs {
+// struct AttrArgsStruct {
+//     prefix: QSelfOrPath,
+//     singlethreaded: bool
+// }
+
+struct AttrArgs_ {
+    prefix: QSelfOrPath,
+    multithreaded: bool,
+    // singlethreaded: bool,
+}
+impl Parse for AttrArgs_ {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut attr_args = AttrArgs_ {
+            prefix: QSelfOrPath(None),
+            multithreaded: false, // singlethreaded: false,
+        };
         if input.is_empty() {
-            return Ok(AttrArgs::None);
+            return Ok(attr_args); //AttrArgs::None);
         }
         let lookahead = input.lookahead1();
         // if lookahead.peek(kw::name) {
@@ -2385,13 +2768,58 @@ impl Parse for AttrArgs {
         //     })
         // } else if lookahead.peek(kw::prefix) {
         if lookahead.peek(kw::prefix) {
-            Ok(AttrArgs::Prefix {
-                _prefix_token: input.parse::<kw::prefix>()?,
-                _eq_token: input.parse()?,
-                qself_or_path: input.parse()?,
-            })
+            input.parse::<kw::prefix>()?;
+            input.parse::<Token![=]>()?;
+            attr_args.prefix = input.parse()?;
+        } else if lookahead.peek(kw::multithreaded) {
+            input.parse::<kw::multithreaded>()?;
+            attr_args.multithreaded = true;
+        // } else if lookahead.peek(kw::singlethreaded) {
+        //     input.parse::<kw::singlethreaded>()?;
+        //     attr_args.singlethreaded = true;
         } else {
-            Err(lookahead.error())
+            return Err(lookahead.error());
         }
+        Ok(attr_args)
     }
 }
+
+// enum AttrArgs {
+//     // // TODO: Dedup or remove `eq_token` and `path`.
+//     // Name{
+//     //     _name_token: kw::name,
+//     //     _eq_token: Token![=],
+//     //     path: ExprPath
+//     // },
+//     Prefix {
+//         _prefix_token: kw::prefix,
+//         _eq_token: Token![=],
+//         qself_or_path: QSelfOrPath,
+//     },
+//     None,
+// }
+
+// impl Parse for AttrArgs {
+//     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+//         if input.is_empty() {
+//             return Ok(AttrArgs::None);
+//         }
+//         let lookahead = input.lookahead1();
+//         // if lookahead.peek(kw::name) {
+//         //     Ok(AttrArgs::Name {
+//         //         _name_token: input.parse::<kw::name>()?,
+//         //         _eq_token: input.parse()?,
+//         //         path: input.parse()?,
+//         //     })
+//         // } else if lookahead.peek(kw::prefix) {
+//         if lookahead.peek(kw::prefix) {
+//             Ok(AttrArgs::Prefix {
+//                 _prefix_token: input.parse::<kw::prefix>()?,
+//                 _eq_token: input.parse()?,
+//                 qself_or_path: input.parse()?,
+//             })
+//         } else {
+//             Err(lookahead.error())
+//         }
+//     }
+// }

@@ -1,7 +1,15 @@
 # TODO:
 * Structure-up single-threaded and multithreaded
+  * Consider controlling the multithreadedness with a FCL crate feature. THe user uses that crate with a feature.
+    Like (see `features`):
+    ```
+    [dependencies]
+    proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
+    syn = { version = "2.0", features = ["full"] }
+    ```
   * `fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {`  
     `// TODO: In a single-threaded case consider canceling the std output buffering.`
+* Consider merging all the FCL crates into a single proc_macro crate.
 * Consider {recursive type} params (lists) when logging the params.
 * Consider a raw pointer param. Probably requires `unsafe` for printing the param.
 * Restructure to a minimal set of crates (fcl, proc_macros, commons).
@@ -14,6 +22,7 @@
     log thread func or not).
 * Consider moving the thread_local use deeper into the call.
   Such that a {Call|Closure}Logger is created unconditionally.
+* Consider extracting all the multithreading items to a `mod mutithreading` (with `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
 * Bug: `f2()`
   ```cpp
   thread_func() {
@@ -37,6 +46,33 @@
 
       g();
   ```
+* Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
+  in both threads, has `main()` destructors reporting the returns during stack unwinding:
+  ```
+  main() {
+    calls() {While FCL was busy (arbiter borrowed) one of the threads has panicked: 'panicked at fcl\src\call_log_infra.rs:746:36:
+  already borrowed: BorrowMutError'.
+  FCL failed to synchronize its cache and buffers with the panic report below. If the panic report is not shown, attach the debugger to see the panic details.
+
+      { // Loop body start.
+        f() {
+  (stderr) While FCL was busy (arbiter and writer borrowed) one of the threads has panicked: 'panicked at fcl\src\writer.rs:130:21:
+  already borrowed: BorrowMutError'. FCL failed to synchronize its cache and buffers with the panic report below. If the panic report is not shown, attach the debugger to see the panic details.
+
+  thread 'main' panicked at fcl\src\writer.rs:130:21:
+  already borrowed: BorrowMutError
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+  (stdout) While FCL was busy (arbiter and writer borrowed) one of the threads has panicked: 'panicked at fcl\src\writer.rs:130:21:
+  already borrowed: BorrowMutError'. FCL failed to synchronize its cache and buffers with the panic report below. If the panic report is not shown, attach the debugger to see the panic details.
+      } // Loop body end.
+
+  thread 'T1' panicked at fcl\src\call_log_infra.rs:746:36:
+  already borrowed: BorrowMutError
+    } // calls().
+  } // main().
+  error: process didn't exit successfully: `target\debug\user.exe` (exit code: 101)  
+  ```
+* Consider using LazyCell instead of LazyLock wherever possible.  
 * ---
 * In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * [Loops]
@@ -84,6 +120,7 @@
     * The crate. Crates.io
     * The code documentation
   * Videos
+    * "Any feedback write in the comments to the video".
     * Intro
     * User Manual
     * Video Course (Learning/Practicing)    

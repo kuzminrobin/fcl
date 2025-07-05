@@ -11,3 +11,6 @@ fcl_proc_macros = { path = "../fcl_proc_macros" }
 #gag = "1.0.0" # TODO: Consider removing (but crediting in the docs).
 filedescriptor = "0.8.3"
 tempfile = "3.20.0"
+
+[features]
+singlethreaded = []
