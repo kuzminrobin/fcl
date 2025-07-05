@@ -715,7 +715,7 @@ static mut ORIGINAL_PANIC_HANDLER: LazyLock<
 pub mod instances {
     use super::*;
     thread_local! {
-        pub static THREAD_LOGGER__: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
+        pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
             let logging_infra = Box::new(CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // fcl_decorators::TreeLikeDecorator::new(
                 //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
@@ -734,14 +734,14 @@ pub mod instances {
 #[cfg(not(feature = "singlethreaded"))]
 pub mod instances {
     use super::*;
-    static mut THREAD_GATEKEEPER__: LazyLock<Arc<Mutex<ThreadGatekeeper>>> =
+    static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> =
         LazyLock::new(|| unsafe {
             Arc::new(Mutex::new(ThreadGatekeeper::new(
                 (*CALL_LOGGER_ARBITER).clone(),
             )))
         });
     thread_local! {
-        pub static THREAD_LOGGER__: RefCell<Box<dyn CallLogger>> = unsafe {
+        pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
             let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // fcl_decorators::TreeLikeDecorator::new(
                 //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
@@ -749,7 +749,7 @@ pub mod instances {
                 fcl_decorators::CodeLikeDecorator::new(
                     Some(Box::new(/*fcl::writer::*/WriterAdapter::new((*/*fcl::call_log_infra::*/THREAD_SHARED_WRITER).clone()))),
                     None)))));
-            match (*THREAD_GATEKEEPER__).lock() {
+            match (*THREAD_GATEKEEPER).lock() {
                 Ok(mut gatekeeper) => gatekeeper.add_thread_logger(logging_infra),
                 Err(e) => {
                     println!("(stdout) FCL Internal Error: Thread panicked while holding a mutex ({}).", e);
@@ -757,7 +757,7 @@ pub mod instances {
                     debug_assert!(false, "FCL Internal Error: Thread panicked while holding a mutex ({}).", e);
                 }
             }
-            RefCell::new(Box::new(ThreadGateAdapter::new((*THREAD_GATEKEEPER__).clone())))
+            RefCell::new(Box::new(ThreadGateAdapter::new((*THREAD_GATEKEEPER).clone())))
         };
     }
 }

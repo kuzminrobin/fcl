@@ -25,9 +25,9 @@ pub fn loggable(
     attr_args: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args_ = parse_macro_input!(attr_args as AttrArgs_); // Handles the compilation errors appropriately.
+    let attr_args_ = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
     let mut prefix = quote! {};
-    if let AttrArgs_ {
+    if let AttrArgs {
         prefix: QSelfOrPath(Some(q_self_or_path)),
         ..
     } = attr_args_
@@ -243,13 +243,13 @@ fn quote_as_expr_call(
     if is_print_func_name {
         #[cfg(feature = "singlethreaded")]
         let thread_logger_access = quote!{
-            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow_mut().borrow_mut().maybe_flush();
             })
         };
         #[cfg(not(feature = "singlethreaded"))]
         let thread_logger_access = quote!{
-            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow_mut().maybe_flush();
             })
         };
@@ -347,7 +347,7 @@ fn quote_as_expr_closure(
 
     #[cfg(feature = "singlethreaded")]
     let thread_logger_access = quote!{
-        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             if logger.borrow().borrow().logging_is_on() {
                 optional_callee_logger = Some(fcl::FunctionLogger::new(
                     #log_closure_name_str, param_val_str))
@@ -356,7 +356,7 @@ fn quote_as_expr_closure(
     };
     #[cfg(not(feature = "singlethreaded"))]
     let thread_logger_access = quote!{
-        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             if logger.borrow().logging_is_on() {
                 optional_callee_logger = Some(fcl::FunctionLogger::new(
                     #log_closure_name_str, param_val_str))
@@ -646,13 +646,13 @@ fn quote_as_macro(
         {
             #[cfg(feature = "singlethreaded")]
             let thread_logger_access = quote!{
-                fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut().borrow_mut().maybe_flush();
                 })
             };
             #[cfg(not(feature = "singlethreaded"))]
             let thread_logger_access = quote!{
-                fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut().maybe_flush();
                 })
             };
@@ -1406,7 +1406,7 @@ fn traversed_block_from_sig(
 
         #[cfg(feature = "singlethreaded")]
         let thread_logger_access = quote!{
-            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 if logger.borrow().borrow().logging_is_on() {
                     optional_callee_logger = Some(
                         fcl::FunctionLogger::new(&generic_func_name, param_val_str))
@@ -1415,7 +1415,7 @@ fn traversed_block_from_sig(
         };
         #[cfg(not(feature = "singlethreaded"))]
         let thread_logger_access = quote!{
-            fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 if logger.borrow().logging_is_on() {
                     optional_callee_logger = Some(
                         fcl::FunctionLogger::new(&generic_func_name, param_val_str))
@@ -2250,7 +2250,7 @@ fn quote_as_loop_block(
     // TODO: Dedup.
     #[cfg(feature = "singlethreaded")]
     let thread_logger_access = quote!{
-        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             if logger.borrow().borrow().logging_is_on() {
                 optional_logger =
                     Some(fcl::LoopbodyLogger::new())
@@ -2259,7 +2259,7 @@ fn quote_as_loop_block(
     };
     #[cfg(not(feature = "singlethreaded"))]
     let thread_logger_access = quote!{
-        fcl::call_log_infra::instances::THREAD_LOGGER__.with(|logger| {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             if logger.borrow().logging_is_on() {
                 optional_logger =
                     Some(fcl::LoopbodyLogger::new())
@@ -2315,7 +2315,7 @@ impl Parse for ExprClosureWOptComma {
 mod kw {
     // syn::custom_keyword!(name);
     syn::custom_keyword!(prefix);
-    syn::custom_keyword!(multithreaded); // TODO: Remove.
+    // syn::custom_keyword!(multithreaded); // TODO: Remove.
 }
 
 struct FclQSelf {
@@ -2380,15 +2380,15 @@ impl Parse for QSelfOrPath {
     }
 }
 
-struct AttrArgs_ {
+struct AttrArgs {
     prefix: QSelfOrPath,
-    multithreaded: bool,    // TODO: Remove.
+    // multithreaded: bool,    // TODO: Remove.
 }
-impl Parse for AttrArgs_ {
+impl Parse for AttrArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut attr_args = AttrArgs_ {
+        let mut attr_args = AttrArgs {
             prefix: QSelfOrPath(None),
-            multithreaded: false, // singlethreaded: false,
+            // multithreaded: false, // singlethreaded: false,
         };
         if input.is_empty() {
             return Ok(attr_args);
@@ -2405,9 +2405,9 @@ impl Parse for AttrArgs_ {
             input.parse::<kw::prefix>()?;
             input.parse::<Token![=]>()?;
             attr_args.prefix = input.parse()?;
-        } else if lookahead.peek(kw::multithreaded) {
-            input.parse::<kw::multithreaded>()?;
-            attr_args.multithreaded = true;
+        // } else if lookahead.peek(kw::multithreaded) {
+        //     input.parse::<kw::multithreaded>()?;
+        //     attr_args.multithreaded = true;
         } else {
             return Err(lookahead.error());
         }

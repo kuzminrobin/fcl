@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 fcl_traits = { path = "../fcl_traits" }
 fcl_decorators = { path = "../fcl_decorators" }
-#fcl = { path = "../fcl" }
-#fcl_proc_macros = { path = "../fcl_proc_macros" }
-fcl = { path = "../fcl", features = ["singlethreaded"] }
-fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
+fcl = { path = "../fcl" }
+fcl_proc_macros = { path = "../fcl_proc_macros" }
+# fcl = { path = "../fcl", features = ["singlethreaded"] }
+# fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }

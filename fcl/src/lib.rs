@@ -7,7 +7,7 @@ pub mod writer; // TODO: Really `pub`?
 #[cfg(feature = "singlethreaded")]
 use fcl_traits::CallLogger;
 
-use call_log_infra::{instances::THREAD_LOGGER__};
+use call_log_infra::{instances::THREAD_LOGGER};
 
 pub trait MaybePrint {
     fn maybe_print(&self) -> String;
@@ -31,14 +31,14 @@ pub struct FunctionLogger {
 impl FunctionLogger {
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         #[cfg(feature = "singlethreaded")]
-        THREAD_LOGGER__.with(|logger| {
+        THREAD_LOGGER.with(|logger| {
             logger
                 .borrow_mut()
                 .borrow_mut()
                 .log_call(func_name, param_vals)
         });
         #[cfg(not(feature = "singlethreaded"))]
-        THREAD_LOGGER__.with(|logger| logger.borrow_mut().log_call(func_name, param_vals));
+        THREAD_LOGGER.with(|logger| logger.borrow_mut().log_call(func_name, param_vals));
         Self {
             // _dropper: CalleeLogger,
             ret_val_str: None,
@@ -51,7 +51,7 @@ impl FunctionLogger {
 impl Drop for FunctionLogger {
     fn drop(&mut self) {
         #[cfg(feature = "singlethreaded")]
-        THREAD_LOGGER__.with(|logger| {
+        THREAD_LOGGER.with(|logger| {
             logger
                 .borrow_mut()
                 .borrow_mut()
@@ -59,7 +59,7 @@ impl Drop for FunctionLogger {
         });
 
         #[cfg(not(feature = "singlethreaded"))]
-        THREAD_LOGGER__.with(|logger| logger.borrow_mut().log_ret(self.ret_val_str.take()));
+        THREAD_LOGGER.with(|logger| logger.borrow_mut().log_ret(self.ret_val_str.take()));
     }
 }
 
@@ -68,7 +68,7 @@ pub struct LoopbodyLogger;
 impl LoopbodyLogger {
     pub fn new() -> Self {
         #[cfg(feature = "singlethreaded")]
-        THREAD_LOGGER__.with(|logger| {
+        THREAD_LOGGER.with(|logger| {
             logger
                 .borrow_mut()
                 .borrow_mut()
@@ -76,14 +76,14 @@ impl LoopbodyLogger {
         });
 
         #[cfg(not(feature = "singlethreaded"))]
-        THREAD_LOGGER__.with(|logger| logger.borrow_mut().log_loopbody_start());
+        THREAD_LOGGER.with(|logger| logger.borrow_mut().log_loopbody_start());
         Self
     }
 }
 impl Drop for LoopbodyLogger {
     fn drop(&mut self) {
         #[cfg(feature = "singlethreaded")]
-        THREAD_LOGGER__.with(|logger| {
+        THREAD_LOGGER.with(|logger| {
             // use fcl_traits::CallLogger;
             logger
                 .borrow_mut()
@@ -92,7 +92,7 @@ impl Drop for LoopbodyLogger {
         });
 
         #[cfg(not(feature = "singlethreaded"))]
-        THREAD_LOGGER__.with(|logger| logger.borrow_mut().log_loopbody_end());
+        THREAD_LOGGER.with(|logger| logger.borrow_mut().log_loopbody_end());
     }
 }
 
