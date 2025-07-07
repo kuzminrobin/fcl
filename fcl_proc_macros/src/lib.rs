@@ -1321,32 +1321,41 @@ fn update_param_data_from_pat(
     param_list: &mut proc_macro2::TokenStream,
 ) {
     match input_pat {
-        // TODO: Review this section against TRPL/Patterns.
-        // Pat::Const(pat_const) => ?, // TODO: An example is needed of using `const { ... }: MyType` among the params.
+        // The Rust Reference. ClosureParam.
+        // https://doc.rust-lang.org/reference/expressions/closure-expr.html#grammar-ClosureParam
+        // https://doc.rust-lang.org/reference/patterns.html#grammar-PatternNoTopAlt
+        // https://doc.rust-lang.org/reference/patterns.html#grammar-RangePattern
+
+        // Pat::Const(pat_const) => ?, 
+        // NOTE: Not found in The Rust Reference (links above) for PatternNoTopAlt.
+        // NOTE: Example from ChatGPT looks too rare to fully parse the nested block: 
+        // |const [a, b, c]: [u8; 3]| { println!("{a} {b} {c}"); }
+
         Pat::Ident(pat_ident) => {
             // x: f32
             let ident = &pat_ident.ident;
             param_format_str.push_str(&format!("{}: {{}}", ident)); // + "x: {}"
             *param_list = quote! { #param_list #ident.maybe_print(), } // + `x.maybe_print(), `
         }
-        // Pat::Lit(pat_lit) => ?, // TODO: Are literals applicable to params pattern?
+        // Pat::Lit(pat_lit) => ?,  // NOTE: Still questionable: Are literals applicable to params pattern?
+        // CahtGPT states "Not Applicable for params". 
+        // The Rust Reference does not add clarity.
+
         // Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
-        // Pat::Or(pat_or) => ?, // Example/explanation is needed (or-pattern among the params). `a | b | c : MyType`: what does it mean among the params?
+        // Pat::Or(pat_or) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
         // Pat::Paren(pat_paren) => ?, // NOTE: At the moment won't dive recursively into `(<pattern>): MyType`
-        // Pat::Path(pat_path) => ?, // NOTE: Example is needed.
-        // Pat::Range(pat_range) => ?, // NOTE: Example is needed. `a..=b: MyRange`?
+        // Pat::Path(pat_path) => ?, // NOTE: Example is needed as a param.
+        // Pat::Range(pat_range) => ?, // NOTE: Example is needed as a param. `a..=b: MyRange`?
         // Pat::Reference(pat_reference) => ?, // NOTE: At the moment won't dive recursively into `&mut <pattern>: MyType`.
-        // Pat::Rest(pat_rest) => ?, // NOTE: Example is needed. `0, 1, ..` -> `0, 1, a: MyType`?
+        // Pat::Rest(pat_rest) => ?, // NOTE: Doesn't seem applicable as a param. Example is needed. `0, 1, ..` -> `0, 1, a: MyType`?
         // Pat::Slice(pat_slice) => ? , // NOTE: At the moment won't dive recursively into `[a, b, ref i @ .., y, z]`.
         // Pat::Struct(pat_struct) => ?, // NOTE: At the moment won't dive recursively into `MyStruct { field_a, filed_b, .. }: MyStruct`.
         // Pat::Tuple(pat_tuple) => ?, // NOTE: At the moment won't dive recursively into `(<pattern>,*): MyTuple`
         // Pat::TupleStruct(pat_tuple_struct) => ?, // NOTE: At the moment won't dive recursively into `MyTupleStruct ( <pattern>,* ): MyTupleStruct`.
-        // Pat::Type(pat_type) => ?, // NOTE: Not sure is applicable. `<pattern>: MyType` part of `<pattern>: MyType: MyType`?
+        // Pat::Type(pat_type) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
         // Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
         // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
-        _ => {
-            // TODO: Consider `todo!()`.
-        } // Ignore.
+        _ => {} // Ignore.
     }
 }
 fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {

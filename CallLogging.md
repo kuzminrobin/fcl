@@ -1,5 +1,4 @@
 # TODO:
-* `// TODO: Review this section against TRPL/Patterns.`
 * Consider extracting all the multithreading items to a `mod mutithreading` (with 
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
 * Consider a raw pointer param amd ret_val. Probably requires `unsafe` for printing the param (and warning 
@@ -1184,3 +1183,4 @@ Let me know if you want a complete working example with both `stdout` and `stder
 
       g();
   ```
+* `// TODO: Review this section against TRPL/Patterns.`
