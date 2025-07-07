@@ -1,27 +1,4 @@
 # TODO:
-* Bug: `f2()`
-  ```cpp
-  thread_func() {
-    { // Loop body start.
-      f2() {  // Unexpected '\n'.
-      } // f2(). 
-    } // Loop body end.
-    // Loop body repeats 9 time(s).
-  ```
-  Source:
-  ```rs
-  #[loggable]
-  fn thread_func() {
-      #[loggable]
-      fn f2() {
-      }
-
-      for _ in 0..10 {
-          f2();
-      }
-
-      g();
-  ```
 * `// TODO: Review this section against TRPL/Patterns.`
 * Consider extracting all the multithreading items to a `mod mutithreading` (with 
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
@@ -1184,3 +1161,26 @@ Let me know if you want a complete working example with both `stdout` and `stder
     * Make separate examples and/or tests.
 * In the log remove trailing commas.
 * In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
+* Bug: `f2()`
+  ```cpp
+  thread_func() {
+    { // Loop body start.
+      f2() {  // Unexpected '\n'.
+      } // f2(). 
+    } // Loop body end.
+    // Loop body repeats 9 time(s).
+  ```
+  Source:
+  ```rs
+  #[loggable]
+  fn thread_func() {
+      #[loggable]
+      fn f2() {
+      }
+
+      for _ in 0..10 {
+          f2();
+      }
+
+      g();
+  ```

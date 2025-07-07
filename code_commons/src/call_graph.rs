@@ -108,9 +108,9 @@ impl CallGraph {
         }
     }
 
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self, flush_notifiable: bool) {
         // If call caching is active:
-        // * the caching model (sibling) node can have a non-zero non-flushed repeat count
+        // * the caching model - sibling node (for non-loopbody caching case) - can have a non-zero non-flushed repeat count
         // * and the subsequent sibling (with its children) is being added to the call graph (is being cached).
         if let Some(caching_model_node) = self.caching_info.model_node.as_ref() {
             // Log the caching_model_node's repeat count, if non-zero,
@@ -153,7 +153,9 @@ impl CallGraph {
                 latest_sibling.borrow_mut().repeat_count.mark_flushed();
             }
         }
-        self.coderun_notifiable.borrow_mut().notify_flush();
+        if flush_notifiable {
+            self.coderun_notifiable.borrow_mut().notify_flush();
+        }
 
         // Stop caching.
         self.caching_info.clear();
@@ -171,7 +173,7 @@ impl CallGraph {
             param_vals: param_vals.clone(),
         })));
 
-        // While the updates have not been done, prepeare the indo for later use.
+        // While the updates have not been done, prepeare the info for later use.
         let siblings_call_depth = self.call_depth();
         let parent = self.current_node.clone();
         let optional_previous_sibling =
@@ -263,9 +265,9 @@ impl CallGraph {
                 // Caching is active.
                 // If the caching has started at the enclosing loopbody
                 // (with optional intermediate enclosing loopbodies in between)
-                // and that loopbody is initial then flush and stop caching.
+                // and that loopbody is initial then flush (without flushing the notifiable) and stop caching.
                 if self.caching_info.model_node.is_none() {
-                    self.flush(); // It also stops caching.
+                    self.flush(false); // It also stops caching.
                 }
             }
         }
@@ -362,7 +364,7 @@ impl CallGraph {
 
             let child_call_depth = self.call_depth();
             match self.call_stack.pop() {
-                // Popped the ending loopbody's node from the call stack (parent or pseudo stays on top).
+                // Popped the ending loopbody's node from the call stack (parent or pseudo stays on top), but not from graph.
                 None => debug_assert!(false, "Unexpected bottom of call stack"),
                 Some(ending_loopbody) => {
                     debug_assert!(
@@ -371,7 +373,7 @@ impl CallGraph {
                     );
 
                     match self.call_stack.last() {
-                        None => debug_assert!(false, "Unexpected bottom of call stack"), // TODO: -> call stack bottom.
+                        None => debug_assert!(false, "Unexpected bottom of call stack"), // TODO: -> "call stack bottom".
                         Some(parent_or_pseudo) => {
                             let parent_or_pseudo = parent_or_pseudo.clone();
                             // If caching is not active
@@ -415,9 +417,9 @@ impl CallGraph {
                                         // Remove this loopbody (from call {graph, stack}) and make parent a current node.
                                         parent_or_pseudo.borrow_mut().children.pop();
                                         // (Removing from call stack is already done above in `match self.call_stack.pop()`)
+                                        // Increment the previous loopbody repeat count.
+                                        previous_node.borrow_mut().repeat_count.inc();
                                         if self.caching_is_active() {
-                                            // Increment the previous loopbody repeat count.
-                                            previous_node.borrow_mut().repeat_count.inc();
                                             // If the current loopbody is the node being cached,
                                             if let Some(node_being_cached) =
                                                 &self.caching_info.node_being_cached
@@ -437,8 +439,8 @@ impl CallGraph {
                                         &self.caching_info.node_being_cached
                                         && ending_loopbody.as_ptr() == node_being_cahed.as_ptr()
                                     {
-                                        // Flush and stop caching.
-                                        self.flush(); // It also stops caching.
+                                        // Flush (including the notifiable) and stop caching.
+                                        self.flush(true); // It also stops caching.
                                     }
                                 }
                                 // Otherwise (no previous iteration of the current loop, previous node is a call or a different loop)

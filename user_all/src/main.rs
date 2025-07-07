@@ -22,6 +22,9 @@ pub fn main() {
         a[0].d();   // Expected: S::d()
         a[1].d();   // Expected: Tr::d()
     }
+    for _ in 0..3 {
+        f();
+    }
 }
 
 

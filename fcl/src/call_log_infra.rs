@@ -74,7 +74,7 @@ impl CallLogger for CallLogInfra {
 
     // TODO: Consider making this impl conditional, for multithreaded case only.
     fn flush(&mut self) {
-        self.call_graph.flush()
+        self.call_graph.flush(true)
     }
     fn maybe_flush(&mut self) {}
     fn log_loopbody_start(&mut self) {
