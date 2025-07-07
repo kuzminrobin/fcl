@@ -25,6 +25,13 @@ pub fn main() {
     for _ in 0..3 {
         f();
     }
+    fn r(rp: *mut i32) -> *const i32 {
+        rp
+    }
+    let mut v = 1;
+    let my_ref = &mut v;
+    let _rp = r(my_ref as *mut i32);
+    println!("Raw pointer: {:?}", my_ref as *mut i32);
 }
 
 
