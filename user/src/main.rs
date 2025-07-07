@@ -323,14 +323,30 @@ fn thread_func() {
             // #[loggable]      // Error: expected `|`
             fn pure_method(&self); // No defualt behavior. Pure virtual function with no def-n.
         }
-        #[derive(std::fmt::Debug)] 
-        struct MyStruct;
+        // #[derive(std::fmt::Debug)] 
+        // struct MyStruct { b: bool, c: i32 }
+        // impl MyStruct {
+        //     fn new() -> Self {
+        //         Self { b: true, c: 5 }
+        //     }
+        // }
         #[loggable]
         impl MyPureTrait for MyStruct {
             #[loggable(prefix = <MyStruct as MyPureTrait>)] // OK.
             fn pure_method(&self) {}
         }
-        MyStruct.pure_method();
+        #[derive(std::fmt::Debug)] 
+        struct MyStruct { _b: bool, _c: i32 }
+        // impl MyStruct {
+        //     fn new() -> Self {
+        //         Self { b: true, c: 5 }
+        //     }
+        // }
+
+        // let m = MyStruct{ c: 5, b: true, };
+        // let m = MyStruct::new();
+        MyStruct{ _c: 5, _b: true, }.pure_method();
+        // m.pure_method();
     }
     {
         struct LoggableStruct(bool);

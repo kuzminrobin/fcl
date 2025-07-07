@@ -309,7 +309,10 @@ fn quote_as_expr_closure(
     let input_vals = {
         let mut param_format_str = String::new();
         let mut param_list = quote! {};
-        for input_pat in inputs {
+        for (idx, input_pat) in inputs.iter().enumerate() {
+            if idx != 0 {
+                param_format_str.push_str(", ");
+            }
             update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
         }
         if param_format_str.is_empty() {
@@ -969,7 +972,7 @@ fn quote_as_expr_struct(
         let mut traversed_fileds = quote! {};
         for field in fields {
             let traversed_field = quote_as_field_value(field, prefix);
-            traversed_fileds = quote! { #traversed_fileds #traversed_field };
+            traversed_fileds = quote! { #traversed_fileds #traversed_field, };
         }
         traversed_fileds
     };
@@ -1041,7 +1044,7 @@ fn quote_as_expr_tuple(
         let mut traversed_elems = quote! {};
         for elem in elems {
             let traversed_elem = quote_as_expr(elem, None, prefix);
-            traversed_elems = quote! { #traversed_elems #traversed_elem }
+            traversed_elems = quote! { #traversed_elems #traversed_elem, }
         }
         traversed_elems
     };
@@ -1318,12 +1321,12 @@ fn update_param_data_from_pat(
     param_list: &mut proc_macro2::TokenStream,
 ) {
     match input_pat {
+        // TODO: Review this section against TRPL/Patterns.
         // Pat::Const(pat_const) => ?, // TODO: An example is needed of using `const { ... }: MyType` among the params.
         Pat::Ident(pat_ident) => {
             // x: f32
             let ident = &pat_ident.ident;
-            param_format_str.push_str(&format!("{}: {{}}, ", ident)); // + "x: {}, "
-            // param_format_str = quote!{ #param_format_str #ident: {}, };  // ` x: {}, `
+            param_format_str.push_str(&format!("{}: {{}}", ident)); // + "x: {}"
             *param_list = quote! { #param_list #ident.maybe_print(), } // + `x.maybe_print(), `
         }
         // Pat::Lit(pat_lit) => ?, // TODO: Are literals applicable to params pattern?
@@ -1341,16 +1344,28 @@ fn update_param_data_from_pat(
         // Pat::Type(pat_type) => ?, // NOTE: Not sure is applicable. `<pattern>: MyType` part of `<pattern>: MyType: MyType`?
         // Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
         // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
-        _ => {} // Ignore.
+        _ => {
+            // TODO: Consider `todo!()`.
+        } // Ignore.
     }
 }
 fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
     let mut param_format_str = String::new();
     let mut param_list = quote! {};
-    for fn_param in inputs {
+    for (index, fn_param) in inputs.iter().enumerate() {
+        if index != 0 {
+            param_format_str.push_str(", ");
+        }
         match fn_param {
             FnArg::Receiver(_receiver) => {
-                param_format_str.push_str("self: {}, ");
+                param_format_str.push_str("self: ");
+                if _receiver.reference.is_some() {
+                    param_format_str.push_str("&");
+                }
+                if _receiver.mutability.is_some() {
+                    param_format_str.push_str("mut ");
+                }
+                param_format_str.push_str("{}");
                 param_list = quote! { #param_list self.maybe_print(), };
             }
             FnArg::Typed(pat_type) => {
@@ -1433,9 +1448,11 @@ fn traversed_block_from_sig(
                     generic_func_name.push_str("<");
                     let generic_arg_names_vec: Vec<&'static str> =
                         vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-                    for generic_arg_name in generic_arg_names_vec {
+                    for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+                        if idx != 0 {
+                            generic_func_name.push_str(",");
+                        }
                         generic_func_name.push_str(generic_arg_name);
-                        generic_func_name.push_str(",");
                     }
                     generic_func_name.push_str(">");
                 }

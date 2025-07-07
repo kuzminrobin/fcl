@@ -1,5 +1,4 @@
 # TODO:
-* In the log remove trailing commas.
 * Bug: `f2()`
   ```cpp
   thread_func() {
@@ -23,11 +22,11 @@
 
       g();
   ```
+* `// TODO: Review this section against TRPL/Patterns.`
 * Consider extracting all the multithreading items to a `mod mutithreading` (with 
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
 * Consider a raw pointer param amd ret_val. Probably requires `unsafe` for printing the param (and warning 
   suppression if `unsafe` is redundant).
-* In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
 * Consider {recursive type} params (lists) when logging the params.
 * Explore the behavior upon patterns among the params: `fn my_fn(MyPoint{x, y}) {}`. Is it logged like `fn my_fn(x: 1, y: -2}) {}`?
   Shouldn't it be logged like this: `fn my_fn(MyPoint{x: 1, y: -2}) {}`?
@@ -1183,3 +1182,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
   * (Done) Structure-up single-threaded and multithreaded
     * Make separate macros
     * Make separate examples and/or tests.
+* In the log remove trailing commas.
+* In `fn pure_method(&self) {} ` the `self` is logged as `self: MyStruct, `, expected `self: &MyStruct, `.
