@@ -32,6 +32,43 @@ pub fn main() {
     let my_ref = &mut v;
     let _rp = r(my_ref as *mut i32);
     println!("Raw pointer: {:?}", my_ref as *mut i32);
+
+    {
+        type Link<Node> = Option<Box<Node>>;
+        #[derive(Debug)]
+        struct Node {
+            _next: Link<Node>
+        }
+        let list = Some(Box::new(Node{ _next: Some(Box::new(Node{ _next: None })) }));
+        fn ls(head: Link<Node>) -> Link<Node> {
+            head
+        }
+        let _list2 = ls(list);
+    }
+    {
+        struct MyPoint{ x: i32, y: i32}
+        fn pattern_param_fn(MyPoint{x/*: _x*/, y: _y}: MyPoint) {}
+        pattern_param_fn(MyPoint{ x: 2, y: -4}); // main()::pattern_param_fn(MyPoint{x: 2, y: _y: -4}) {}
+
+        fn ref_pattern_param_fn(&mut MyPoint{x/*: _x*/, y: _y}: &mut MyPoint) {}
+        ref_pattern_param_fn(&mut MyPoint{ x: 2, y: -4}); // main()::ref_pattern_param_fn(&mut MyPoint{x: 2, y: _y: -4}) {}
+
+        fn tp((a, b): (i32, bool)) {}
+        tp((8, false)); // main()::tp((a: 8, b: false)) {}
+        fn tpp((MyPoint{x: _x1, y: _y1}, MyPoint{x: _x2, y: _y2}): (MyPoint, MyPoint)) {}
+        tpp((MyPoint{ x: 2, y: -4}, MyPoint{ x: -5, y: 6})); // main()::tpp((MyPoint{x: _x1: 2, y: _y1: -4}, MyPoint{x: _x2: -5, y: _y2: 6})) {}
+
+        struct MyTupleStruct(i32, char);
+        fn f(MyTupleStruct(_i, _c): MyTupleStruct) {}
+        f(MyTupleStruct(7, 'K')); // main()::f(MyTupleStruct(_i: 7, _c: 'K')) {}
+
+        struct MyTupleStructS(MyPoint, char);
+        fn fts(MyTupleStructS(MyPoint {x, y: _y}, char): MyTupleStructS) {}
+        fts(MyTupleStructS(MyPoint {x: -3, y: 8}, 'h'));    // main()::fts(MyTupleStructS(MyPoint{x: -3, y: _y: 8}, char: 'h')) {}
+
+        fn fs(&[a, b, ref i @ .., y, z]: &[i32; 6]) {}
+        fs(&[0, 1, 2, 3, 4, 5]);    // main()::fs(& [a: 0, b: 1, i: [2, 3], y: 4, z: 5]) {}
+    }
 }
 
 

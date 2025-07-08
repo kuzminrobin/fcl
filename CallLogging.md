@@ -1,10 +1,6 @@
 # TODO:
 * Consider extracting all the multithreading items to a `mod mutithreading` (with 
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
-* Consider {recursive type} params (lists) when logging the params.
-* Explore the behavior upon patterns among the params: `fn my_fn(MyPoint{x, y}) {}`. Is it logged like `fn my_fn(x: 1, y: -2}) {}`?
-  Shouldn't it be logged like this: `fn my_fn(MyPoint{x: 1, y: -2}) {}`?
-  Or are pattern-params not parsed?
 * Consider using LazyCell instead of LazyLock wherever possible.  
 * Finalize the user's use
   * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
@@ -1185,3 +1181,9 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Consider a raw pointer param and ret_val. Probably requires `unsafe` for printing the 
   param (and warning suppression if `unsafe` is redundant).
   No. Prints the address in the raw pointer.
+* Consider {recursive type} params (lists) when logging the params.
+  Prints recursively (the values of types implementing `Debug`).
+* Parse pattern params.
+  Explore the behavior upon patterns among the params: `fn my_fn(MyPoint{x, y}) {}`. Is it logged like `fn my_fn(x: 1, y: -2}) {}`?
+  Shouldn't it be logged like this: `fn my_fn(MyPoint{x: 1, y: -2}) {}`?
+  Or are pattern-params not parsed?

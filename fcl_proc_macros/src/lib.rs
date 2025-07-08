@@ -1328,7 +1328,7 @@ fn update_param_data_from_pat(
 
         // Pat::Const(pat_const) => ?, 
         // NOTE: Not found in The Rust Reference (links above) for PatternNoTopAlt.
-        // NOTE: Example from ChatGPT looks too rare to fully parse the nested block: 
+        // NOTE: Example from ChatGPT looks too rare to fully parse the nested `block`: 
         // |const [a, b, c]: [u8; 3]| { println!("{a} {b} {c}"); }
 
         Pat::Ident(pat_ident) => {
@@ -1338,24 +1338,178 @@ fn update_param_data_from_pat(
             *param_list = quote! { #param_list #ident.maybe_print(), } // + `x.maybe_print(), `
         }
         // Pat::Lit(pat_lit) => ?,  // NOTE: Still questionable: Are literals applicable to params pattern?
+        // The Rust Reference mentions/lists it but does not add clarity.
         // CahtGPT states "Not Applicable for params". 
-        // The Rust Reference does not add clarity.
 
         // Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
         // Pat::Or(pat_or) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
-        // Pat::Paren(pat_paren) => ?, // NOTE: At the moment won't dive recursively into `(<pattern>): MyType`
-        // Pat::Path(pat_path) => ?, // NOTE: Example is needed as a param.
-        // Pat::Range(pat_range) => ?, // NOTE: Example is needed as a param. `a..=b: MyRange`?
-        // Pat::Reference(pat_reference) => ?, // NOTE: At the moment won't dive recursively into `&mut <pattern>: MyType`.
-        // Pat::Rest(pat_rest) => ?, // NOTE: Doesn't seem applicable as a param. Example is needed. `0, 1, ..` -> `0, 1, a: MyType`?
-        // Pat::Slice(pat_slice) => ? , // NOTE: At the moment won't dive recursively into `[a, b, ref i @ .., y, z]`.
-        // Pat::Struct(pat_struct) => ?, // NOTE: At the moment won't dive recursively into `MyStruct { field_a, filed_b, .. }: MyStruct`.
-        // Pat::Tuple(pat_tuple) => ?, // NOTE: At the moment won't dive recursively into `(<pattern>,*): MyTuple`
-        // Pat::TupleStruct(pat_tuple_struct) => ?, // NOTE: At the moment won't dive recursively into `MyTupleStruct ( <pattern>,* ): MyTupleStruct`.
-        // Pat::Type(pat_type) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
+        Pat::Paren(pat_paren) => {
+            let PatParen {
+                // attrs, //: Vec<Attribute>,
+                // paren_token, //: Paren,
+                pat, //: Box<Pat>,
+                ..
+            } = pat_paren;
+            param_format_str.push_str(&"(");
+            update_param_data_from_pat(
+                pat.as_ref(),
+                param_format_str,
+                param_list,
+            );
+            param_format_str.push_str(&")");
+        },
+        // Pat::Path(pat_path) => ?, // NOTE: Example is needed as a param (`path` without `: Type`).
+        // Pat::Range(pat_range) => ?, // NOTE: N/A as a param.
+        Pat::Reference(pat_reference) => {
+            let PatReference {
+                // attrs, //: Vec<Attribute>,
+                // and_token, //: And, &
+                mutability, //: Option<Mut>,
+                pat, //: Box<Pat>,
+                ..
+            } = pat_reference;
+            let mut pat_str = String::with_capacity(32);
+            update_param_data_from_pat(
+                pat.as_ref(),
+                &mut pat_str,
+                param_list,
+            );
+
+            param_format_str.push_str(&format!("&{} {}", quote!{ #mutability }, pat_str)); // + "&mut x: {}"
+        }
+        // Pat::Rest(pat_rest) => ?, // NOTE: N/A as a param.
+        Pat::Slice(pat_slice) => {
+            let PatSlice {
+                // attrs, //: Vec<Attribute>,
+                // bracket_token, //: Bracket,
+                elems, //: Punctuated<Pat, Comma>,
+                ..
+            } = pat_slice;
+            param_format_str.push_str(&"[");
+            for (idx, elem) in elems.iter().enumerate() {
+                if idx != 0 {
+                    param_format_str.push_str(&", ");
+                }
+                update_param_data_from_pat(
+                    elem,
+                    param_format_str,
+                    param_list,
+                );
+            }
+            param_format_str.push_str(&"]");
+        }, // NOTE: At the moment won't dive recursively into `[a, b, ref i @ .., y, z]`.
+        Pat::Struct(pat_struct) => {
+            // struct MyPoint{ x: i32, y: i32}
+            // fn f(MyPoint{x, y: _y}: MyPoint) {}
+            // f(MyPoint{ x: 2, y: -4});  // Log: f(MyPoint { x: 2, y: _y: -4 }) {}
+            let PatStruct {
+                // attrs, // : Vec<Attribute>,
+                // qself, // : Option<QSelf>,
+                path, // : Path,
+                // brace_token, // : Brace,
+                fields, // : Punctuated<FieldPat, Comma>,
+                // rest, // : Option<PatRest>,
+                ..
+            } = pat_struct;
+            let mut fields_format_str = String::with_capacity(32);
+            for (idx, field) in fields.iter().enumerate() {
+                if idx != 0 {
+                    fields_format_str.push_str(&", ");
+                }
+                let FieldPat {
+                    // attrs, //: Vec<Attribute>,
+                    member, //: Member,
+                    colon_token, //: Option<Colon>,
+                    pat, //: Box<Pat>,
+                    ..
+                } = field;
+                if colon_token.is_some() {
+                    let mut member_val_format_str = String::with_capacity(32);
+                    let mut member_val_param_list = quote!{};
+                    update_param_data_from_pat(
+                        pat.as_ref(),
+                        &mut member_val_format_str,
+                        &mut member_val_param_list,
+                    );
+                    fields_format_str.push_str(&format!("{}: {}", 
+                        quote!{#member}, member_val_format_str)); // + "member: MyStruct { <fields> }"
+                    *param_list = quote! { 
+                        #param_list #member_val_param_list // Comma-terminated
+                    } // + `field_a.maybe_print(), field_b.maybe_print(), `
+                } else {
+                    fields_format_str.push_str(&format!("{}: {{}}", 
+                        quote!{#member})); // + "member: {}"
+                    *param_list = quote! { #param_list #member.maybe_print(), } // + `member.maybe_print(), `
+                }
+            }
+            param_format_str.push_str(&format!("{}{{{{{}}}}}", // "MyPoint{{x: {}, y: _y: {}}}"
+                remove_spaces(&quote!{#path}.to_string()), fields_format_str)); // + "MyStruct: { <fileds> }"
+        }
+        Pat::Tuple(pat_tuple) => {
+            let PatTuple {
+                // attrs, //: Vec<Attribute>,
+                // paren_token, //: Paren,
+                elems, //: Punctuated<Pat, Comma>,
+                ..
+            } = pat_tuple;
+            param_format_str.push_str(&"(");
+            for (idx, elem) in elems.iter().enumerate() {
+                if idx != 0 {
+                    param_format_str.push_str(&", ");
+                }
+                update_param_data_from_pat(
+                    elem,
+                    param_format_str,
+                    param_list,
+                );
+            }
+            param_format_str.push_str(&")");
+        }
+        Pat::TupleStruct(pat_tuple_struct) => {
+            let PatTupleStruct {
+                // attrs, //: Vec<Attribute>,
+                qself, //: Option<QSelf>,
+                path, //: Path,
+                // paren_token, //: Paren,
+                elems, //: Punctuated<Pat, Comma>,
+                ..
+            } = pat_tuple_struct;
+            if let Some(qself) = qself {
+                let ty = &qself.ty;
+                // NOTE: The fragment "<{} as {}>" is questionable.
+                param_format_str.push_str(&format!("<{} as {}>(", quote!{ #ty }, remove_spaces(&quote!{ #path }.to_string())));
+            } else {
+                param_format_str.push_str(&format!("{}(", remove_spaces(&quote!{ #path }.to_string())));
+            }
+            for (idx, elem) in elems.iter().enumerate() {
+                if idx != 0 {
+                    param_format_str.push_str(&", ");
+                }
+                update_param_data_from_pat(
+                    elem,
+                    param_format_str,
+                    param_list,
+                );
+            }
+            param_format_str.push_str(&")");
+        }
+        Pat::Type(pat_type) => {
+            let PatType {
+                // attrs, //: Vec<Attribute>,
+                pat, //: Box<Pat>,
+                // colon_token, //: Colon,
+                // ty, //: Box<Type>,
+                ..
+            } = pat_type;
+            update_param_data_from_pat(
+                pat.as_ref(),
+                param_format_str,
+                param_list,
+            );
+        },
         // Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
         // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
-        _ => {} // Ignore.
+        _ => {} // Do not print the param values.
     }
 }
 fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
