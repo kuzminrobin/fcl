@@ -1,7 +1,6 @@
 # TODO:
 * Consider extracting all the multithreading items to a `mod mutithreading` (with 
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
-* Consider using LazyCell instead of LazyLock wherever possible.  
 * Finalize the user's use
   * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
     log thread func or not).
@@ -1189,3 +1188,4 @@ Let me know if you want a complete working example with both `stdout` and `stder
   Or are pattern-params not parsed?
 * Consider moving the thread_local use deeper into the call.
   Such that a {Call|Closure}Logger is created unconditionally.
+* Consider using LazyCell instead of LazyLock wherever possible.  

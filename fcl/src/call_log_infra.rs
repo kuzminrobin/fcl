@@ -1,7 +1,7 @@
 use code_commons::{CallGraph, CoderunNotifiable};
 use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use std::{
-    cell::RefCell,
+    cell::{LazyCell, RefCell},
     collections::HashMap,
     io::Write,
     rc::Rc,
@@ -705,10 +705,9 @@ pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
         }))
     });
 
-// TODO: COnsider removing `LazyLock<RefCell<>>`.
-static mut ORIGINAL_PANIC_HANDLER: LazyLock<
-    RefCell<Option<Box<dyn Fn(&std::panic::PanicHookInfo<'_>)>>>,
-> = LazyLock::new(|| RefCell::new(None));
+static mut ORIGINAL_PANIC_HANDLER:
+    LazyCell<RefCell<Option<Box<dyn Fn(&std::panic::PanicHookInfo<'_>)>>>>
+    = LazyCell::new(|| RefCell::new(None));
 
 #[cfg(feature = "singlethreaded")]
 pub mod instances {
