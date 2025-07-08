@@ -5,14 +5,15 @@
 * Finalize the user's use
   * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
     log thread func or not).
-* Consider merging all the FCL crates into a single proc_macro crate.
-  * Restructure to a minimal set of crates (fcl, proc_macros, commons).
+  * Customizing the thread indent.
 * Overall clean-up.
   * Remove commented code.
   * Move privates down, publics up (in file).
   * Refactor long functions (especially the CallGraph).
   * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
-* Consider toolchain stable or document why inachievable.
+* Consider merging all the FCL crates into a single proc_macro crate.
+  * Restructure to a minimal set of crates (fcl, proc_macros, commons).
+* Customizable params and ret_val logging enabling/disabling (global, per-case).  
 * Test
   * Testing
     * Log to string/Vector and compare.
@@ -22,8 +23,7 @@
     * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
   * Test with the existing projects.
     * Update the instructions, how to enable func call logging in your project.
-* Consider moving the thread_local use deeper into the call.
-  Such that a {Call|Closure}Logger is created unconditionally.
+* Consider toolchain stable or document why inachievable.
 * (Low priority) Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
   in both threads, has `main()` destructors reporting the returns during stack unwinding:
   ```
@@ -1187,3 +1187,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
   Explore the behavior upon patterns among the params: `fn my_fn(MyPoint{x, y}) {}`. Is it logged like `fn my_fn(x: 1, y: -2}) {}`?
   Shouldn't it be logged like this: `fn my_fn(MyPoint{x: 1, y: -2}) {}`?
   Or are pattern-params not parsed?
+* Consider moving the thread_local use deeper into the call.
+  Such that a {Call|Closure}Logger is created unconditionally.

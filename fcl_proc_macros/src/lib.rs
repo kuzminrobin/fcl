@@ -242,13 +242,13 @@ fn quote_as_expr_call(
     let mut ret_val = quote! { #(#attrs)* #func ( #args ) };
     if is_print_func_name {
         #[cfg(feature = "singlethreaded")]
-        let thread_logger_access = quote!{
+        let thread_logger_access = quote! {
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow_mut().borrow_mut().maybe_flush();
             })
         };
         #[cfg(not(feature = "singlethreaded"))]
-        let thread_logger_access = quote!{
+        let thread_logger_access = quote! {
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow_mut().maybe_flush();
             })
@@ -349,7 +349,7 @@ fn quote_as_expr_closure(
     let body = { quote_as_expr(&**body, None, prefix) };
 
     #[cfg(feature = "singlethreaded")]
-    let thread_logger_access = quote!{
+    let thread_logger_access = quote! {
         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             if logger.borrow().borrow().logging_is_on() {
                 optional_callee_logger = Some(fcl::FunctionLogger::new(
@@ -358,7 +358,7 @@ fn quote_as_expr_closure(
         })
     };
     #[cfg(not(feature = "singlethreaded"))]
-    let thread_logger_access = quote!{
+    let thread_logger_access = quote! {
         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             if logger.borrow().logging_is_on() {
                 optional_callee_logger = Some(fcl::FunctionLogger::new(
@@ -648,13 +648,13 @@ fn quote_as_macro(
             || &macro_name.ident.to_string() == &"eprint"
         {
             #[cfg(feature = "singlethreaded")]
-            let thread_logger_access = quote!{
+            let thread_logger_access = quote! {
                 fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut().borrow_mut().maybe_flush();
                 })
             };
             #[cfg(not(feature = "singlethreaded"))]
-            let thread_logger_access = quote!{
+            let thread_logger_access = quote! {
                 fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut().maybe_flush();
                 })
@@ -1326,11 +1326,10 @@ fn update_param_data_from_pat(
         // https://doc.rust-lang.org/reference/patterns.html#grammar-PatternNoTopAlt
         // https://doc.rust-lang.org/reference/patterns.html#grammar-RangePattern
 
-        // Pat::Const(pat_const) => ?, 
+        // Pat::Const(pat_const) => ?,
         // NOTE: Not found in The Rust Reference (links above) for PatternNoTopAlt.
-        // NOTE: Example from ChatGPT looks too rare to fully parse the nested `block`: 
+        // NOTE: Example from ChatGPT looks too rare to fully parse the nested `block`:
         // |const [a, b, c]: [u8; 3]| { println!("{a} {b} {c}"); }
-
         Pat::Ident(pat_ident) => {
             // x: f32
             let ident = &pat_ident.ident;
@@ -1339,7 +1338,7 @@ fn update_param_data_from_pat(
         }
         // Pat::Lit(pat_lit) => ?,  // NOTE: Still questionable: Are literals applicable to params pattern?
         // The Rust Reference mentions/lists it but does not add clarity.
-        // CahtGPT states "Not Applicable for params". 
+        // CahtGPT states "Not Applicable for params".
 
         // Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
         // Pat::Or(pat_or) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
@@ -1351,13 +1350,9 @@ fn update_param_data_from_pat(
                 ..
             } = pat_paren;
             param_format_str.push_str(&"(");
-            update_param_data_from_pat(
-                pat.as_ref(),
-                param_format_str,
-                param_list,
-            );
+            update_param_data_from_pat(pat.as_ref(), param_format_str, param_list);
             param_format_str.push_str(&")");
-        },
+        }
         // Pat::Path(pat_path) => ?, // NOTE: Example is needed as a param (`path` without `: Type`).
         // Pat::Range(pat_range) => ?, // NOTE: N/A as a param.
         Pat::Reference(pat_reference) => {
@@ -1365,17 +1360,13 @@ fn update_param_data_from_pat(
                 // attrs, //: Vec<Attribute>,
                 // and_token, //: And, &
                 mutability, //: Option<Mut>,
-                pat, //: Box<Pat>,
+                pat,        //: Box<Pat>,
                 ..
             } = pat_reference;
             let mut pat_str = String::with_capacity(32);
-            update_param_data_from_pat(
-                pat.as_ref(),
-                &mut pat_str,
-                param_list,
-            );
+            update_param_data_from_pat(pat.as_ref(), &mut pat_str, param_list);
 
-            param_format_str.push_str(&format!("&{} {}", quote!{ #mutability }, pat_str)); // + "&mut x: {}"
+            param_format_str.push_str(&format!("&{} {}", quote! { #mutability }, pat_str)); // + "&mut x: {}"
         }
         // Pat::Rest(pat_rest) => ?, // NOTE: N/A as a param.
         Pat::Slice(pat_slice) => {
@@ -1390,14 +1381,10 @@ fn update_param_data_from_pat(
                 if idx != 0 {
                     param_format_str.push_str(&", ");
                 }
-                update_param_data_from_pat(
-                    elem,
-                    param_format_str,
-                    param_list,
-                );
+                update_param_data_from_pat(elem, param_format_str, param_list);
             }
             param_format_str.push_str(&"]");
-        }, // NOTE: At the moment won't dive recursively into `[a, b, ref i @ .., y, z]`.
+        }
         Pat::Struct(pat_struct) => {
             // struct MyPoint{ x: i32, y: i32}
             // fn f(MyPoint{x, y: _y}: MyPoint) {}
@@ -1408,7 +1395,7 @@ fn update_param_data_from_pat(
                 path, // : Path,
                 // brace_token, // : Brace,
                 fields, // : Punctuated<FieldPat, Comma>,
-                // rest, // : Option<PatRest>,
+                        // rest, // : Option<PatRest>,
                 ..
             } = pat_struct;
             let mut fields_format_str = String::with_capacity(32);
@@ -1418,32 +1405,37 @@ fn update_param_data_from_pat(
                 }
                 let FieldPat {
                     // attrs, //: Vec<Attribute>,
-                    member, //: Member,
+                    member,      //: Member,
                     colon_token, //: Option<Colon>,
-                    pat, //: Box<Pat>,
+                    pat,         //: Box<Pat>,
                     ..
                 } = field;
                 if colon_token.is_some() {
                     let mut member_val_format_str = String::with_capacity(32);
-                    let mut member_val_param_list = quote!{};
+                    let mut member_val_param_list = quote! {};
                     update_param_data_from_pat(
                         pat.as_ref(),
                         &mut member_val_format_str,
                         &mut member_val_param_list,
                     );
-                    fields_format_str.push_str(&format!("{}: {}", 
-                        quote!{#member}, member_val_format_str)); // + "member: MyStruct { <fields> }"
-                    *param_list = quote! { 
+                    fields_format_str.push_str(&format!(
+                        "{}: {}",
+                        quote! {#member},
+                        member_val_format_str
+                    )); // + "member: MyStruct { <fields> }"
+                    *param_list = quote! {
                         #param_list #member_val_param_list // Comma-terminated
                     } // + `field_a.maybe_print(), field_b.maybe_print(), `
                 } else {
-                    fields_format_str.push_str(&format!("{}: {{}}", 
-                        quote!{#member})); // + "member: {}"
+                    fields_format_str.push_str(&format!("{}: {{}}", quote! {#member})); // + "member: {}"
                     *param_list = quote! { #param_list #member.maybe_print(), } // + `member.maybe_print(), `
                 }
             }
-            param_format_str.push_str(&format!("{}{{{{{}}}}}", // "MyPoint{{x: {}, y: _y: {}}}"
-                remove_spaces(&quote!{#path}.to_string()), fields_format_str)); // + "MyStruct: { <fileds> }"
+            param_format_str.push_str(&format!(
+                "{}{{{{{}}}}}", // "MyPoint{{x: {}, y: _y: {}}}"
+                remove_spaces(&quote! {#path}.to_string()),
+                fields_format_str
+            )); // + "MyStruct: { <fileds> }"
         }
         Pat::Tuple(pat_tuple) => {
             let PatTuple {
@@ -1457,11 +1449,7 @@ fn update_param_data_from_pat(
                 if idx != 0 {
                     param_format_str.push_str(&", ");
                 }
-                update_param_data_from_pat(
-                    elem,
-                    param_format_str,
-                    param_list,
-                );
+                update_param_data_from_pat(elem, param_format_str, param_list);
             }
             param_format_str.push_str(&")");
         }
@@ -1469,7 +1457,7 @@ fn update_param_data_from_pat(
             let PatTupleStruct {
                 // attrs, //: Vec<Attribute>,
                 qself, //: Option<QSelf>,
-                path, //: Path,
+                path,  //: Path,
                 // paren_token, //: Paren,
                 elems, //: Punctuated<Pat, Comma>,
                 ..
@@ -1477,19 +1465,22 @@ fn update_param_data_from_pat(
             if let Some(qself) = qself {
                 let ty = &qself.ty;
                 // NOTE: The fragment "<{} as {}>" is questionable.
-                param_format_str.push_str(&format!("<{} as {}>(", quote!{ #ty }, remove_spaces(&quote!{ #path }.to_string())));
+                param_format_str.push_str(&format!(
+                    "<{} as {}>(",
+                    quote! { #ty },
+                    remove_spaces(&quote! { #path }.to_string())
+                ));
             } else {
-                param_format_str.push_str(&format!("{}(", remove_spaces(&quote!{ #path }.to_string())));
+                param_format_str.push_str(&format!(
+                    "{}(",
+                    remove_spaces(&quote! { #path }.to_string())
+                ));
             }
             for (idx, elem) in elems.iter().enumerate() {
                 if idx != 0 {
                     param_format_str.push_str(&", ");
                 }
-                update_param_data_from_pat(
-                    elem,
-                    param_format_str,
-                    param_list,
-                );
+                update_param_data_from_pat(elem, param_format_str, param_list);
             }
             param_format_str.push_str(&")");
         }
@@ -1497,16 +1488,12 @@ fn update_param_data_from_pat(
             let PatType {
                 // attrs, //: Vec<Attribute>,
                 pat, //: Box<Pat>,
-                // colon_token, //: Colon,
-                // ty, //: Box<Type>,
+                     // colon_token, //: Colon,
+                     // ty, //: Box<Type>,
                 ..
             } = pat_type;
-            update_param_data_from_pat(
-                pat.as_ref(),
-                param_format_str,
-                param_list,
-            );
-        },
+            update_param_data_from_pat(pat.as_ref(), param_format_str, param_list);
+        }
         // Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
         // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
         _ => {} // Do not print the param values.
@@ -1582,24 +1569,6 @@ fn traversed_block_from_sig(
 
         let func_log_name = remove_spaces(&func_log_name.to_string());
 
-        #[cfg(feature = "singlethreaded")]
-        let thread_logger_access = quote!{
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                if logger.borrow().borrow().logging_is_on() {
-                    optional_callee_logger = Some(
-                        fcl::FunctionLogger::new(&generic_func_name, param_val_str))
-                }
-            })
-        };
-        #[cfg(not(feature = "singlethreaded"))]
-        let thread_logger_access = quote!{
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                if logger.borrow().logging_is_on() {
-                    optional_callee_logger = Some(
-                        fcl::FunctionLogger::new(&generic_func_name, param_val_str))
-                }
-            })
-        };
 
         quote! {
             {
@@ -1623,18 +1592,16 @@ fn traversed_block_from_sig(
                 use fcl::MaybePrint;
                 use fcl_traits::CallLogger;
                 let param_val_str = #inputs;
-                let mut optional_callee_logger = None;
+                let mut callee_logger =
+                    fcl::FunctionLogger::new(&generic_func_name, param_val_str);
 
-                #thread_logger_access;
 
                 // NOTE: Running the `block` as a closure to handle the `return` in the `block` correctly.
                 let ret_val = (move || #block )();
 
                 if #returns_something {
                     let ret_val_str = format!("{}", ret_val.maybe_print());
-                    if let Some(callee_logger) = optional_callee_logger.as_mut() {
-                        callee_logger.set_ret_val(ret_val_str);
-                    }
+                    callee_logger.set_ret_val(ret_val_str);
                 }
 
                 ret_val
@@ -2427,34 +2394,15 @@ fn quote_as_loop_block(
         traversed_stmts
     };
 
-    // TODO: Dedup.
-    #[cfg(feature = "singlethreaded")]
-    let thread_logger_access = quote!{
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            if logger.borrow().borrow().logging_is_on() {
-                optional_logger =
-                    Some(fcl::LoopbodyLogger::new())
-            }
-        })
-    };
-    #[cfg(not(feature = "singlethreaded"))]
-    let thread_logger_access = quote!{
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            if logger.borrow().logging_is_on() {
-                optional_logger =
-                    Some(fcl::LoopbodyLogger::new())
-            }
-        })
-    };
 
     quote! {
         {
-            use fcl_traits::CallLogger;
             // Log the loop body start (if logging is enabled).
-            let mut optional_logger = None;
-            #thread_logger_access;
+            let _logger = fcl::LoopbodyLogger::new();
+
             #stmts
-            // The loop body end is logged in the destructor of `optional_logger`.
+
+            // The loop body end is logged in the destructor of `LoopbodyLogger` instance.
         }
     }
 }
