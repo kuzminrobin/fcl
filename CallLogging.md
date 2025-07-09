@@ -1,10 +1,4 @@
 # TODO:
-* Consider extracting all the multithreading items to a `mod mutithreading` (with 
-  `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
-* Finalize the user's use
-  * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
-    log thread func or not).
-  * Customizing the thread indent.
 * Overall clean-up.
   * Remove commented code.
   * Move privates down, publics up (in file).
@@ -22,6 +16,10 @@
     * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
   * Test with the existing projects.
     * Update the instructions, how to enable func call logging in your project.
+    * (After testing with real code) Finalize the user's use
+      * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
+        log thread func or not).
+      * Customizing the thread indent.
 * Consider toolchain stable or document why inachievable.
 * (Low priority) Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
   in both threads, has `main()` destructors reporting the returns during stack unwinding:
@@ -1189,3 +1187,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Consider moving the thread_local use deeper into the call.
   Such that a {Call|Closure}Logger is created unconditionally.
 * Consider using LazyCell instead of LazyLock wherever possible.  
+* Consider extracting all the multithreading items to a `mod mutithreading` (with 
+  `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.

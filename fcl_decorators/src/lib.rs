@@ -210,7 +210,7 @@ impl TreeLikeDecorator {
         indent_step_parent : Option<&'static str>,
     ) -> Self {
         Self {
-            common: CommonDecorator::new(writer/*, thread_indent */),
+            common: CommonDecorator::new(writer),
             indent_step_call   : indent_step_call   .unwrap_or(&"+-"),
             indent_step_noncall: indent_step_noncall.unwrap_or(&"  "),
             indent_step_parent : indent_step_parent .unwrap_or(&"| ")

@@ -9,11 +9,6 @@ use std::{
     thread,
 };
 
-#[cfg(not(feature = "singlethreaded"))]
-use std::{
-    sync::{Mutex, MutexGuard},
-};
-
 use crate::{
     output_sync::StdOutputRedirector,
     writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
@@ -26,7 +21,7 @@ macro_rules! NO_LOGGER_ERR_STR {
 }
 
 pub struct CallLogInfra {
-    logging_is_on: Vec<bool>, // Enabled by default (if empty). // TODO: Test.
+    logging_is_on: Vec<bool>, // Enabled by default (if empty).
     thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
     call_graph: CallGraph,
 }
@@ -90,72 +85,6 @@ impl CallLogger for CallLogInfra {
     // }
 }
 
-#[cfg(not(feature = "singlethreaded"))]
-struct ThreadGatekeeper {
-    call_logger_arbiter: Rc<RefCell<CallLoggerArbiter>>,
-}
-#[cfg(not(feature = "singlethreaded"))]
-impl ThreadGatekeeper {
-    pub fn new(call_logger_arbiter: Rc<RefCell<CallLoggerArbiter>>) -> Self {
-        Self {
-            call_logger_arbiter,
-        }
-    }
-    pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
-        self.call_logger_arbiter
-            .borrow_mut()
-            .add_thread_logger(thread_logger)
-    }
-    pub fn remove_thread_logger(&mut self) {
-        self.call_logger_arbiter.borrow_mut().remove_thread_logger()
-    }
-}
-#[cfg(not(feature = "singlethreaded"))]
-impl CallLogger for ThreadGatekeeper {
-    fn push_logging_is_on(&mut self, is_on: bool) {
-        self.call_logger_arbiter
-            .borrow_mut()
-            .push_logging_is_on(is_on)
-    }
-    fn pop_logging_is_on(&mut self) {
-        self.call_logger_arbiter.borrow_mut().pop_logging_is_on()
-    }
-    fn logging_is_on(&self) -> bool {
-        self.call_logger_arbiter.borrow().logging_is_on()
-    }
-    fn set_logging_is_on(&mut self, is_on: bool) {
-        self.call_logger_arbiter
-            .borrow_mut()
-            .set_logging_is_on(is_on)
-    }
-    fn set_thread_indent(&mut self, _thread_indent: String) {
-        self.call_logger_arbiter
-            .borrow_mut()
-            .set_thread_indent(_thread_indent)
-    }
-    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        self.call_logger_arbiter
-            .borrow_mut()
-            .log_call(name, param_vals)
-    }
-    fn log_ret(&mut self, ret_val: Option<String>) {
-        self.call_logger_arbiter.borrow_mut().log_ret(ret_val)
-    }
-    fn flush(&mut self) {
-        self.call_logger_arbiter.borrow_mut().flush()
-    }
-    fn maybe_flush(&mut self) {
-        self.call_logger_arbiter.borrow_mut().maybe_flush()
-    }
-    fn log_loopbody_start(&mut self) {
-        self.call_logger_arbiter.borrow_mut().log_loopbody_start()
-    }
-    fn log_loopbody_end(&mut self) {
-        self.call_logger_arbiter.borrow_mut().log_loopbody_end()
-    }
-    // fn log_loop_end(&mut self);
-    // fn set_loop_ret_val(&mut self, ret_val: String);
-}
 struct ThreadIndents {
     indents_taken: Vec<bool>,
     thread_indent_step: String,
@@ -613,80 +542,6 @@ impl CallLogger for CallLoggerArbiter {
     // }
 }
 
-#[cfg(not(feature = "singlethreaded"))]
-struct ThreadGateAdapter {
-    gatekeeper: Arc<Mutex<ThreadGatekeeper>>,
-}
-#[cfg(not(feature = "singlethreaded"))]
-impl ThreadGateAdapter {
-    fn new(gatekeeper: Arc<Mutex<ThreadGatekeeper>>) -> Self {
-        Self { gatekeeper }
-    }
-    fn get_gatekeeper(&self) -> MutexGuard<'_, ThreadGatekeeper> {
-        match self.gatekeeper.lock() {
-            Ok(guard) => {
-                return guard;
-            }
-            Err(poison_error) => {
-                println!(
-                    "Internal Error: A poisoned mutex detected (a thread has panicked while holding that mutex): '{:?}'. {}",
-                    poison_error, "Trying to recover the mutex."
-                );
-                return poison_error.into_inner();
-            }
-        }
-    }
-}
-#[cfg(not(feature = "singlethreaded"))]
-impl Drop for ThreadGateAdapter {
-    fn drop(&mut self) {
-        // todo!("Implement for single-threaded case"); // TODO.
-        self.get_gatekeeper().remove_thread_logger();
-    }
-}
-#[cfg(not(feature = "singlethreaded"))]
-impl CallLogger for ThreadGateAdapter {
-    fn push_logging_is_on(&mut self, is_on: bool) {
-        self.get_gatekeeper().push_logging_is_on(is_on);
-    }
-    fn pop_logging_is_on(&mut self) {
-        self.get_gatekeeper().pop_logging_is_on();
-    }
-    fn logging_is_on(&self) -> bool {
-        self.get_gatekeeper().logging_is_on()
-    }
-    fn set_logging_is_on(&mut self, is_on: bool) {
-        self.get_gatekeeper().set_logging_is_on(is_on)
-    }
-
-    fn set_thread_indent(&mut self, thread_indent: String) {
-        self.get_gatekeeper().set_thread_indent(thread_indent)
-    }
-
-    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        self.get_gatekeeper().log_call(name, param_vals)
-    }
-    fn log_ret(&mut self, ret_val: Option<String>) {
-        self.get_gatekeeper().log_ret(ret_val)
-    }
-    fn maybe_flush(&mut self) {
-        self.get_gatekeeper().maybe_flush();
-    }
-    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
-    fn log_loopbody_start(&mut self) {
-        self.get_gatekeeper().log_loopbody_start()
-    }
-    fn log_loopbody_end(&mut self) {
-        self.get_gatekeeper().log_loopbody_end()
-    }
-    // fn log_loop_end(&mut self) {
-    //     self.get_gatekeeper().log_loop_end()
-    // }
-    // fn set_loop_ret_val(&mut self, ret_val: String) {
-    //     self.get_gatekeeper().set_loop_ret_val(ret_val)
-    // }
-}
-
 // Global data shared by all the threads:
 // TODO: Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
 // TODO: Consider removing `pub`.
@@ -732,6 +587,7 @@ pub mod instances {
 #[cfg(not(feature = "singlethreaded"))]
 pub mod instances {
     use super::*;
+    use crate::multithreaded::*;
     static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> =
         LazyLock::new(|| unsafe {
             Arc::new(Mutex::new(ThreadGatekeeper::new(

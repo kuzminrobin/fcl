@@ -3,6 +3,8 @@
 pub mod call_log_infra; // TODO: Really `pub`?
 mod output_sync;
 pub mod writer; // TODO: Really `pub`?
+pub mod multithreaded;
+pub mod singlethreaded;
 
 #[cfg(feature = "singlethreaded")]
 use fcl_traits::CallLogger;
@@ -74,7 +76,6 @@ impl Drop for FunctionLogger {
 
                 logger_borrow.log_ret(self.ret_val_str.take());
             });
-
         }
     }
 }

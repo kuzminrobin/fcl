@@ -3,6 +3,7 @@
 pub fn main() {
     // fcl::_single_threaded_otimization!();
     // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
+    fcl::set_thread_indent!(String::from("                "));
     let _a = Some(0);
 
     use root::*;
@@ -62,9 +63,15 @@ pub fn main() {
         fn f(MyTupleStruct(_i, _c): MyTupleStruct) {}
         f(MyTupleStruct(7, 'K')); // main()::f(MyTupleStruct(_i: 7, _c: 'K')) {}
 
+
         struct MyTupleStructS(MyPoint, char);
         fn fts(MyTupleStructS(MyPoint {x, y: _y}, char): MyTupleStructS) {}
+        assert!(fcl::logging_is_on!());
+        fcl::push_logging_is_on!(false);
+        assert!(!fcl::logging_is_on!());
         fts(MyTupleStructS(MyPoint {x: -3, y: 8}, 'h'));    // main()::fts(MyTupleStructS(MyPoint{x: -3, y: _y: 8}, char: 'h')) {}
+        fcl::pop_logging_is_on!();
+        assert!(fcl::logging_is_on!());
 
         fn fs(&[a, b, ref i @ .., y, z]: &[i32; 6]) {}
         fs(&[0, 1, 2, 3, 4, 5]);    // main()::fs(& [a: 0, b: 1, i: [2, 3], y: 4, z: 5]) {}
