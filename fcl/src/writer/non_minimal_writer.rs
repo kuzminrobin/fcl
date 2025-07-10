@@ -1,9 +1,5 @@
-#![cfg(not(feature = "minimal_writer"))]
-
 use std::{
-    cell::RefCell,
-    io::{Write, stderr, stdout},
-    sync::Arc,
+    io::{Write}
 };
 
 pub enum FclWriter {
@@ -18,6 +14,7 @@ pub enum WriterKind {
     Stderr,
     Other,
 }
+
 pub struct ThreadSharedWriter {
     writer_kind: WriterKind,
     writer: Box<dyn Write>,
@@ -117,6 +114,7 @@ impl Write for ThreadSharedWriter {
 }
 
 pub type ThreadSharedWriterPtr = Arc<RefCell<ThreadSharedWriter>>;
+
 pub struct WriterAdapter {
     writer: ThreadSharedWriterPtr,
 }

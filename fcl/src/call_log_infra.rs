@@ -1,14 +1,18 @@
 use code_commons::{CallGraph, CoderunNotifiable};
 use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use std::{
-    cell::{LazyCell, RefCell},
+    cell::RefCell,
     collections::HashMap,
     io::Write,
     rc::Rc,
-    sync::{Arc, LazyLock},
+    sync::{LazyLock},
     thread,
 };
+#[cfg(not(feature = "minimal_writer"))]
+use std::{cell::LazyCell, sync::Arc};
 
+
+#[cfg(not(feature = "minimal_writer"))]
 use crate::{
     output_sync::StdOutputRedirector,
     writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
@@ -118,24 +122,35 @@ impl ThreadIndents {
     }
 }
 pub struct CallLoggerArbiter {
-    thread_shared_writer: ThreadSharedWriterPtr,
+    #[cfg(not(feature = "minimal_writer"))]
+    thread_shared_writer: Option<ThreadSharedWriterPtr>,
     /// Collection of per-thread loggers and thread indent IDs used by the corresponding logger.
     thread_loggers: HashMap<thread::ThreadId, (Box<dyn CallLogger>, usize)>,
     last_fcl_update_thread: Option<thread::ThreadId>,
+    #[cfg(not(feature = "minimal_writer"))]
     stderr_redirector: Option<StdOutputRedirector>,
+    #[cfg(not(feature = "minimal_writer"))]
     stdout_redirector: Option<StdOutputRedirector>,
+    #[cfg(not(feature = "minimal_writer"))]
     main_thread_id: thread::ThreadId,
     thread_indents: ThreadIndents,
 }
 
 impl CallLoggerArbiter {
-    pub fn new(thread_shared_writer: ThreadSharedWriterPtr) -> Self {
+    pub fn new(
+        #[cfg(not(feature = "minimal_writer"))]
+        thread_shared_writer: Option<ThreadSharedWriterPtr>
+    ) -> Self {
         return Self {
+            #[cfg(not(feature = "minimal_writer"))]
             thread_shared_writer,
             thread_loggers: HashMap::new(),
             last_fcl_update_thread: None,
+            #[cfg(not(feature = "minimal_writer"))]
             stderr_redirector: None,
+            #[cfg(not(feature = "minimal_writer"))]
             stdout_redirector: None,
+            #[cfg(not(feature = "minimal_writer"))]
             main_thread_id: thread::current().id(),
             thread_indents: ThreadIndents::new(None),
         };
@@ -158,8 +173,14 @@ impl CallLoggerArbiter {
         let current_thread_id = thread::current().id();
         if let Some((_logger, thread_indent_id)) = self.get_thread_logger(current_thread_id) {
             let thread_indent_id = *thread_indent_id; // Released the mutable borrow.
+
             // Flush the possible trailing repeat count and std output.
+            #[cfg(not(feature = "minimal_writer"))]
             self.sync_fcl_and_std_output(true);
+            #[cfg(feature = "minimal_writer")]
+            if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
+                logger.flush();
+            }
 
             if self.thread_loggers.remove(&current_thread_id).is_none() {
                 debug_assert!(false, "Internal Error: Unregistering failed");
@@ -167,6 +188,7 @@ impl CallLoggerArbiter {
             self.thread_indents.check_in(thread_indent_id);
         } // else (no logger) the logger for the current thread is assumed removed in the panic handler.
 
+        #[cfg(not(feature = "minimal_writer"))]
         if self.thread_loggers.is_empty() {
             // The last remaining main() thread has terminated, its thread_local data are being destroyed;
             // or main() has panicked earlier and the last thread has terminated while
@@ -179,52 +201,62 @@ impl CallLoggerArbiter {
             self.last_fcl_update_thread = None; // Prevent the subsequent flush attempt for the terminated thread.
         }
     }
+    #[cfg(not(feature = "minimal_writer"))]
     pub fn set_panic_sync(&mut self) {
         unsafe {
             *(*ORIGINAL_PANIC_HANDLER).borrow_mut() = Some(std::panic::take_hook());
         }
         std::panic::set_hook(Box::new(Self::panic_hook))
     }
+    #[cfg(not(feature = "minimal_writer"))]
     pub fn set_std_output_sync(&mut self) {
-        // Set stdout and stderr redirection to a corresponding buffer (set std output buffering):
-        let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
-        self.stderr_redirector = self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
-        self.stdout_redirector = self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
+        if let Some(thread_shared_writer) = self.thread_shared_writer.clone() {
+            // Set stdout and stderr redirection to a corresponding buffer (set std output buffering):
+            let writer_kind = thread_shared_writer.borrow().get_writer_kind();
+            // let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
+            self.stderr_redirector =
+                self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
+            self.stdout_redirector =
+                self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
 
-        // Recover {FCL's own logging directly to the original stdout (or stderr)}
-        // while still buffering the program's {stdout and stderr} output.
-        // Get the original std writer:
-        let get_original_writer_result = if writer_kind == WriterKind::Stderr {
-            self.stderr_redirector
-                .as_ref()
-                .map(|redirector| redirector.clone_original_writer())
-        } else if writer_kind == WriterKind::Stdout {
-            self.stdout_redirector
-                .as_ref()
-                .map(|redirector| redirector.clone_original_writer())
-        } else {
-            // FCL is outputing to a non-std stream (file, socket, pipe, etc.).
-            // Nothing to recover.
-            None
-        };
-        // Tell Thread Shared Writer to write the FCL's own output to the original std writer:
-        get_original_writer_result.map(|result| match result {
-            Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
-            Err(e) => {
-                // Something is wrong with std{out|err}, log the error to the opposite stream (std{err|out}):
-                let report_stream: &mut dyn std::io::Write = if writer_kind == WriterKind::Stderr {
-                    &mut std::io::stdout()
-                } else {
-                    &mut std::io::stderr()
-                };
-                let _ignore_another_error = writeln!(
-                    report_stream,
-                    "Warning: Failed to sync FCL and {:?} output: '{}'",
-                    writer_kind, e
-                );
-            }
-        });
+            // Recover {FCL's own logging directly to the original stdout (or stderr)}
+            // while still buffering the program's {stdout and stderr} output.
+            // Get the original std writer:
+            let get_original_writer_result = if writer_kind == WriterKind::Stderr {
+                self.stderr_redirector
+                    .as_ref()
+                    .map(|redirector| redirector.clone_original_writer())
+            } else if writer_kind == WriterKind::Stdout {
+                self.stdout_redirector
+                    .as_ref()
+                    .map(|redirector| redirector.clone_original_writer())
+            } else {
+                // FCL is outputing to a non-std stream (file, socket, pipe, etc.).
+                // Nothing to recover.
+                None
+            };
+            // Tell Thread Shared Writer to write the FCL's own output to the original std writer:
+            get_original_writer_result.map(|result| match result {
+                Ok(file) => thread_shared_writer.borrow_mut().set_writer(file),
+                // Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
+                Err(e) => {
+                    // Something is wrong with std{out|err}, log the error to the opposite stream (std{err|out}):
+                    let report_stream: &mut dyn std::io::Write =
+                        if writer_kind == WriterKind::Stderr {
+                            &mut std::io::stdout()
+                        } else {
+                            &mut std::io::stderr()
+                        };
+                    let _ignore_another_error = writeln!(
+                        report_stream,
+                        "Warning: Failed to sync FCL and {:?} output: '{}'",
+                        writer_kind, e
+                    );
+                }
+            });
+        }
     }
+    #[cfg(not(feature = "minimal_writer"))]
     fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {
         unsafe {
             let mut arbiter = None;
@@ -246,23 +278,15 @@ impl CallLoggerArbiter {
                         }
                         Err(_e) => {
                             const DOUBLE_BUSY_MSG: &str = "While FCL was busy (arbiter and writer borrowed) one of the threads has panicked:";
-                            let msg = format!("{} '{}'.\n{}. {}.",
-                                DOUBLE_BUSY_MSG,
-                                panic_hook_info,
-                                SYNC_MSG,
-                                DEBUGGER_MSG
+                            let msg = format!(
+                                "{} '{}'.\n{}. {}.",
+                                DOUBLE_BUSY_MSG, panic_hook_info, SYNC_MSG, DEBUGGER_MSG
                             );
                             let stdout_msg = format!("(stdout) {}", &msg);
-                            println!(
-                                "{}",
-                                &stdout_msg
-                            );
+                            println!("{}", &stdout_msg);
 
                             let stderr_msg = format!("(stderr) {}", &msg);
-                            eprintln!(
-                                "{}",
-                                &stderr_msg
-                            );
+                            eprintln!("{}", &stderr_msg);
                         }
                     }
                 }
@@ -283,6 +307,7 @@ impl CallLoggerArbiter {
                 .map(|handler| handler(panic_hook_info));
         }
     }
+    #[cfg(not(feature = "minimal_writer"))]
     fn set_stdx_sync(
         &mut self,
         writer_kind: WriterKind,
@@ -307,6 +332,7 @@ impl CallLoggerArbiter {
     ) -> Option<&mut (Box<dyn CallLogger>, usize)> {
         self.thread_loggers.get_mut(&thread_id)
     }
+    #[cfg(not(feature = "minimal_writer"))]
     fn sync_fcl_and_std_output(&mut self, full_flush: bool) {
         // {Previuous thread}'s activity, if any, ended with
         // * either FCL updates (cached or flushed), in which case there's no buffered std output,
@@ -461,6 +487,7 @@ impl CallLogger for CallLoggerArbiter {
     }
 
     fn log_call(&mut self, name: &str, param_vals: Option<String>) {
+        #[cfg(not(feature = "minimal_writer"))]
         self.sync_fcl_and_std_output(false);
 
         let current_thread_id = thread::current().id();
@@ -479,6 +506,7 @@ impl CallLogger for CallLoggerArbiter {
         // (by removing the thread's logger from the HashMap in the FCL's panic hook
         // and ignoring the absence of the thread's logger in the code below).
         // NOTE: Two `if`s below (instead of one `if let`) are to work around the double exclusive borrow between `logger` and `self`.
+        #[cfg(not(feature = "minimal_writer"))]
         if self.get_thread_logger(current_thread_id).is_some() {
             self.sync_fcl_and_std_output(false);
         } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress flushing).
@@ -489,10 +517,12 @@ impl CallLogger for CallLoggerArbiter {
         // the fake return logging).
     }
     fn maybe_flush(&mut self) {
+        #[cfg(not(feature = "minimal_writer"))]
         self.sync_fcl_and_std_output(false);
     }
     // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
     fn log_loopbody_start(&mut self) {
+        #[cfg(not(feature = "minimal_writer"))]
         self.sync_fcl_and_std_output(false);
 
         let current_thread_id = thread::current().id();
@@ -511,6 +541,7 @@ impl CallLogger for CallLoggerArbiter {
         // (by removing the thread's logger from the HashMap in the FCL's panic hook
         // and ignoring the absence of the thread's logger in the code below).
         // NOTE: Two `if`s below (instead of one `if let`) are to work around the double exclusive borrow between `logger` and `self`.
+        #[cfg(not(feature = "minimal_writer"))]
         if self.get_thread_logger(current_thread_id).is_some() {
             self.sync_fcl_and_std_output(false);
         } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress flushing).
@@ -520,27 +551,9 @@ impl CallLogger for CallLoggerArbiter {
         } // else (no logger) the stack unwinding of the current thread is in progress. Do nothing (suppress 
         // the fake loopbody end logging).
     }
-    // fn log_loop_end(&mut self) {
-    //     self.sync_fcl_and_std_output(false);
-    //     let current_thread_id = thread::current().id();
-    //     if let Some(logger) = self.get_thread_logger(current_thread_id) {
-    //         logger.log_loop_end();
-    //     } else {
-    //         debug_assert!(false, NO_LOGGER_ERR_STR!());
-    //     }
-    //     self.last_fcl_update_thread = Some(current_thread_id);
-    // }
-
-    // fn set_loop_ret_val(&mut self, ret_val: String) {
-    //     let current_thread_id = thread::current().id();
-    //     if let Some(logger) = self.get_thread_logger(current_thread_id) {
-    //         logger.set_loop_ret_val(ret_val)
-    //     } else {
-    //         debug_assert!(false, "FCL Internal Error: Unexpected lack of a thread logger");
-    //     }
-    // }
 }
 
+#[cfg(not(feature = "minimal_writer"))]
 // Global data shared by all the threads:
 static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
     Arc::new(RefCell::new(ThreadSharedWriter::new(Some(
@@ -550,13 +563,21 @@ static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new
 pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
     LazyLock::new(|| {
         Rc::new(RefCell::new({
-            let mut arbiter = unsafe { CallLoggerArbiter::new((*THREAD_SHARED_WRITER).clone()) };
-            arbiter.set_std_output_sync();
-            arbiter.set_panic_sync();
+            #[cfg(not(feature = "minimal_writer"))]
+            let arbiter = {
+                let mut arbiter =
+                    unsafe { CallLoggerArbiter::new(Some((*THREAD_SHARED_WRITER).clone())) };
+                arbiter.set_std_output_sync();
+                arbiter.set_panic_sync();
+                arbiter
+            };
+            #[cfg(feature = "minimal_writer")]
+            let arbiter = CallLoggerArbiter::new();
             arbiter
         }))
     });
 
+#[cfg(not(feature = "minimal_writer"))]
 static mut ORIGINAL_PANIC_HANDLER:
     LazyCell<RefCell<Option<Box<dyn Fn(&std::panic::PanicHookInfo<'_>)>>>>
     = LazyCell::new(|| RefCell::new(None));
@@ -566,12 +587,17 @@ pub mod instances {
     use super::*;
     thread_local! {
         pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
+            #[cfg(not(feature = "minimal_writer"))]
+            let writer: Option<Box<dyn Write>> = Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone())));
+            #[cfg(feature = "minimal_writer")]
+            let writer: Option<Box<dyn Write>> = None;
+
             let logging_infra = Box::new(CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // fcl_decorators::TreeLikeDecorator::new(
-                //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                //     writer,
                 //     None, None, None))))))
                 fcl_decorators::CodeLikeDecorator::new(
-                    Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                    writer,
                     None)))));
             (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
 
@@ -594,10 +620,10 @@ pub mod instances {
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
             let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // fcl_decorators::TreeLikeDecorator::new(
-                //     Some(Box::new(fcl::writer::WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                 //     None, None, None))))))
                 fcl_decorators::CodeLikeDecorator::new(
-                    Some(Box::new(/*fcl::writer::*/WriterAdapter::new((*/*fcl::call_log_infra::*/THREAD_SHARED_WRITER).clone()))),
+                    Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                     None)))));
             match (*THREAD_GATEKEEPER).lock() {
                 Ok(mut gatekeeper) => gatekeeper.add_thread_logger(logging_infra),

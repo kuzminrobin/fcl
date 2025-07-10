@@ -1,5 +1,5 @@
-use std::{cell::RefCell, rc::Rc};
 use crate::{CoderunNotifiable, ItemKind, RepeatCount};
+use std::{cell::RefCell, rc::Rc};
 
 type Link = Rc<RefCell<CallNode>>;
 
@@ -12,13 +12,13 @@ struct CallNode {
     children: Vec<Link>,
     /// Counter that tells how many times the call (including all of its nested calls) repeats.
     repeat_count: RepeatCount,
-    /// Flag that tells that the function/closure has returned or the loopbody (loop iteration) has ended. 
+    /// Flag that tells that the function/closure has returned or the loopbody (loop iteration) has ended.
     /// Tells to log the item return in case of a `flush`
     /// upon thread context switch or {std output and panic} sync, e.g.
     /// * `} // f().`
     /// * `} // closure().`
     /// * `} // Loop body end.`
-    has_ended: bool, // 
+    has_ended: bool,
 }
 impl CallNode {
     fn new(kind: ItemKind) -> Self {
@@ -38,13 +38,12 @@ impl CallNode {
     }
 }
 
-#[rustfmt::skip]
 struct CachingInfo {
     /// The node to compare the `node_being_cached` with.
     /// This is `None` for an _initial_ loopbody in `node_being_cached`.
-    model_node  : Option<Link>, 
+    model_node: Option<Link>,
     node_being_cached: Option<Link>,
-    call_depth  : usize,
+    call_depth: usize,
 }
 impl CachingInfo {
     fn new() -> Self {
@@ -63,26 +62,26 @@ impl CachingInfo {
     }
 }
 
-/// The per-thread instance of this type contains the full information about 
+/// The per-thread instance of this type contains the full information about
 /// the thread's logged functions (the thread's logged call graph).
-/// 
-/// Typically the call graph of a program or a thread is a tree 
-/// with the `main()` or a thread function in the root. 
-/// But if the logging gets enabled later, then the logged graph 
+///
+/// Typically the call graph of a program or a thread is a tree
+/// with the `main()` or a thread function in the root.
+/// But if the logging gets enabled later, then the logged graph
 /// can be not a tree but a sequence of trees.  
-/// 
-/// E.g. if `main()` calls `f()` and then `g()`, 
+///
+/// E.g. if `main()` calls `f()` and then `g()`,
 /// but logging gets enabled after `main()` and before `f()`,
 /// then `f()` will be the first-most call to be added to the call graph, and then `g()`.
 /// The `f()` followed by `g()` will be a sequence of call trees added to the call graph.
-/// 
-/// To unify and simplify handling, a _pseudonode_ is always added to the call graph as a root, 
+///
+/// To unify and simplify handling, a _pseudonode_ is always added to the call graph as a root,
 /// which turns any call graph to a tree. Both `f()` and `g()` get added as children of the pseudonode.  
-/// 
+///
 /// But if logging gets enabled before `main()` then `main()` gets added as a child to the pseudonode.
 pub struct CallGraph {
     /// The call stack, i.e. a stack of links to the call graph nodes.
-    /// In other words a stack of links to the nodes on the path 
+    /// In other words a stack of links to the nodes on the path
     /// to the currently active call node in the call graph.
     /// Is used for returning to the parent at any moment in a singly linked call tree.
     /// The link to a pseudo-node always exists at the bottom of the call stack.
@@ -101,7 +100,7 @@ pub struct CallGraph {
     /// * flushing of the cache upon thread context switch or {std output/panic} sync.
     caching_info: CachingInfo,
 
-    /// An instance (in particular a decorator) that gets notified 
+    /// An instance (in particular a decorator) that gets notified
     /// about changes in the call graph which ends up in the call logging.
     coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>,
 }
@@ -286,20 +285,6 @@ impl CallGraph {
         self.current_node = new_sibling.clone();
     }
 
-    // // parent() { // `current`. `call_stack`: [..., parent].
-    // //      . . .
-    // //      { // Loop body start.   
-    // //          . . .
-    // //          [child() { ... }
-    // //          [// child() repeats 3 time(s).]]
-    // //      } // Loop body end.
-    // fn set_loop_ret_val(&mut self, ret_val: String) {
-    //     // Reservation for the possible future extension.
-    //     // If the last loop iteration had no nested calls then the loopbody is removed without a trace.
-    //     // Logging the return value for such an iteration requires extra refatoring.
-    //     // Lowering down the priority of `loop` ret val logging.
-    // }
-
     // parent() {
     //      . . .
     //      [{ // Loop body start.   // Possible previous iterations of the current loop.
@@ -466,22 +451,6 @@ impl CallGraph {
             } // match
         }
     }
-    // // parent() { // current: parent (call or loopbody). `call_stack`: [..., parent]. `current.children`: siblings.
-    // //      . . .
-    // //      [{ // Loop body start.   // Previous iterations of the current loop.
-    // //          . . .
-    // //          child() { ... } // At least one function call in the loopbody.
-    // //          [// child() repeats 7 time(s).]
-    // //      } // Loop body end.
-    // //      // Loop body repeats 6 time(s).]
-    // pub fn add_loop_end(&mut self) {
-    //     if let Some(last_sibling) = self.current_node.borrow_mut().children.last() {
-    //         match &mut last_sibling.borrow_mut().kind {
-    //             ItemKind::Loopbody { ended_the_loop } => *ended_the_loop = true,
-    //             ItemKind::Call { .. } => debug_assert!(false, "Unexpected state"),
-    //         }
-    //     }
-    // }
 
     // < `parent() {` | `{ // Loop body start` > // `current`. `call_stack`: [..., parent]. `current.children`: [..., {previous_sibling | loopbody}].
     //     [...]
@@ -843,11 +812,10 @@ impl CallGraph {
                         current_node.get_ret_val(),
                     );
                 }
-                ItemKind::Loopbody { .. } => {
-                    self.coderun_notifiable
-                        .borrow_mut()
-                        .notify_loopbody_end(call_depth)
-                }
+                ItemKind::Loopbody { .. } => self
+                    .coderun_notifiable
+                    .borrow_mut()
+                    .notify_loopbody_end(call_depth),
             }
 
             // The repeat count:

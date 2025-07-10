@@ -82,19 +82,6 @@ pub fn main() {
 // use fcl_proc_macros::loggable;
 #[fcl_proc_macros::loggable]
 mod root {
-    // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
-    // Const(ItemConst)
-    // Enum(ItemEnum)
-    // ExternCrate(ItemExternCrate)
-    // ForeignMod(ItemForeignMod)
-    // Macro(ItemMacro)
-    // Static(ItemStatic)
-    // Struct(ItemStruct)
-    // Trait(ItemTrait)
-    // TraitAlias(ItemTraitAlias)
-    // Type(ItemType)
-    // Union(ItemUnion)
-    // Verbatim(TokenStream)
 
     // use fcl_proc_macros::loggable;
     // use fcl::FunctionLogger;

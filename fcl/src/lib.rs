@@ -3,7 +3,9 @@
 pub mod call_log_infra;
 mod output_sync;
 mod writer;
+#[cfg(not(feature = "singlethreaded"))]
 pub mod multithreaded;
+#[cfg(feature = "singlethreaded")]
 pub mod singlethreaded;
 
 #[cfg(feature = "singlethreaded")]

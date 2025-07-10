@@ -10,3 +10,5 @@ fcl = { path = "../fcl" }
 fcl_proc_macros = { path = "../fcl_proc_macros" }
 # fcl = { path = "../fcl", features = ["singlethreaded"] }
 # fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
+# fcl = { path = "../fcl", features = ["minimal_writer"] }
+# fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }

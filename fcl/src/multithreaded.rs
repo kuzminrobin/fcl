@@ -1,5 +1,3 @@
-#![cfg(not(feature = "singlethreaded"))]
-
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 pub use std::{
     sync::{Mutex, MutexGuard},

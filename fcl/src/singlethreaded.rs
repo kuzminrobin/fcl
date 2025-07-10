@@ -1,6 +1,4 @@
-#![cfg(feature = "singlethreaded")]
 
-use fcl_traits::CallLogger;
 
 /// #### Examples
 /// ```rs

@@ -1,3 +1,5 @@
+#![cfg(not(feature = "minimal_writer"))]
+
 use filedescriptor::{FileDescriptor, StdioDescriptor};
 use std::fs::File;
 use std::io::{self, Read, Write};

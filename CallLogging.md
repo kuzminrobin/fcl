@@ -1,10 +1,9 @@
 # TODO:
 * Overall clean-up.
-  * Remove commented code.
   * Refactor long functions (especially the CallGraph).
+  * Remove commented code.
   * Move privates down, publics up (in file).
   * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
-* Review CallLoggerArbiter such that THREAD_SHARED_RITER is optional (and WriterAdapter is absent). 
 * On the diagrams consider using `+` for `pub` and `-` for private.
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
@@ -90,6 +89,8 @@
           the feature in the lib crate is either on for both bin crates or off for both bin crates.
           This looks like an inconsistency on the Rust toolchain side.
     * mdBook "Practicing Rust with FCL"
+      * Links
+        * Rust Features: https://doc.rust-lang.org/cargo/reference/features.html
       * While writing, develop again from scratch
         * User Practice
           * ```rs
@@ -1230,3 +1231,4 @@ Let me know if you want a complete working example with both `stdout` and `stder
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
 * Overall clean-up.
   * TODOs.
+* Review CallLoggerArbiter such that THREAD_SHARED_RITER is optional (and WriterAdapter is absent). 
