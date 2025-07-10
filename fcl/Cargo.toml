@@ -8,7 +8,6 @@ fcl_traits = { path = "../fcl_traits" }
 fcl_decorators = { path = "../fcl_decorators" }
 code_commons = { path = "../code_commons" }
 fcl_proc_macros = { path = "../fcl_proc_macros" }
-#gag = "1.0.0" # TODO: Consider removing (but crediting in the docs).
 filedescriptor = "0.8.3"
 tempfile = "3.20.0"
 

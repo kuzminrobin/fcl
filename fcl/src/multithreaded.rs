@@ -168,7 +168,6 @@ impl ThreadGateAdapter {
 }
 impl Drop for ThreadGateAdapter {
     fn drop(&mut self) {
-        // todo!("Implement for single-threaded case"); // TODO.
         self.get_gatekeeper().remove_thread_logger();
     }
 }

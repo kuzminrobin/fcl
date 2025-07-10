@@ -1,27 +1,24 @@
 use std::{cell::RefCell, rc::Rc};
-
 use crate::{CoderunNotifiable, ItemKind, RepeatCount};
-//use crate::{CalleeName, CoderunNotifiable, RepeatCount};
-// TODO: Stop dependency on fcl (extract CalleeName, CoderunNotifiable to non-fcl-related file/package)
-// Option: Move {CalleeName, CoderunNotifiable, RepeatCount} and CallGraph to Code[run]Commons crate
-// (to be reused for (dynamic handling) code profiling, code coverage, (static handling) translation from language to language).
 
 type Link = Rc<RefCell<CallNode>>;
 
 struct CallNode {
-    // TODO: Consider -> ItemNode (function, closure, loop)
     kind: ItemKind,
-    /// Value returned by a function or `loop` (`while` and `for` loops do not return a value).
+    /// String representation of a value returned by a function or `loop`
+    /// (`while` and `for` loops do not return a value).
     ret_val: Option<String>,
+    /// Collection of nested calls.
     children: Vec<Link>,
+    /// Counter that tells how many times the call (including all of its nested calls) repeats.
     repeat_count: RepeatCount,
-    /// Flag that tells to flush the item return (like
-    /// * "} // f().",
-    /// * "} // closure()."
-    /// * "} // Loop body end." )
-    ///
-    /// upon thread context switch or std output and panic sync.
-    has_ended: bool, // Function has returned, loopbody (one iteration) has ended.
+    /// Flag that tells that the function/closure has returned or the loopbody (loop iteration) has ended. 
+    /// Tells to log the item return in case of a `flush`
+    /// upon thread context switch or {std output and panic} sync, e.g.
+    /// * `} // f().`
+    /// * `} // closure().`
+    /// * `} // Loop body end.`
+    has_ended: bool, // 
 }
 impl CallNode {
     fn new(kind: ItemKind) -> Self {
@@ -41,22 +38,15 @@ impl CallNode {
     }
 }
 
-// enum CacheKind {
-//     Call,
-//     Loopbody {
-//         initial: bool,
-//     }
-// }
 #[rustfmt::skip]
 struct CachingInfo {
     /// The node to compare the `node_being_cached` with.
-    /// This is None for an _initial_ loopbody in `node_being_cached`.
+    /// This is `None` for an _initial_ loopbody in `node_being_cached`.
     model_node  : Option<Link>, 
     node_being_cached: Option<Link>,
     call_depth  : usize,
 }
 impl CachingInfo {
-    // #[rustfmt::skip]
     fn new() -> Self {
         Self {
             model_node: None,
@@ -73,24 +63,46 @@ impl CachingInfo {
     }
 }
 
+/// The per-thread instance of this type contains the full information about 
+/// the thread's logged functions (the thread's logged call graph).
+/// 
+/// Typically the call graph of a program or a thread is a tree 
+/// with the `main()` or a thread function in the root. 
+/// But if the logging gets enabled later, then the logged graph 
+/// can be not a tree but a sequence of trees.  
+/// 
+/// E.g. if `main()` calls `f()` and then `g()`, 
+/// but logging gets enabled after `main()` and before `f()`,
+/// then `f()` will be the first-most call to be added to the call graph, and then `g()`.
+/// The `f()` followed by `g()` will be a sequence of call trees added to the call graph.
+/// 
+/// To unify and simplify handling, a _pseudonode_ is always added to the call graph as a root, 
+/// which turns any call graph to a tree. Both `f()` and `g()` get added as children of the pseudonode.  
+/// 
+/// But if logging gets enabled before `main()` then `main()` gets added as a child to the pseudonode.
 pub struct CallGraph {
-    // For returning to the parent at any moment.
-    // The link to a pseudo-node always exists at the bottom of the call stack.
-    // The pseudo-node is not to be logged.
+    /// The call stack, i.e. a stack of links to the call graph nodes.
+    /// In other words a stack of links to the nodes on the path 
+    /// to the currently active call node in the call graph.
+    /// Is used for returning to the parent at any moment in a singly linked call tree.
+    /// The link to a pseudo-node always exists at the bottom of the call stack.
+    /// The pseudo-node is not to be logged.
     call_stack: Vec<Link>,
 
-    // Repeats the self.call_stack.last() for quick access and brevity
-    // (strictly speaking is not required).
-    // The node that represents the currently running function.
-    // The nested calls are added as children to this node.
+    /// Repeats the `self.call_stack.last()` for quick access and brevity
+    /// (strictly speaking is not required).
+    /// The node that represents the currently running function.
+    /// The nested calls are added as children to the node pointed by this link.
     current_node: Link,
 
-    // The last node that is not being cached and is used as a model for caching the subsequent sibling(s).
-    // The node referred to by caching_model_node is never removed
-    // (caching_model_node is None when the node is removed upon graph clearing).
+    /// The instance containing the info necessary for caching the calls before logging.
+    /// The cache is used for
+    /// * repeating call or empty loop body removal,
+    /// * flushing of the cache upon thread context switch or {std output/panic} sync.
     caching_info: CachingInfo,
 
-    // An instance (e.g. a decorator) that gets notified about changes in the call graph.
+    /// An instance (in particular a decorator) that gets notified 
+    /// about changes in the call graph which ends up in the call logging.
     coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>,
 }
 
@@ -194,81 +206,77 @@ impl CallGraph {
         // But not yet make the new_sibling current.
 
         // Fork depending on whether the caching is active.
-        match self.caching_info.node_being_cached.as_ref() {
-            // TODO: -> if !self.caching_is_active() {
-            None => {
-                // Caching is not active (ancestry has no loopbodies being cached).
-                // There potentially can be a previous sibling (call or non-initial loopbody)
-                // with non-zero repeat count.
-                // If there is a previous sibling
-                //   If a call with the same name then
-                //        begin caching starting with the new sibling;
-                //   otherwise (a call with different name or a loopbody)
-                //        log the previous sibling's repeat count, if non-zero.
-                //        Log the call.
-                // else
-                //   log the call.
+        if !self.caching_is_active() {
+            // Caching is not active (ancestry has no loopbodies being cached).
+            // There potentially can be a previous sibling (call or non-initial loopbody)
+            // with non-zero repeat count.
+            // If there is a previous sibling
+            //   If a call with the same name then
+            //        begin caching starting with the new sibling;
+            //   otherwise (a call with different name or a loopbody)
+            //        log the previous sibling's repeat count, if non-zero.
+            //        Log the call.
+            // else
+            //   log the call.
 
-                // If there is a previous_sibling
-                if let Some(previous_sibling) = optional_previous_sibling {
-                    // If two last siblings differ then
-                    // * log the previous sibling's repeat count, if non-zero;
-                    // * log the call.
-                    let previous_sibling_kind = previous_sibling.borrow().kind.clone();
-                    let previous_sibling_is_different_call = if let ItemKind::Call { name, .. } =
-                        &previous_sibling_kind
-                        && name != call_name
-                    {
-                        true
-                    } else {
-                        false
-                    };
-                    if previous_sibling_kind.is_loopbody() || previous_sibling_is_different_call {
-                        // Log the previous sibling's repeat count, if non-zero.
-                        if !previous_sibling
-                            .borrow()
-                            .repeat_count
-                            .non_flushed_is_empty()
-                        {
-                            self.coderun_notifiable.borrow_mut().notify_repeat_count(
-                                siblings_call_depth,
-                                &previous_sibling.borrow().kind,
-                                previous_sibling.borrow().repeat_count.non_flushed(),
-                            );
-                            previous_sibling.borrow_mut().repeat_count.mark_flushed();
-                        }
-                        // Log the call.
-                        self.coderun_notifiable.borrow_mut().notify_call(
-                            self.call_depth(),
-                            &call_name,
-                            &param_vals,
-                        );
-                    } else {
-                        // Otherwise (the previous and the new siblings both are calls with the same name)
-                        // begin caching starting with the new sibling.
-                        self.caching_info = CachingInfo {
-                            model_node: Some(previous_sibling.clone()),
-                            node_being_cached: Some(new_sibling.clone()),
-                            call_depth: siblings_call_depth,
-                        };
-                    }
+            // If there is a previous_sibling
+            if let Some(previous_sibling) = optional_previous_sibling {
+                // If two last siblings differ then
+                // * log the previous sibling's repeat count, if non-zero;
+                // * log the call.
+                let previous_sibling_kind = previous_sibling.borrow().kind.clone();
+                let previous_sibling_is_different_call = if let ItemKind::Call { name, .. } =
+                    &previous_sibling_kind
+                    && name != call_name
+                {
+                    true
                 } else {
-                    // (no previous sibling) Log the call.
+                    false
+                };
+                if previous_sibling_kind.is_loopbody() || previous_sibling_is_different_call {
+                    // Log the previous sibling's repeat count, if non-zero.
+                    if !previous_sibling
+                        .borrow()
+                        .repeat_count
+                        .non_flushed_is_empty()
+                    {
+                        self.coderun_notifiable.borrow_mut().notify_repeat_count(
+                            siblings_call_depth,
+                            &previous_sibling.borrow().kind,
+                            previous_sibling.borrow().repeat_count.non_flushed(),
+                        );
+                        previous_sibling.borrow_mut().repeat_count.mark_flushed();
+                    }
+                    // Log the call.
                     self.coderun_notifiable.borrow_mut().notify_call(
                         self.call_depth(),
                         &call_name,
                         &param_vals,
                     );
+                } else {
+                    // Otherwise (the previous and the new siblings both are calls with the same name)
+                    // begin caching starting with the new sibling.
+                    self.caching_info = CachingInfo {
+                        model_node: Some(previous_sibling.clone()),
+                        node_being_cached: Some(new_sibling.clone()),
+                        call_depth: siblings_call_depth,
+                    };
                 }
+            } else {
+                // (no previous sibling) Log the call.
+                self.coderun_notifiable.borrow_mut().notify_call(
+                    self.call_depth(),
+                    &call_name,
+                    &param_vals,
+                );
             }
-            Some(_node_being_cached) => {
-                // Caching is active.
-                // If the caching has started at the enclosing loopbody
-                // (with optional intermediate enclosing loopbodies in between)
-                // and that loopbody is initial then flush (without flushing the notifiable) and stop caching.
-                if self.caching_info.model_node.is_none() {
-                    self.flush(false); // It also stops caching.
-                }
+        } else {
+            // Caching is active.
+            // If the caching has started at the enclosing loopbody
+            // (with optional intermediate enclosing loopbodies in between)
+            // and that loopbody is initial then flush (without flushing the notifiable) and stop caching.
+            if self.caching_info.model_node.is_none() {
+                self.flush(false); // It also stops caching.
             }
         }
         // Add new_sibling to the call stack:
@@ -373,7 +381,7 @@ impl CallGraph {
                     );
 
                     match self.call_stack.last() {
-                        None => debug_assert!(false, "Unexpected bottom of call stack"), // TODO: -> "call stack bottom".
+                        None => debug_assert!(false, "Unexpected call stack bottom"),
                         Some(parent_or_pseudo) => {
                             let parent_or_pseudo = parent_or_pseudo.clone();
                             // If caching is not active
@@ -586,7 +594,6 @@ impl CallGraph {
             {
                 // Log the repeat count, if non-zero, of the previous sibling-level node.
                 let mut previous_sibling = rc_previous_sibling.borrow_mut();
-                // TODO: `if` below -> separate call.
                 if !previous_sibling.repeat_count.non_flushed_is_empty() {
                     self.coderun_notifiable.borrow_mut().notify_repeat_count(
                         call_depth,
@@ -839,7 +846,7 @@ impl CallGraph {
                 ItemKind::Loopbody { .. } => {
                     self.coderun_notifiable
                         .borrow_mut()
-                        .notify_loopbody_end(call_depth) // TODO: call_depth
+                        .notify_loopbody_end(call_depth)
                 }
             }
 

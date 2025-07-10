@@ -11,8 +11,6 @@ use fcl_proc_macros::{loggable, non_loggable};
 
 #[loggable]
 fn main() {
-    // let _ = fcl::call_log_infra::THREAD_LOGGER_REDIRECTION;
-    // TODO: -> macro, or simplify otherwise.
     // THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
 
     let result = thread::Builder::new().name("T1".into()).spawn(thread_func); // T1 thread.
@@ -144,10 +142,6 @@ fn calls() {
         impl MyPureTrait for MyStruct {
             // #[loggable(prefix=MyStruct)]
             #[loggable(prefix=<MyStruct as MyPureTrait>)]
-            // TODO: Unexpected result: `MyPureTrait :: pure_method() {}`.
-            // Expected `<MyStruct as MyPureTrait> :: pure_method() {}`.
-            // Consider `#[loggable((MyStruct as MyPureTrait)::pure_method)]`. Doesn't work. Results in `pure_method`.
-            // Consider `#[loggable(MyStruct::as::MyPureTrait::pure_method)]`. Doesn't work. Results in `pure_method`.
             fn pure_method(&self) {}
         }
         MyStruct.pure_method();

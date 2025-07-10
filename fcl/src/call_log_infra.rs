@@ -28,7 +28,6 @@ pub struct CallLogInfra {
 
 impl CallLogInfra {
     pub fn new(thread_spec_notifyable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>>) -> Self {
-        // NOTE: Curious trick. // TODO: Document it.
         let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone();
         let thread_specifics: Rc<RefCell<dyn ThreadSpecifics>> = thread_spec_notifyable;
         Self {
@@ -67,7 +66,6 @@ impl CallLogger for CallLogInfra {
         self.call_graph.add_ret(ret_val);
     }
 
-    // TODO: Consider making this impl conditional, for multithreaded case only.
     fn flush(&mut self) {
         self.call_graph.flush(true)
     }
@@ -233,6 +231,8 @@ impl CallLoggerArbiter {
             match (*CALL_LOGGER_ARBITER).try_borrow_mut() {
                 Ok(_arbiter) => arbiter = Some(_arbiter),
                 Err(_e) => {
+                    const SYNC_MSG: &str = &"FCL failed to synchronize its cache and buffers with the panic report below";
+                    const DEBUGGER_MSG: &str = &"If the panic report is not shown, attach the debugger to see the panic details";
                     match (*THREAD_SHARED_WRITER).try_borrow_mut() {
                         Ok(mut writer) => {
                             let _ignore_write_error = writeln!(
@@ -240,26 +240,28 @@ impl CallLoggerArbiter {
                                 "{} '{}'.\n{}. {}.",
                                 "While FCL was busy (arbiter borrowed) one of the threads has panicked:",
                                 panic_hook_info,
-                                "FCL failed to synchronize its cache and buffers with the panic report below",
-                                "If the panic report is not shown, attach the debugger to see the panic details"
+                                SYNC_MSG,
+                                DEBUGGER_MSG
                             );
                         }
                         Err(_e) => {
-                            // TODO: Dedup.
-                            println!(
-                                "(stdout) {} '{}'. {}. {}.",
-                                "While FCL was busy (arbiter and writer borrowed) one of the threads has panicked:",
+                            const DOUBLE_BUSY_MSG: &str = "While FCL was busy (arbiter and writer borrowed) one of the threads has panicked:";
+                            let msg = format!("{} '{}'.\n{}. {}.",
+                                DOUBLE_BUSY_MSG,
                                 panic_hook_info,
-                                "FCL failed to synchronize its cache and buffers with the panic report below",
-                                "If the panic report is not shown, attach the debugger to see the panic details"
+                                SYNC_MSG,
+                                DEBUGGER_MSG
+                            );
+                            let stdout_msg = format!("(stdout) {}", &msg);
+                            println!(
+                                "{}",
+                                &stdout_msg
                             );
 
+                            let stderr_msg = format!("(stderr) {}", &msg);
                             eprintln!(
-                                "(stderr) {} '{}'. {}. {}.",
-                                "While FCL was busy (arbiter and writer borrowed) one of the threads has panicked:",
-                                panic_hook_info,
-                                "FCL failed to synchronize its cache and buffers with the panic report below",
-                                "If the panic report is not shown, attach the debugger to see the panic details"
+                                "{}",
+                                &stderr_msg
                             );
                         }
                     }
@@ -439,7 +441,6 @@ impl CallLogger for CallLoggerArbiter {
         if let Some((logger, ..)) = self.thread_loggers.get(&thread::current().id()) {
             return logger.logging_is_on();
         } else {
-            println!("logging_is_on() panic"); // TODO: Remove when freezing is clarified.
             panic!(NO_LOGGER_ERR_STR!());
         }
     }
@@ -472,8 +473,6 @@ impl CallLogger for CallLoggerArbiter {
     }
     fn log_ret(&mut self, ret_val: Option<String>) {
         let current_thread_id = thread::current().id();
-
-        // TODO: Come up with a more strict terminology regarding the "regular panic handler" as opposed to "(FCL's panic hook)".
 
         // Potentially a call (from a `FunctionLogger` destructor) during stack unwinding in the regular panic handler.
         // In that case suppress flushing and {logging the fake returns in the panicking thread}
@@ -543,9 +542,7 @@ impl CallLogger for CallLoggerArbiter {
 }
 
 // Global data shared by all the threads:
-// TODO: Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
-// TODO: Consider removing `pub`.
-pub static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
+static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
     Arc::new(RefCell::new(ThreadSharedWriter::new(Some(
         crate::writer::FclWriter::Stdout,
     ))))
@@ -583,7 +580,6 @@ pub mod instances {
     }
 }
 
-// TODO: Consider renaming ThreadGatekeeper to ThreadGate.
 #[cfg(not(feature = "singlethreaded"))]
 pub mod instances {
     use super::*;

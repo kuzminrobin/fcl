@@ -66,3 +66,13 @@ macro_rules! set_logging_is_on {
             .with(|logger| logger.borrow_mut().borrow_mut().set_logging_is_on($expr))
     };
 }
+
+impl Drop for crate::call_log_infra::CallLoggerArbiter {
+    fn drop(&mut self) {
+        // Flushes 
+        // * the repeat count
+        // * the std output 
+        // in the end of main(), when main() itself is not logged (but the internals are).
+        self.remove_thread_logger();
+    }
+}

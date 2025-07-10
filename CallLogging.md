@@ -1,9 +1,11 @@
 # TODO:
 * Overall clean-up.
   * Remove commented code.
-  * Move privates down, publics up (in file).
   * Refactor long functions (especially the CallGraph).
+  * Move privates down, publics up (in file).
   * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
+* Review CallLoggerArbiter such that THREAD_SHARED_RITER is optional (and WriterAdapter is absent). 
+* On the diagrams consider using `+` for `pub` and `-` for private.
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
@@ -14,6 +16,23 @@
     * std output and panic sync.
     * Enable/disable.
     * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+    * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
+    * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
+    * ```rs
+      // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
+      // Const(ItemConst)
+      // Enum(ItemEnum)
+      // ExternCrate(ItemExternCrate)
+      // ForeignMod(ItemForeignMod)
+      // Macro(ItemMacro)
+      // Static(ItemStatic)
+      // Struct(ItemStruct)
+      // Trait(ItemTrait)
+      // TraitAlias(ItemTraitAlias)
+      // Type(ItemType)
+      // Union(ItemUnion)
+      // Verbatim(TokenStream)
+      ```
   * Test with the existing projects.
     * Update the instructions, how to enable func call logging in your project.
     * (After testing with real code) Finalize the user's use
@@ -72,6 +91,25 @@
           This looks like an inconsistency on the Rust toolchain side.
     * mdBook "Practicing Rust with FCL"
       * While writing, develop again from scratch
+        * User Practice
+          * ```rs
+            // // Likely not applicable for instrumenting the run time functions and
+            // // closures (as opposed to compile time const functions and closures).
+            // fn quote_as_item_foreign_mod(item_foreign_mod: &ItemForeignMod, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+            //     // TODO: User practice: Implement the traverse.
+            //     // let ItemForeignMod {} = item_foreign_mod;
+            //     quote!{ #item_foreign_mod }
+            // }
+            ```
+          * ```rs
+            // // Likely not applicable for instrumenting the run time functions and
+            // // closures (as opposed to compile time const functions and closures).
+            // fn quote_as_item_macro(item_macro: &ItemMacro, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+            //     // TODO: User Practice: Implement.
+            //     // let ItemMacro {} = item_macro;
+            //     quote!{ #item_macro }
+            // }
+            ```
       * Document that sequential loops can be logged as a single loop (if the iterations are equal).
       * Document that loop ret val loggign has been deprioritized.
       * If there are multiple binary crates in the workspace and one library crate with features 
@@ -94,7 +132,7 @@
           The [Struct Generics](https://docs.rs/syn/latest/syn/struct.Generics.html) does not support `: FnOnce()` there,
           only in `where` clause.
       * {Reader Practice: ?} Logging the async funcs.
-      * Document the `NOTE: Curious trick`.  
+      * Document the `NOTE: Curious trick` (`let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone();`).  
         What's the diff between `Rc::clone(&rc)` and `rc.clone()`? The latter works when casting `Rc<dyn SuperTrait>` to `Rc<dyn Trait>`?  
         ```rs
         trait MyTraitA {}
@@ -108,6 +146,7 @@
         ```
         * `rc.cone()` -> `Rc::clone(&rc)`. Works not always, see the curious trick. Document it.
         * [Graph clearing (upon allocation failure?). User practice]
+      * `// use gag::BufferRedirect;     // TODO: Credit in the docs.`
   * Request for comments about the doc-n
   * Publish 
     * The code documentation
@@ -1189,3 +1228,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Consider using LazyCell instead of LazyLock wherever possible.  
 * Consider extracting all the multithreading items to a `mod mutithreading` (with 
   `#[cfg(feature = "miltithreading")]`). E.g. `struct ThreadGatekeeper`.
+* Overall clean-up.
+  * TODOs.

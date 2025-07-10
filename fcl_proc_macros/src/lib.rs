@@ -967,7 +967,6 @@ fn quote_as_expr_struct(
     // // closures (as opposed to compile time const functions and closures).
     // let path = quote_as_path(path, prefix);
 
-    // TODO: Refactor:
     let fields = {
         let mut traversed_fileds = quote! {};
         for field in fields {
@@ -981,7 +980,6 @@ fn quote_as_expr_struct(
         .map(|expr| quote_as_expr(&**expr, None, prefix));
 
     quote! { #(#attrs)* #qself_and_apth { #fields #dot2_token #rest } }
-    // quote!{ #(#attrs)* #qself #path { #traversed_fileds #dot2_token #rest } }
 }
 fn quote_as_expr_try(
     expr_try: &ExprTry,
@@ -1695,7 +1693,6 @@ fn quote_as_item_fn(
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
 // fn quote_as_item_foreign_mod(item_foreign_mod: &ItemForeignMod, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-//     // TODO: User practice: Implement the traverse.
 //     // let ItemForeignMod {} = item_foreign_mod;
 //     quote!{ #item_foreign_mod }
 // }
@@ -1801,7 +1798,6 @@ fn quote_as_item_impl(
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
 // fn quote_as_item_macro(item_macro: &ItemMacro, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-//     // TODO: User Practice: Implement.
 //     // let ItemMacro {} = item_macro;
 //     quote!{ #item_macro }
 // }
@@ -1907,7 +1903,7 @@ fn quote_as_item_static(
 //     //     let prefix = quote!{ #prefix::#ident };
 //     //     let mut traversed_fields = quote!{};
 //     //     for field in fields {
-//     //         let traversed_field = quote_as_field(field, prefix); // TODO: Add field name when traversing field in `quote_as_field()`.
+//     //         let traversed_field = quote_as_field(field, prefix);
 //     //         traversed_fields = quote!{ #traversed_fields #traversed_field };
 //     //     }
 //     // };
@@ -2011,7 +2007,7 @@ fn quote_as_item_trait(
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, prefix);
 
-    // TODO: Future: restriction. Unused, but reserved for RFC 3323 restrictions.
+    // NOTE: Future: restriction. Unused, but reserved for RFC 3323 restrictions.
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -2071,8 +2067,11 @@ fn quote_as_item_trait(
 //     // };
 //     quote!{ #(#attrs)* #vis #trait_token #ident #generics #eq_token #bounds #semi_token }
 // }
-// TODO: Likely not applicable since types are a compile time concepts and require const functions
-// executed at compile time.
+
+// // Likely not applicable for instrumenting the run time functions and
+// // closures (as opposed to compile time const functions and closures)
+// // since types are a compile time concepts and require const functions
+// // executed at compile time.
 // fn quote_as_type_array(type_array: &TypeArray, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 //     let TypeArray { // [T; n]
 //         // bracket_token, //: Bracket,
@@ -2156,7 +2155,7 @@ fn quote_as_item_trait(
 //     quote!{}
 // }
 
-// // TODO: Likely not applicable since types are a compile time concepts and require
+// // Likely not applicable since types are a compile time concepts and require
 // // the const functions (executed at compile time) rather than the run time functions.
 // fn quote_as_type(ty: &Type, prefix: &proc_macro2::TokenStream) -> TokenStream {
 //     quote!{ #ty }
@@ -2443,7 +2442,6 @@ impl Parse for ExprClosureWOptComma {
 mod kw {
     // syn::custom_keyword!(name);
     syn::custom_keyword!(prefix);
-    // syn::custom_keyword!(multithreaded); // TODO: Remove.
 }
 
 struct FclQSelf {
@@ -2464,8 +2462,8 @@ impl quote::ToTokens for FclQSelf {
             // lt_token, // : Token![<],
             ty, // : Box<Type>,
             // as_token, // : Token![as],
+            // gt_token, // : Token![>],
             path, // : Path,
-                  // gt_token, // : Token![>],
             ..
         } = self;
         *tokens = quote! { < #ty as #path > };
@@ -2510,13 +2508,11 @@ impl Parse for QSelfOrPath {
 
 struct AttrArgs {
     prefix: QSelfOrPath,
-    // multithreaded: bool,    // TODO: Remove.
 }
 impl Parse for AttrArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut attr_args = AttrArgs {
             prefix: QSelfOrPath(None),
-            // multithreaded: false, // singlethreaded: false,
         };
         if input.is_empty() {
             return Ok(attr_args);
@@ -2533,9 +2529,6 @@ impl Parse for AttrArgs {
             input.parse::<kw::prefix>()?;
             input.parse::<Token![=]>()?;
             attr_args.prefix = input.parse()?;
-        // } else if lookahead.peek(kw::multithreaded) {
-        //     input.parse::<kw::multithreaded>()?;
-        //     attr_args.multithreaded = true;
         } else {
             return Err(lookahead.error());
         }

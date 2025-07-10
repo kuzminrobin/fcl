@@ -1,7 +1,6 @@
 use filedescriptor::{FileDescriptor, StdioDescriptor};
 use std::fs::File;
-// use gag::BufferRedirect;     // TODO: Credit in the docs.
-use std::io::{self /*, Error*/, Read, Write};
+use std::io::{self, Read, Write};
 use tempfile::NamedTempFile;
 
 pub struct StdOutputRedirector {

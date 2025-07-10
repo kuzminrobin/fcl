@@ -58,7 +58,7 @@ impl CodeLikeDecorator {
     pub fn new(writer: Option<Box<dyn Write>>, indent_step: Option<&'static str>) -> Self {
         Self {
             common: CommonDecorator::new(writer),
-            indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".
+            indent_step: indent_step.unwrap_or(&"  "),
             line_end_pending: false,
         }
     }
