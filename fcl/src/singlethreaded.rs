@@ -1,5 +1,3 @@
-
-
 /// #### Examples
 /// ```rs
 /// fcl::set_thread_indent!(String::from("                "));
@@ -67,9 +65,9 @@ macro_rules! set_logging_is_on {
 
 impl Drop for crate::call_log_infra::CallLoggerArbiter {
     fn drop(&mut self) {
-        // Flushes 
+        // Flushes
         // * the repeat count
-        // * the std output 
+        // * the std output
         // in the end of main(), when main() itself is not logged (but the internals are).
         self.remove_thread_logger();
     }

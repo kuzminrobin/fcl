@@ -2,7 +2,7 @@
 #![feature(stmt_expr_attributes)] // Loggable closures.
 #![feature(proc_macro_hygiene)] // Loggable closures.
 // #![feature(min_specialization)]
- 
+
 use std::thread;
 use std::time::Duration;
 
@@ -19,7 +19,7 @@ fn main() {
 
 #[loggable]
 fn f() {
-    thread::sleep(Duration::from_millis(1)); 
+    thread::sleep(Duration::from_millis(1));
 }
 
 #[loggable]
@@ -33,7 +33,7 @@ fn _h() {
     unsafe { _i::<i32, bool>(1, 2.0, true) };
 }
 
-#[loggable] 
+#[loggable]
 pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64 {
     #[loggable]
     fn j(_x: u32, _y: u32) -> bool {
@@ -173,18 +173,18 @@ fn calls() {
                 let mut i = 0;
                 {
                     let _ret_val = loop {
-                    // while i < 3 {
-                    // for i in 0..3 {
+                        // while i < 3 {
+                        // for i in 0..3 {
 
                         // Log loopbody start
 
                         // {
-                            g(i);
-                            h(i);
-                            if i == 2 {
-                                break 5;
-                            }
-                            i += 1;
+                        g(i);
+                        h(i);
+                        if i == 2 {
+                            break 5;
+                        }
+                        i += 1;
                         // };
 
                         // Log loopbody end
@@ -227,7 +227,9 @@ fn calls() {
 fn thread_func() {
     fcl::set_logging_is_on!(true);
     // fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(false)); // Turn logging on.
-    fcl::set_thread_indent!(String::from("                                                  "));
+    fcl::set_thread_indent!(String::from(
+        "                                                  "
+    ));
 
     // THREAD_LOGGER.with(|logger| {
     //     logger
@@ -236,8 +238,7 @@ fn thread_func() {
     // });
 
     #[loggable]
-    fn f2() {
-    }
+    fn f2() {}
 
     for _ in 0..10 {
         f2();
@@ -260,10 +261,10 @@ fn thread_func() {
             Some(b)
                 .map(
                     #[loggable]
-                    |v| !v
+                    |v| !v,
                 )
                 .unwrap()
-        }
+        },
     );
     // assert_eq!(Some(false), _b);
 
@@ -315,7 +316,7 @@ fn thread_func() {
             // #[loggable]      // Error: expected `|`
             fn pure_method(&self); // No defualt behavior. Pure virtual function with no def-n.
         }
-        // #[derive(std::fmt::Debug)] 
+        // #[derive(std::fmt::Debug)]
         // struct MyStruct { b: bool, c: i32 }
         // impl MyStruct {
         //     fn new() -> Self {
@@ -327,8 +328,11 @@ fn thread_func() {
             #[loggable(prefix = <MyStruct as MyPureTrait>)] // OK.
             fn pure_method(&self) {}
         }
-        #[derive(std::fmt::Debug)] 
-        struct MyStruct { _b: bool, _c: i32 }
+        #[derive(std::fmt::Debug)]
+        struct MyStruct {
+            _b: bool,
+            _c: i32,
+        }
         // impl MyStruct {
         //     fn new() -> Self {
         //         Self { b: true, c: 5 }
@@ -337,7 +341,7 @@ fn thread_func() {
 
         // let m = MyStruct{ c: 5, b: true, };
         // let m = MyStruct::new();
-        MyStruct{ _c: 5, _b: true, }.pure_method();
+        MyStruct { _c: 5, _b: true }.pure_method();
         // m.pure_method();
     }
     {
@@ -378,7 +382,7 @@ fn thread_func() {
     //     }
     //     struct S;
     //     struct P;
-    //     impl<T> ToStr<T, P> for S 
+    //     impl<T> ToStr<T, P> for S
     //     where T: ToString
     //     {
     //         fn to_string(value: T) -> String {
@@ -386,7 +390,7 @@ fn thread_func() {
     //         }
     //     }
     //     struct NP;
-    //     impl<T> ToStr<T, NP> for S 
+    //     impl<T> ToStr<T, NP> for S
     //     // where T: !ToString
     //     {
     //         fn to_string(_value: T) -> String {
@@ -425,10 +429,7 @@ fn thread_func() {
             fun()
         }
         #[loggable]
-        f(
-            || (),
-            true,
-        );
+        f(|| (), true);
     }
     {
         struct ST;
@@ -441,11 +442,10 @@ fn thread_func() {
             fn i(self) {}
         }
         let mut st = ST;
-        ST::f();    // ST :: f() {}
+        ST::f(); // ST :: f() {}
         st.g(); // ST :: g() {}
         st.h(); // ST :: h() {}
         st.i(); // - (#[non_loggable])
-        
     }
     {
         #[loggable]
@@ -467,7 +467,6 @@ fn thread_func() {
             || (),
             true,
         );
-
     }
 
     #[loggable]
@@ -517,7 +516,7 @@ fn thread_func() {
     }
     #[loggable]
     fn ff() {
-        thread::sleep(Duration::from_millis(1)); 
+        thread::sleep(Duration::from_millis(1));
     }
 
     #[loggable]
@@ -529,7 +528,6 @@ fn thread_func() {
     //     gg(i);
     // }
 }
-
 
 // CodeLikeDecorator:
 // main() {

@@ -1,6 +1,4 @@
-use std::{
-    io::{Write, stdout},
-};
+use std::io::{Write, stdout};
 
 use code_commons::{CoderunNotifiable, ItemKind, RepeatCountCategory};
 use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};

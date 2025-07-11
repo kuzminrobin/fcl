@@ -1,12 +1,12 @@
 #![feature(specialization)]
 
 pub mod call_log_infra;
-mod output_sync;
-mod writer;
 #[cfg(not(feature = "singlethreaded"))]
 pub mod multithreaded;
+mod output_sync;
 #[cfg(feature = "singlethreaded")]
 pub mod singlethreaded;
+mod writer;
 
 #[cfg(feature = "singlethreaded")]
 use fcl_traits::CallLogger;

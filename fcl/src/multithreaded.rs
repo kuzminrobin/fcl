@@ -1,10 +1,8 @@
+pub use std::sync::{Mutex, MutexGuard};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
-pub use std::{
-    sync::{Mutex, MutexGuard},
-};
 
-use fcl_traits::CallLogger;
 use crate::call_log_infra::CallLoggerArbiter;
+use fcl_traits::CallLogger;
 
 /// #### Examples
 /// ```rs
@@ -73,7 +71,6 @@ macro_rules! set_logging_is_on {
             .with(|logger| logger.borrow_mut().set_logging_is_on($expr))
     };
 }
-
 
 pub struct ThreadGatekeeper {
     call_logger_arbiter: Rc<RefCell<CallLoggerArbiter>>,

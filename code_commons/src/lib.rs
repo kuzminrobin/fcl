@@ -34,7 +34,7 @@ pub enum ItemKind {
         param_vals: Option<String>,
     },
     /// Item is a loop body.
-    Loopbody 
+    Loopbody,
 }
 impl ItemKind {
     pub fn is_call(&self) -> bool {

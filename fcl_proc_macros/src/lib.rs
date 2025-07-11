@@ -1502,7 +1502,6 @@ fn traversed_block_from_sig(
 
         let func_log_name = remove_spaces(&func_log_name.to_string());
 
-
         quote! {
             {
                 // The run time part of the infrastructure for
@@ -1554,7 +1553,6 @@ fn quote_as_item_fn(
         sig,   //: Signature,
         block, //: Box<Block>,
     } = item_fn;
-
 
     for attr in attrs {
         if attr.is_traverse_stopper() {
@@ -1623,7 +1621,6 @@ fn quote_as_item_impl(
         .. // brace_token
     } = item_impl;
 
-
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_impl };
@@ -1688,7 +1685,6 @@ fn quote_as_item_mod(
         semi,      //: Option<Semi>,
     } = item_mod;
 
-
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_mod };
@@ -1729,7 +1725,6 @@ fn quote_as_item_static(
         expr,         //: Box<Expr>,
         semi_token,   //: Semi,
     } = item_static;
-
 
     for attr in attrs {
         if attr.is_traverse_stopper() {
@@ -1859,7 +1854,6 @@ fn quote_as_item_trait(
         items, //: Vec<TraitItem>,
         .. // restriction, brace_token
     } = item_trait;
-
 
     for attr in attrs {
         if attr.is_traverse_stopper() {
@@ -2257,7 +2251,6 @@ fn quote_as_loop_block(
         traversed_stmts
     };
 
-
     quote! {
         {
             // Log the loop body start (if logging is enabled).
@@ -2338,10 +2331,7 @@ impl Parse for FclQSelf {
         input.parse::<Token![as]>()?;
         let path = input.parse()?;
         input.parse::<Token![>]>()?;
-        Ok(Self {
-            ty,
-            path
-        })
+        Ok(Self { ty, path })
     }
 }
 
