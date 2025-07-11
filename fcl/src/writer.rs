@@ -2,8 +2,8 @@
 
 use std::{
     cell::RefCell,
-    io::{Write, stderr, stdout},
-    sync::Arc,
+    io::{stderr, stdout, Write},
+    sync::{Arc, LazyLock},
 };
 
 pub enum FclWriter {
@@ -84,3 +84,10 @@ impl Write for WriterAdapter {
         self.writer.borrow_mut().flush()
     }
 }
+
+// Global data shared by all the threads:
+pub static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
+    Arc::new(RefCell::new(ThreadSharedWriter::new(Some(
+        crate::writer::FclWriter::Stdout,
+    ))))
+});

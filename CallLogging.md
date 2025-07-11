@@ -1,8 +1,7 @@
 # TODO:
 * Overall clean-up.
-  * Format all (`<Alt+Shift+f>`)
-  * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
+  * Refactor long functions (especially the CallGraph).
   * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
 * On the diagrams consider using `+` for `pub` and `-` for private.
 * Consider merging all the FCL crates into a single proc_macro crate.
@@ -1246,3 +1245,4 @@ Let me know if you want a complete working example with both `stdout` and `stder
     // If the entity already has the (nested) traverse-stopping attribute
     // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
     ```
+  * Format all (`<Alt+Shift+f>`)

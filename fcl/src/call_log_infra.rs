@@ -7,7 +7,7 @@ use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock
 #[cfg(not(feature = "minimal_writer"))]
 use crate::{
     output_sync::StdOutputRedirector,
-    writer::{ThreadSharedWriter, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
+    writer::{THREAD_SHARED_WRITER, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
 };
 
 macro_rules! NO_LOGGER_ERR_STR {
@@ -108,19 +108,23 @@ impl ThreadIndents {
         self.indents_taken[index] = false;
     }
 }
-pub struct CallLoggerArbiter {
-    #[cfg(not(feature = "minimal_writer"))]
+
+#[cfg(not(feature = "minimal_writer"))]
+struct OutputSync {
     thread_shared_writer: Option<ThreadSharedWriterPtr>,
+    stderr_redirector: Option<StdOutputRedirector>,
+    stdout_redirector: Option<StdOutputRedirector>,
+    main_thread_id: thread::ThreadId,
+}
+
+pub struct CallLoggerArbiter {
     /// Collection of per-thread loggers and thread indent IDs used by the corresponding logger.
     thread_loggers: HashMap<thread::ThreadId, (Box<dyn CallLogger>, usize)>,
     last_fcl_update_thread: Option<thread::ThreadId>,
-    #[cfg(not(feature = "minimal_writer"))]
-    stderr_redirector: Option<StdOutputRedirector>,
-    #[cfg(not(feature = "minimal_writer"))]
-    stdout_redirector: Option<StdOutputRedirector>,
-    #[cfg(not(feature = "minimal_writer"))]
-    main_thread_id: thread::ThreadId,
     thread_indents: ThreadIndents,
+
+    #[cfg(not(feature = "minimal_writer"))]
+    output_sync: OutputSync,
 }
 
 impl CallLoggerArbiter {
@@ -128,17 +132,17 @@ impl CallLoggerArbiter {
         #[cfg(not(feature = "minimal_writer"))] thread_shared_writer: Option<ThreadSharedWriterPtr>,
     ) -> Self {
         return Self {
-            #[cfg(not(feature = "minimal_writer"))]
-            thread_shared_writer,
             thread_loggers: HashMap::new(),
             last_fcl_update_thread: None,
-            #[cfg(not(feature = "minimal_writer"))]
-            stderr_redirector: None,
-            #[cfg(not(feature = "minimal_writer"))]
-            stdout_redirector: None,
-            #[cfg(not(feature = "minimal_writer"))]
-            main_thread_id: thread::current().id(),
             thread_indents: ThreadIndents::new(None),
+
+            #[cfg(not(feature = "minimal_writer"))]
+            output_sync: OutputSync {
+                thread_shared_writer,
+                stderr_redirector: None,
+                stdout_redirector: None,
+                main_thread_id: thread::current().id(),
+            },
         };
     }
     pub fn add_thread_logger(&mut self, mut thread_logger: Box<dyn CallLogger>) {
@@ -180,8 +184,8 @@ impl CallLoggerArbiter {
             // or main() has panicked earlier and the last thread has terminated while
             // the panic hook is still running for the main() thread.
             // Flush the buffered std output and do not buffer any more.
-            self.stderr_redirector = None;
-            self.stdout_redirector = None;
+            self.output_sync.stderr_redirector = None;
+            self.output_sync.stdout_redirector = None;
         }
         if self.last_fcl_update_thread == Some(current_thread_id) {
             self.last_fcl_update_thread = None; // Prevent the subsequent flush attempt for the terminated thread.
@@ -196,25 +200,29 @@ impl CallLoggerArbiter {
     }
     #[cfg(not(feature = "minimal_writer"))]
     pub fn set_std_output_sync(&mut self) {
-        let Some(thread_shared_writer) = self.thread_shared_writer.clone() else {
+        let Some(thread_shared_writer) = self.output_sync.thread_shared_writer.clone() else {
             return;
         };
 
         // Set stdout and stderr redirection to a corresponding buffer (set std output buffering):
         let writer_kind = thread_shared_writer.borrow().get_writer_kind();
         // let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
-        self.stderr_redirector = self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
-        self.stdout_redirector = self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
+        self.output_sync.stderr_redirector =
+            Self::set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
+        self.output_sync.stdout_redirector =
+            Self::set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
 
         // Recover {FCL's own logging directly to the original stdout (or stderr)}
         // while still buffering the program's {stdout and stderr} output.
         // Get the original std writer:
         let get_original_writer_result = if writer_kind == WriterKind::Stderr {
-            self.stderr_redirector
+            self.output_sync
+                .stderr_redirector
                 .as_ref()
                 .map(|redirector| redirector.clone_original_writer())
         } else if writer_kind == WriterKind::Stdout {
-            self.stdout_redirector
+            self.output_sync
+                .stdout_redirector
                 .as_ref()
                 .map(|redirector| redirector.clone_original_writer())
         } else {
@@ -279,11 +287,11 @@ impl CallLoggerArbiter {
             if let Some(mut arbiter) = arbiter {
                 arbiter.sync_fcl_and_std_output(true);
                 arbiter.remove_thread_logger();
-                if thread::current().id() == arbiter.main_thread_id {
+                if thread::current().id() == arbiter.output_sync.main_thread_id {
                     // The main() thread is panicking.
                     // Stop buffering the std output.
-                    arbiter.stderr_redirector = None;
-                    arbiter.stdout_redirector = None;
+                    arbiter.output_sync.stderr_redirector = None;
+                    arbiter.output_sync.stdout_redirector = None;
                 }
             }
             (*ORIGINAL_PANIC_HANDLER)
@@ -294,7 +302,6 @@ impl CallLoggerArbiter {
     }
     #[cfg(not(feature = "minimal_writer"))]
     fn set_stdx_sync(
-        &mut self,
         writer_kind: WriterKind,
         stdx_redirector_result: std::io::Result<StdOutputRedirector>,
     ) -> Option<StdOutputRedirector> {
@@ -336,10 +343,10 @@ impl CallLoggerArbiter {
                 }
 
                 // Flush the previous (and current) thread's buffered std output, if any:
-                if let Some(redirector) = &mut self.stderr_redirector {
+                if let Some(redirector) = &mut self.output_sync.stderr_redirector {
                     redirector.flush()
                 }
-                if let Some(redirector) = &mut self.stdout_redirector {
+                if let Some(redirector) = &mut self.output_sync.stdout_redirector {
                     redirector.flush()
                 }
                 // The pregvious thread's activity is fully flushed.
@@ -354,7 +361,7 @@ impl CallLoggerArbiter {
 
                 // Read stderr buffer:
                 let mut stderr_buf_content = String::new();
-                if let Some(redirector) = &mut self.stderr_redirector {
+                if let Some(redirector) = &mut self.output_sync.stderr_redirector {
                     let _ignore_error = Some(
                         redirector
                             .get_buffer_reader()
@@ -364,7 +371,7 @@ impl CallLoggerArbiter {
 
                 // Read stdout buffer:
                 let mut stdout_buf_content = String::new();
-                if let Some(redirector) = &mut self.stdout_redirector {
+                if let Some(redirector) = &mut self.output_sync.stdout_redirector {
                     // If there's any buffered std output, flush the thread's own FCL updates and the std output:
                     let _ignore_error = Some(
                         redirector
@@ -383,7 +390,7 @@ impl CallLoggerArbiter {
                 }
                 // Flush the buffered stderr output (to the original stderr):
                 if !stderr_buf_content.is_empty() {
-                    if let Some(redirector) = &mut self.stderr_redirector {
+                    if let Some(redirector) = &mut self.output_sync.stderr_redirector {
                         let _ignore_error = redirector
                             .get_original_writer()
                             .write_all(stderr_buf_content.as_bytes());
@@ -397,7 +404,7 @@ impl CallLoggerArbiter {
 
                 // Flush the buffered stdout output (to the original stdout):
                 if !stdout_buf_content.is_empty() {
-                    if let Some(redirector) = &mut self.stdout_redirector {
+                    if let Some(redirector) = &mut self.output_sync.stdout_redirector {
                         let _ignore_error = redirector
                             .get_original_writer()
                             .write_all(stdout_buf_content.as_bytes());
@@ -417,14 +424,14 @@ impl CallLoggerArbiter {
             // If there's any buffered std output by this moment then flush that std output.
 
             // If redirection is active
-            if let Some(redirector) = &mut self.stderr_redirector {
+            if let Some(redirector) = &mut self.output_sync.stderr_redirector {
                 redirector.flush()
             }
             // Else (redirection is inactive, failed to set redirection (and reported an error) earlier)
             //   Do nothing (proceed to the FCL updates).
 
             // If redirection is active
-            if let Some(redirector) = &mut self.stdout_redirector {
+            if let Some(redirector) = &mut self.output_sync.stdout_redirector {
                 redirector.flush()
             }
             // Else (redirection is inactive, failed to set redirection (and reported an error) earlier)
@@ -538,13 +545,7 @@ impl CallLogger for CallLoggerArbiter {
     }
 }
 
-#[cfg(not(feature = "minimal_writer"))]
 // Global data shared by all the threads:
-static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
-    Arc::new(RefCell::new(ThreadSharedWriter::new(Some(
-        crate::writer::FclWriter::Stdout,
-    ))))
-});
 pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
     LazyLock::new(|| {
         Rc::new(RefCell::new({
