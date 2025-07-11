@@ -61,8 +61,6 @@ fn quote_as_expr_array(
         elems, //: Punctuated<Expr, Comma>,
         .. // bracket_token
     } = expr_array;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_array };
@@ -91,8 +89,7 @@ fn quote_as_expr_assign(
         eq_token, //: Eq,
         right,    //: Box<Expr>,
     } = expr_assign;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_assign };
@@ -113,8 +110,7 @@ fn quote_as_expr_async(
         capture,     //: Option<Move>,
         block,       //: Block,
     } = expr_async;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_async };
@@ -134,8 +130,7 @@ fn quote_as_expr_await(
         dot_token,   //: Dot,
         await_token, //: Await,
     } = expr_await;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_await };
@@ -155,8 +150,7 @@ fn quote_as_expr_binary(
         op,    //: BinOp,
         right, //: Box<Expr>,
     } = expr_binary;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_binary };
@@ -175,8 +169,7 @@ fn quote_as_expr_block(
         label, //: Option<Label>,
         block, //: Block,
     } = expr_block;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_block };
@@ -195,8 +188,7 @@ fn quote_as_expr_break(
         label,       //: Option<Lifetime>,
         expr,        //: Option<Box<Expr>>,
     } = expr_break;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_break };
@@ -216,8 +208,7 @@ fn quote_as_expr_call(
         args, //: Punctuated<Expr, Comma>,
         .. // paren_token
     } = expr_call;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_call };
@@ -265,8 +256,7 @@ fn quote_as_expr_cast(
         as_token, //: As,
         ty,       //: Box<Type>,
     } = expr_cast;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_cast };
@@ -292,8 +282,7 @@ fn quote_as_expr_closure(
         output,     //: ReturnType,
         body,       //: Box<Expr>,
     } = expr_closure;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_closure };
@@ -412,8 +401,7 @@ fn quote_as_expr_field(
         dot_token, //: Dot,
         member,    //: Member,
     } = expr_field;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_field };
@@ -435,8 +423,7 @@ fn quote_as_expr_for_loop(
         expr,      //: Box<Expr>,
         body,      //: Block,
     } = expr_for_loop;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_for_loop };
@@ -456,8 +443,7 @@ fn quote_as_expr_group(
         expr, //: Box<Expr>,
         .. // group_token
     } = expr_group;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_group };
@@ -478,8 +464,7 @@ fn quote_as_expr_if(
         then_branch, //: Block,
         else_branch, //: Option<(Else, Box<Expr>)>,
     } = expr_if;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_if };
@@ -504,8 +489,7 @@ fn quote_as_expr_index(
         index, //: Box<Expr>,
         .. // bracket_token
     } = expr_index;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_index };
@@ -531,8 +515,7 @@ fn quote_as_expr_let(
         eq_token,  //: Eq,
         expr,      //: Box<Expr>,
     } = expr_let;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_let };
@@ -559,8 +542,7 @@ fn quote_as_expr_loop(
         loop_token, //: Loop,
         body,       //: Block,
     } = expr_loop;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_loop };
@@ -592,8 +574,7 @@ fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::To
         body,            //: Box<Expr>,
         comma,           //: Option<Comma>,
     } = arm;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #arm };
@@ -676,8 +657,7 @@ fn quote_as_expr_match(
         arms, //: Vec<Arm>,
         .. // brace_token
     } = expr_match;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_match };
@@ -705,8 +685,7 @@ fn quote_as_expr_method_call(
         args, //: Punctuated<Expr, Comma>,
         .. // paren_token
     } = expr_method_call;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_method_call };
@@ -737,8 +716,7 @@ fn quote_as_expr_paren(
         expr, //: Box<Expr>,
         .. // paren_token
     } = expr_paren;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_paren };
@@ -779,8 +757,7 @@ fn quote_as_expr_range(
         limits, //: RangeLimits,
         end,    //: Option<Box<Expr>>,
     } = expr_range;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_range };
@@ -803,8 +780,7 @@ fn quote_as_expr_raw_addr(
         mutability, //: PointerMutability,
         expr,       //: Box<Expr>,
     } = expr_raw_addr;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_raw_addr };
@@ -823,8 +799,7 @@ fn quote_as_expr_reference(
         mutability, //: Option<Mut>,
         expr,       //: Box<Expr>,
     } = expr_reference;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_reference };
@@ -845,8 +820,7 @@ fn quote_as_expr_repeat(
         len, //: Box<Expr>,
         .. // bracket_token
     } = expr_repeat;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_repeat };
@@ -865,8 +839,7 @@ fn quote_as_expr_return(
         return_token, //: Return,
         expr,         //: Option<Box<Expr>>,
     } = expr_return;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_return };
@@ -887,8 +860,7 @@ fn quote_as_field_value(
         colon_token, //: Option<Colon>,
         expr,        //: Expr,
     } = field;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #field };
@@ -911,8 +883,7 @@ fn quote_as_expr_struct(
         rest, //: Option<Box<Expr>>,
         .. // brace_token
     } = expr_struct;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_struct };
@@ -971,8 +942,7 @@ fn quote_as_expr_try(
         expr,           //: Box<Expr>,
         question_token, //: Question,
     } = expr_try;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_try };
@@ -991,8 +961,7 @@ fn quote_as_expr_try_block(
         try_token, //: Try,
         block,     //: Block,
     } = expr_try_block;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_try_block };
@@ -1011,8 +980,7 @@ fn quote_as_expr_tuple(
         elems, //: Punctuated<Expr, Comma>,
         .. // paren_token
     } = expr_tuple;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_tuple };
@@ -1038,8 +1006,7 @@ fn quote_as_expr_unary(
         op,    //: UnOp,
         expr,  //: Box<Expr>,
     } = expr_unary;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_unary };
@@ -1058,8 +1025,7 @@ fn quote_as_expr_unsafe(
         unsafe_token, //: Unsafe,
         block,        //: Block,
     } = expr_unsafe;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_unsafe };
@@ -1079,8 +1045,7 @@ fn quote_as_expr_while(
         cond,        //: Box<Expr>,
         body,        //: Block,
     } = expr_while;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_while };
@@ -1099,8 +1064,7 @@ fn quote_as_expr_yield(
         yield_token, //: Yield,
         expr,        //: Option<Box<Expr>>,
     } = expr_yield;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #expr_yield };
@@ -1190,8 +1154,7 @@ fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macr
         init,       //: Option<LocalInit>,
         semi_token, //: Semi,
     } = local;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #local };
@@ -1592,8 +1555,7 @@ fn quote_as_item_fn(
         block, //: Box<Block>,
     } = item_fn;
 
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_fn };
@@ -1620,8 +1582,7 @@ fn quote_as_impl_item_fn(
         sig,         //: Signature,
         block,       //: Block,
     } = impl_item_fn;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #impl_item_fn };
@@ -1662,8 +1623,7 @@ fn quote_as_item_impl(
         .. // brace_token
     } = item_impl;
 
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_impl };
@@ -1728,8 +1688,7 @@ fn quote_as_item_mod(
         semi,      //: Option<Semi>,
     } = item_mod;
 
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_mod };
@@ -1771,8 +1730,7 @@ fn quote_as_item_static(
         semi_token,   //: Semi,
     } = item_static;
 
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_static };
@@ -1832,8 +1790,7 @@ fn quote_as_trait_item_const(
         default,     //: Option<(Eq, Expr)>, // NOTE: Can be (re)assigned in trait impl.
         semi_token,  //: Semi,
     } = trait_item_const;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #trait_item_const };
@@ -1855,8 +1812,7 @@ fn quote_as_trait_item_fn(
         default,    //: Option<Block>,
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #trait_item_fn };
@@ -1904,8 +1860,7 @@ fn quote_as_item_trait(
         .. // restriction, brace_token
     } = item_trait;
 
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+
     for attr in attrs {
         if attr.is_traverse_stopper() {
             return quote! { #item_trait };

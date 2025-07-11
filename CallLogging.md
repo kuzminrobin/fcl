@@ -1,10 +1,5 @@
 # TODO:
 * Overall clean-up.
-  * Consider removing
-    ```
-    // If the entity already has the (nested) traverse-stopping attribute
-    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
-    ```
   * Format all (`<Alt+Shift+f>`)
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
@@ -1246,3 +1241,8 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Review CallLoggerArbiter such that THREAD_SHARED_RITER is optional (and WriterAdapter is absent). 
 * Overall clean-up.
   * Remove commented code.
+  * Consider removing
+    ```
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    ```
