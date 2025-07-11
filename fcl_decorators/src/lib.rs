@@ -24,7 +24,7 @@ impl CommonDecorator {
 }
 
 // By example of `println!()`.
-macro_rules! decorator_write {
+macro_rules! decorator_write {  // TODO: Condsider renaming to `writer_write()`.
     ($self:ident, $($arg:tt)*) => {{
         let _result = write!($self.common.writer, $($arg)*);
     }};
@@ -255,7 +255,7 @@ impl CoderunNotifiable for TreeLikeDecorator {
         ); // E.g."<thread_indent><indent>+-Loop body", "| | | | +-Loop body"
     }
 
-    // NOTE: Reusing the default behavior of `notify_loopbody_end()` that does nothing.
+    // NOTE: Reusing the default implementation of `notify_loopbody_end()` that does nothing.
 }
 
 impl ThreadSpecifics for TreeLikeDecorator {

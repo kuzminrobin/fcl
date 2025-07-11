@@ -1,7 +1,5 @@
 # TODO:
 * Overall clean-up.
-  * Move privates down, publics up (in file).
-  * Refactor long functions (especially the CallGraph).
   * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
 * On the diagrams consider using `+` for `pub` and `-` for private.
 * Consider merging all the FCL crates into a single proc_macro crate.
@@ -84,6 +82,9 @@
   * Test against real code/projects
   * DocComment the code (write the Code Documentation)
     * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
+  * Static and dynamic analysis
+    * miri
+    * valgrind
   * Write the documentation
     * ReadMe.md
       * User Manual
@@ -1246,3 +1247,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
     // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
     ```
   * Format all (`<Alt+Shift+f>`)
+  * Refactor long functions (especially the CallGraph).
+  * Move privates down, publics up (in file).

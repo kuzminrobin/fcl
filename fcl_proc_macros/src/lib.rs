@@ -11,15 +11,6 @@ pub fn non_loggable(
     attributed_item
 }
 
-fn remove_spaces(s: &str) -> String {
-    // Preserve spaces in fragments like `<MyType as MyTrait>`.
-    let tmp_str: String = s
-        .replace(" as ", "$as$")
-        .chars()
-        .filter(|ch| *ch != ' ')
-        .collect();
-    tmp_str.replace("$as$", " as ")
-}
 #[proc_macro_attribute]
 pub fn loggable(
     attr_args: proc_macro::TokenStream,
@@ -49,6 +40,16 @@ pub fn loggable(
     };
     let ret_val = quote! { #output };
     ret_val.into()
+}
+
+fn remove_spaces(s: &str) -> String {
+    // Preserve spaces in fragments like `<MyType as MyTrait>`.
+    let tmp_str: String = s
+        .replace(" as ", "$as$")
+        .chars()
+        .filter(|ch| *ch != ' ')
+        .collect();
+    tmp_str.replace("$as$", " as ")
 }
 
 fn quote_as_expr_array(
