@@ -423,8 +423,6 @@ impl CallGraph {
                                                 self.caching_info.clear();
                                             }
                                         }
-                                        // // Return.
-                                        // return;
                                     }
                                     // Otherwise (differs)
                                     // If caching and the current node is the one being cached

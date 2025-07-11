@@ -49,7 +49,6 @@ pub fn loggable(
     };
     let ret_val = quote! { #output };
     ret_val.into()
-    // output.into()
 }
 
 fn quote_as_expr_array(
@@ -85,8 +84,8 @@ fn quote_as_expr_assign(
     expr_assign: &ExprAssign,
     prefix: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+    // a = compute()
     let ExprAssign {
-        // a = compute()
         attrs,    //: Vec<Attribute>,
         left,     //: Box<Expr>,
         eq_token, //: Eq,
@@ -204,11 +203,6 @@ fn quote_as_expr_break(
         }
     }
     let expr = expr.as_ref().map(|expr| quote_as_expr(expr, None, prefix));
-    // let expr = if let Some(expr) = expr {
-    //     Some(quote_as_expr(&expr, prefix))
-    // } else {
-    //     None
-    // };
     quote! { #(#attrs)* #break_token #label #expr }
 }
 fn quote_as_expr_call(
@@ -264,8 +258,8 @@ fn quote_as_expr_cast(
     expr_cast: &ExprCast,
     prefix: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
+    // foo as f64
     let ExprCast {
-        // foo as f64
         attrs,    //: Vec<Attribute>,
         expr,     //: Box<Expr>,
         as_token, //: As,
@@ -279,7 +273,6 @@ fn quote_as_expr_cast(
         }
     }
     let expr = quote_as_expr(expr, None, prefix);
-    // let ty = quote_as_type(ty, prefix);
     quote! { #(#attrs)* #expr #as_token #ty }
 }
 fn quote_as_expr_closure(
@@ -472,7 +465,7 @@ fn quote_as_expr_group(
     }
     let expr = quote_as_expr(&**expr, None, prefix);
     // the trait bound `syn::token::Group: quote::ToTokens` is not satisfied
-    quote! { #(#attrs)* #expr }
+    quote! { { #(#attrs)* #expr } }
 }
 fn quote_as_expr_if(
     expr_if: &ExprIf,
@@ -576,7 +569,7 @@ fn quote_as_expr_loop(
     let body = quote_as_loop_block(body, prefix);
     quote! {
         // // Ret val for `loop` has been deprioritized since it requires extra
-        // // refactoring for the case of empty (removed) loopbody.
+        // // refactoring for the case of a (removed) loopbody with no nested calls.
         // {
         //     let ret_val =
                 #(#attrs)* #label #loop_token #body
@@ -589,19 +582,6 @@ fn quote_as_expr_loop(
         //     ret_val
         // }
     }
-    // quote!{
-    //     {
-    //         let ret_val = {
-    //             #(#attrs)* #label #loop_token #body
-    //         };
-    //         fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-    //             if thread_logger.borrow_mut().logging_is_on() {
-    //                 thread_logger.borrow_mut().log_loop_end()
-    //             }
-    //         });
-    //         ret_val
-    //     }
-    // }
 }
 fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let Arm {
@@ -1218,14 +1198,6 @@ fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macr
         }
     }
 
-    // // Likely not applicable for instrumenting the run time functions and
-    // // closures (as opposed to compile time const functions and closures).
-    // // Work around "the trait bound `Vec<Attribute>: quote::ToTokens` is not satisfied":
-    // let mut iterated_attrs = quote!{};
-    // for attr in attrs {
-    //     iterated_attrs = quote!{ #iterated_attrs #attr };
-    // }
-
     let init = init.as_ref().map(|init| quote_as_init(init, prefix));
 
     quote! { #(#attrs)* #let_token #pat #init #semi_token }
@@ -1336,7 +1308,7 @@ fn update_param_data_from_pat(
         }
         // Pat::Lit(pat_lit) => ?,  // NOTE: Still questionable: Are literals applicable to params pattern?
         // The Rust Reference mentions/lists it but does not add clarity.
-        // CahtGPT states "Not Applicable for params".
+        // ChatGPT states "Not Applicable for params".
 
         // Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
         // Pat::Or(pat_or) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
@@ -1630,65 +1602,6 @@ fn quote_as_item_fn(
 
     let block = traversed_block_from_sig(block, sig, prefix);
     quote! { #(#attrs)* #vis #sig #block }
-
-    // // // Likely not applicable for instrumenting the run time functions and
-    // // // closures (as opposed to compile time const functions and closures).
-    // // let vis = quote_as_vis(vis, prefix);
-    // let Signature {
-    //     constness, //: Option<Const>,
-    //     asyncness, //: Option<Async>,
-    //     unsafety, //: Option<Unsafe>,
-    //     abi, //: Option<Abi>,
-    //     fn_token, //: Fn,
-    //     ident, //: Ident,
-    //     generics, //: Generics,
-    //     // paren_token, //: Paren,
-    //     inputs, //: Punctuated<FnArg, Comma>,
-    //     variadic, //: Option<Variadic>,
-    //     output, //: ReturnType
-    //     .. // paren_token
-    // } = sig;
-    // // // Likely not applicable for instrumenting the run time functions and
-    // // // closures (as opposed to compile time const functions and closures).
-    // // let generics = quote_as_generics(generics, prefix);
-    // // // Likely not applicable for instrumenting the run time functions and
-    // // // closures (as opposed to compile time const functions and closures).
-    // // let inputs = {
-    // //     let mut traversed_inputs = quote!{};
-    // //     for input in inputs {
-    // //         let input = quote_as_fn_arg(input, prefix);
-    // //         traversed_inputs = quote!{ #traversed_inputs #input, }
-    // //     }
-    // //     traversed_inputs
-    // // };
-    // // // Likely not applicable for instrumenting the run time functions and
-    // // // closures (as opposed to compile time const functions and closures).
-    // // let variadic = variadic.as_ref().map(|variadic| {
-    // //     let Variadic {
-    // //         attrs, //: Vec<Attribute>,
-    // //         pat, //: Option<(Box<Pat>, Colon)>,
-    // //         dots, //: DotDotDot,
-    // //         comma, //: Option<Comma>,
-    // //     } = variadic;
-    // //     let pat = pat.as_ref().map(|(pat, colon)| {
-    // //         // // Likely not applicable for instrumenting the run time functions and
-    // //         // // closures (as opposed to compile time const functions and closures).
-    // //         // let pat = quote_as_pat(pat, prefix);
-    // //         quote!{ #pat #colon }
-    // //     });
-    // //     quote!{ #(#attrs)* #pat #dots #comma }
-    // // });
-    // // // Likely not applicable for instrumenting the run time functions and
-    // // // closures (as opposed to compile time const functions and closures).
-    // // let output = quote_as_return_type(output, prefix);
-
-    // // Add the function name to the prefix:
-    // let prefix = quote!{ #prefix::#ident };
-
-    // let block = quote_as_block(block, prefix);
-    // quote!{ #(#attrs)* #vis
-    //     #constness #asyncness #unsafety #abi #fn_token #ident #generics ( #inputs #variadic ) #output
-    //     #block }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -1823,10 +1736,6 @@ fn quote_as_item_mod(
         }
     }
 
-    // // Likely not applicable for instrumenting the run time functions and
-    // // closures (as opposed to compile time const functions and closures).
-    // let vis = quote_as_vis(vis, prefix);
-
     let prefix = {
         if prefix.is_empty() {
             quote! { #ident }
@@ -1834,7 +1743,7 @@ fn quote_as_item_mod(
             quote! { #prefix::#ident }
         }
     };
-    // let prefix = quote!{ #prefix::#ident };
+
     let content = content.as_ref().map(|(_brace, items)| {
         let mut traversed_items = quote! {};
         for item in items {
@@ -2446,11 +2355,8 @@ mod kw {
 
 struct FclQSelf {
     // <T as U::V>
-    _lt_token: Token![<],
     ty: Box<Type>,
-    _as_token: Token![as],
     path: Path,
-    _gt_token: Token![>],
 }
 impl quote::ToTokens for FclQSelf {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
@@ -2471,13 +2377,15 @@ impl quote::ToTokens for FclQSelf {
 }
 impl Parse for FclQSelf {
     fn parse(input: parse::ParseStream) -> Result<Self> {
+        // <T as U::V>
+        input.parse::<Token![<]>()?;
+        let ty = input.parse()?;
+        input.parse::<Token![as]>()?;
+        let path = input.parse()?;
+        input.parse::<Token![>]>()?;
         Ok(Self {
-            _lt_token: input.parse()?,
-            ty: input.parse()?,
-            _as_token: input.parse()?,
-            path: input.parse()?,
-            // as_clause: Some((input.parse()?, input.parse()?)),
-            _gt_token: input.parse()?,
+            ty,
+            path
         })
     }
 }

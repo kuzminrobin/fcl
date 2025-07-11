@@ -3,14 +3,7 @@ use std::{
 };
 
 use code_commons::{CoderunNotifiable, ItemKind, RepeatCountCategory};
-// use code_commons::{CalleeName, CoderunNotifiable, RepeatCountCategory};
 use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
-
-// macro_rules! CLOSURE_NAME_FORMAT {
-//     () => {
-//         "closure{{{},{}:{},{}}}"
-//     }; // E.g. "closure{112,9:116,34}"
-// }
 
 struct CommonDecorator {
     writer: Box<dyn Write>,
@@ -23,15 +16,6 @@ impl CommonDecorator {
             thread_indent: String::from(""),
         }
     }
-    // fn get_callee_name_string(name: &CalleeName) -> String {
-    //     match name {
-    //         CalleeName::Function(name) => name.clone(),
-    //         CalleeName::Closure(info) => String::from(format!(
-    //             CLOSURE_NAME_FORMAT!(),
-    //             info.start_line, info.start_column, info.end_line, info.end_column
-    //         )),
-    //     }
-    // }
     fn set_thread_indent(&mut self, thread_indent: String) {
         self.thread_indent = thread_indent;
     }
@@ -82,10 +66,8 @@ impl CoderunNotifiable for CodeLikeDecorator {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before an output of another thread.
             self.line_end_pending = false;
         }
-        // let _ = self.common.writer.flush();
     }
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
-        // fn notify_call(&mut self, call_depth: usize, name: &CalleeName) {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
         }
@@ -99,7 +81,6 @@ impl CoderunNotifiable for CodeLikeDecorator {
                 .as_ref()
                 .map(|string| string.as_str())
                 .unwrap_or(&""),
-            // CommonDecorator::get_callee_name_string(name)
         ); // E.g. "<thread_indent><indent>sibling() {"
         self.line_end_pending = true; // '\n' pending. Won't be printed if there will be no nested calls (immediate "}\n").
     }
@@ -144,7 +125,6 @@ impl CoderunNotifiable for CodeLikeDecorator {
             self.common.get_thread_indent(),
             self.get_indent_string(call_depth),
             item_name,
-            // name,
             count.to_string()
         );
     }

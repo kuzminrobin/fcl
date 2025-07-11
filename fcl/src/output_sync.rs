@@ -40,9 +40,6 @@ impl StdOutputRedirector {
     pub fn clone_original_writer(&self) -> filedescriptor::Result<File> {
         self.original_std_output_fd.as_file()
     }
-    // pub fn get_original_writer(&mut self) -> &mut dyn Write {
-    //     &mut self.original_std_output_fd
-    // }
     pub fn get_buffer_reader(&mut self) -> &mut dyn Read {
         &mut self.tmpfile_for_fcl_to_read_from
     }

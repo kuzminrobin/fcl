@@ -80,11 +80,6 @@ impl CallLogger for CallLogInfra {
     fn log_loopbody_end(&mut self) {
         self.call_graph.add_loopbody_end()
     }
-    // fn log_loop_end(&mut self) {
-    //     self.call_graph.add_loop_end()
-    // fn set_loop_ret_val(&mut self, ret_val: String) {
-    //     self.call_graph.set_loop_ret_val(ret_val)
-    // }
 }
 
 struct ThreadIndents {
@@ -210,51 +205,51 @@ impl CallLoggerArbiter {
     }
     #[cfg(not(feature = "minimal_writer"))]
     pub fn set_std_output_sync(&mut self) {
-        if let Some(thread_shared_writer) = self.thread_shared_writer.clone() {
-            // Set stdout and stderr redirection to a corresponding buffer (set std output buffering):
-            let writer_kind = thread_shared_writer.borrow().get_writer_kind();
-            // let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
-            self.stderr_redirector =
-                self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
-            self.stdout_redirector =
-                self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
+        let Some(thread_shared_writer) = self.thread_shared_writer.clone() else { return };
 
-            // Recover {FCL's own logging directly to the original stdout (or stderr)}
-            // while still buffering the program's {stdout and stderr} output.
-            // Get the original std writer:
-            let get_original_writer_result = if writer_kind == WriterKind::Stderr {
-                self.stderr_redirector
-                    .as_ref()
-                    .map(|redirector| redirector.clone_original_writer())
-            } else if writer_kind == WriterKind::Stdout {
-                self.stdout_redirector
-                    .as_ref()
-                    .map(|redirector| redirector.clone_original_writer())
-            } else {
-                // FCL is outputing to a non-std stream (file, socket, pipe, etc.).
-                // Nothing to recover.
-                None
-            };
-            // Tell Thread Shared Writer to write the FCL's own output to the original std writer:
-            get_original_writer_result.map(|result| match result {
-                Ok(file) => thread_shared_writer.borrow_mut().set_writer(file),
-                // Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
-                Err(e) => {
-                    // Something is wrong with std{out|err}, log the error to the opposite stream (std{err|out}):
-                    let report_stream: &mut dyn std::io::Write =
-                        if writer_kind == WriterKind::Stderr {
-                            &mut std::io::stdout()
-                        } else {
-                            &mut std::io::stderr()
-                        };
-                    let _ignore_another_error = writeln!(
-                        report_stream,
-                        "Warning: Failed to sync FCL and {:?} output: '{}'",
-                        writer_kind, e
-                    );
-                }
-            });
-        }
+        // Set stdout and stderr redirection to a corresponding buffer (set std output buffering):
+        let writer_kind = thread_shared_writer.borrow().get_writer_kind();
+        // let writer_kind = self.thread_shared_writer.borrow().get_writer_kind();
+        self.stderr_redirector =
+            self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stderr());
+        self.stdout_redirector =
+            self.set_stdx_sync(writer_kind, StdOutputRedirector::new_stdout());
+
+        // Recover {FCL's own logging directly to the original stdout (or stderr)}
+        // while still buffering the program's {stdout and stderr} output.
+        // Get the original std writer:
+        let get_original_writer_result = if writer_kind == WriterKind::Stderr {
+            self.stderr_redirector
+                .as_ref()
+                .map(|redirector| redirector.clone_original_writer())
+        } else if writer_kind == WriterKind::Stdout {
+            self.stdout_redirector
+                .as_ref()
+                .map(|redirector| redirector.clone_original_writer())
+        } else {
+            // FCL is outputing to a non-std stream (file, socket, pipe, etc.).
+            // Nothing to recover.
+            None
+        };
+        // Tell Thread Shared Writer to write the FCL's own output to the original std writer:
+        get_original_writer_result.map(|result| match result {
+            Ok(file) => thread_shared_writer.borrow_mut().set_writer(file),
+            // Ok(file) => self.thread_shared_writer.borrow_mut().set_writer(file),
+            Err(e) => {
+                // Something is wrong with std{out|err}, log the error to the opposite stream (std{err|out}):
+                let report_stream: &mut dyn std::io::Write =
+                    if writer_kind == WriterKind::Stderr {
+                        &mut std::io::stdout()
+                    } else {
+                        &mut std::io::stderr()
+                    };
+                let _ignore_another_error = writeln!(
+                    report_stream,
+                    "Warning: Failed to sync FCL and {:?} output: '{}'",
+                    writer_kind, e
+                );
+            }
+        });
     }
     #[cfg(not(feature = "minimal_writer"))]
     fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {

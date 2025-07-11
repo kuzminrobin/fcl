@@ -4,20 +4,6 @@
 mod call_graph;
 pub use call_graph::CallGraph;
 
-// #[derive(PartialEq, Clone)]
-// pub struct ClosureInfo {
-//     pub start_line: usize,
-//     pub start_column: usize,
-//     pub end_line: usize,
-//     pub end_column: usize,
-// }
-
-// #[derive(PartialEq, Clone)]
-// pub enum CalleeName {
-//     Function(String),
-//     Closure(ClosureInfo),
-// }
-
 /// Function call repeat count data type.
 type RepeatCountType = usize;
 /// The maximum value (saturation value) for the function call repeat count data type.
@@ -49,13 +35,6 @@ pub enum ItemKind {
     },
     /// Item is a loop body.
     Loopbody 
-    // {
-    //     /// Flag that tells that the loop has ended (the loop body has ended the loop).  
-    //     /// Surves for distinguishing
-    //     /// the last iteration of an earlier loop from the first iteration of an
-    //     /// immediately following loop. So that the two loops are not logged as one.
-    //     ended_the_loop: bool,
-    // },
 }
 impl ItemKind {
     pub fn is_call(&self) -> bool {

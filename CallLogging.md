@@ -1,7 +1,12 @@
 # TODO:
 * Overall clean-up.
+  * Consider removing
+    ```
+    // If the entity already has the (nested) traverse-stopping attribute
+    // (`#[loggable]` or `#[non_loggable]`) then leave the entity as is:
+    ```
+  * Format all (`<Alt+Shift+f>`)
   * Refactor long functions (especially the CallGraph).
-  * Remove commented code.
   * Move privates down, publics up (in file).
   * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
 * On the diagrams consider using `+` for `pub` and `-` for private.
@@ -10,13 +15,20 @@
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
 * Test
   * Testing
+    * Features
+      * minimal_writer
+      * singlethreaded
+      * multithreaded
+    * Decorators
+      * CodeLike
+      * TreeLike
+    * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
+    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
     * Log to string/Vector and compare.
     * Basics (from user/main.rs).
     * std output and panic sync.
-    * Enable/disable.
-    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+    * Enable/disable logging.
     * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
-    * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
     * ```rs
       // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
       // Const(ItemConst)
@@ -1232,3 +1244,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Overall clean-up.
   * TODOs.
 * Review CallLoggerArbiter such that THREAD_SHARED_RITER is optional (and WriterAdapter is absent). 
+* Overall clean-up.
+  * Remove commented code.

@@ -1,5 +1,4 @@
 #[fcl_proc_macros::loggable]
-// #[fcl_proc_macros::loggable(singlethreaded)]
 pub fn main() {
     // fcl::_single_threaded_otimization!();
     // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.

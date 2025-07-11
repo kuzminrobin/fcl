@@ -6,7 +6,6 @@
 use std::thread;
 use std::time::Duration;
 
-// use fcl::call_log_infra::THREAD_LOGGER;
 use fcl_proc_macros::{loggable, non_loggable};
 
 #[loggable]
@@ -35,8 +34,6 @@ fn _h() {
 }
 
 #[loggable] 
-// #[somemyattr]
-// #[anotherattr]
 pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64 {
     #[loggable]
     fn j(_x: u32, _y: u32) -> bool {
@@ -74,9 +71,7 @@ fn calls() {
 
     let _b = Some(true).map(
         // #[loggable]
-        // #[rustfmt::skip]
         move |b| -> bool {
-            /*println!("Lambda"); */
             Some(b)
                 .map(
                     // main()::closure()::closure() {}
