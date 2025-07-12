@@ -1,7 +1,4 @@
 # TODO:
-* Overall clean-up.
-  * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
-* On the diagrams consider using `+` for `pub` and `-` for private.
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
@@ -42,6 +39,8 @@
       * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
         log thread func or not).
       * Customizing the thread indent.
+* Overall clean-up.
+  * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
 * Consider toolchain stable or document why inachievable.
 * (Low priority) Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
   in both threads, has `main()` destructors reporting the returns during stack unwinding:
@@ -86,6 +85,7 @@
     * miri
     * valgrind
   * Write the documentation
+    * On the diagrams consider using `+` for `pub` and `-` for private.
     * ReadMe.md
       * User Manual
         * Document that sequential loops can be logged as a single loop (if the iterations are equal).
