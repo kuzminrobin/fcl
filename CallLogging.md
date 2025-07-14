@@ -1,8 +1,6 @@
 # TODO:
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
-  * Move writer.rs
-  * Remove traits.rs
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
 * Test
   * Testing
@@ -87,6 +85,7 @@
     * miri
     * valgrind
   * Write the documentation
+    * Extract fcl_doc into something separate.
     * On the diagrams consider using `+` for `pub` and `-` for private.
     * ReadMe.md
       * User Manual
@@ -1251,3 +1250,6 @@ Let me know if you want a complete working example with both `stdout` and `stder
   * Format all (`<Alt+Shift+f>`)
   * Refactor long functions (especially the CallGraph).
   * Move privates down, publics up (in file).
+* Consider merging all the FCL crates into a single proc_macro crate.
+  * Move writer.rs
+  * Remove traits.rs

@@ -1,11 +1,13 @@
 // TODO: Review the order.
+use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock, thread};
+#[cfg(not(feature = "minimal_writer"))]
+use std::cell::LazyCell;
+#[cfg(not(feature = "singlethreaded"))]
+use std::sync::Arc;
+
 use code_commons::{CallGraph, CoderunNotifiable};
 use crate::CallLogger;
-// use fcl_traits::{CallLogger};   //, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 use crate::decorators::{ThreadSpecifics, CoderunThreadSpecificNotifyable};
-#[cfg(not(feature = "minimal_writer"))]
-use std::{cell::LazyCell, sync::Arc};
-use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock, thread};
 
 // TODO: Consider mving `#[cfg(not(feature = "minimal_writer"))]` to here from mod writer.
 mod writer;

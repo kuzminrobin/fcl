@@ -1,6 +1,5 @@
 #![feature(specialization)]
 
-mod traits;
 pub mod call_log_infra;
 pub mod decorators;
 #[cfg(not(feature = "singlethreaded"))]
