@@ -11,9 +11,11 @@ use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock
 mod writer;
 
 #[cfg(not(feature = "minimal_writer"))]
+use writer::{THREAD_SHARED_WRITER, ThreadSharedWriterPtr, WriterAdapter, WriterKind};
+#[cfg(not(feature = "minimal_writer"))]
 use crate::{
     output_sync::StdOutputRedirector,
-    writer::{THREAD_SHARED_WRITER, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
+    // writer::{THREAD_SHARED_WRITER, ThreadSharedWriterPtr, WriterAdapter, WriterKind},
 };
 
 macro_rules! NO_LOGGER_ERR_STR {

@@ -1,8 +1,0 @@
-[package]
-name = "fcl_decorators"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-fcl_traits = { path = "../fcl_traits" }
-code_commons = { path = "../code_commons" }
