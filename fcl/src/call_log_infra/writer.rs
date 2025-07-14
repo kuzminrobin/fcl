@@ -1,5 +1,3 @@
-#![cfg(not(feature = "minimal_writer"))]
-
 use std::{
     cell::RefCell,
     io::{stderr, stdout, Write},

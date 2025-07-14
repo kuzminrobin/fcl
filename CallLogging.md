@@ -1,5 +1,6 @@
 # TODO:
 * Consider merging all the FCL crates into a single proc_macro crate.
+  * Cleanup
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
 * Test
