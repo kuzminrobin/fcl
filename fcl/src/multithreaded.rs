@@ -2,7 +2,8 @@ pub use std::sync::{Mutex, MutexGuard};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::call_log_infra::CallLoggerArbiter;
-use fcl_traits::CallLogger;
+use crate::CallLogger;
+// use fcl_traits::CallLogger;
 
 /// #### Examples
 /// ```rs

@@ -1,6 +1,6 @@
 // The code_commons crate is to be reused for various code-handling projects.
 mod call_graph;
-pub use call_graph::CallGraph;
+pub use call_graph::{CallGraph, ItemKind, RepeatCountCategory};
 
 /// Trait to be implemented by the instances that need to be notified about the code run events
 /// (such as function or closure calls, returns, etc.).

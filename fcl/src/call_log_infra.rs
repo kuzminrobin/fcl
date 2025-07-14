@@ -1,8 +1,14 @@
+// TODO: Review the order.
 use code_commons::{CallGraph, CoderunNotifiable};
-use fcl_traits::{CallLogger, CoderunThreadSpecificNotifyable, ThreadSpecifics};
+use crate::CallLogger;
+// use fcl_traits::{CallLogger};   //, CoderunThreadSpecificNotifyable, ThreadSpecifics};
+use crate::decorators::{ThreadSpecifics, CoderunThreadSpecificNotifyable};
 #[cfg(not(feature = "minimal_writer"))]
 use std::{cell::LazyCell, sync::Arc};
 use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock, thread};
+
+// TODO: Consider mving `#[cfg(not(feature = "minimal_writer"))]` to here from mod writer.
+mod writer;
 
 #[cfg(not(feature = "minimal_writer"))]
 use crate::{
@@ -579,10 +585,12 @@ pub mod instances {
             let writer: Option<Box<dyn Write>> = None;
 
             let logging_infra = Box::new(CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
-                // fcl_decorators::TreeLikeDecorator::new(
+                // crate::decorators::TreeLikeDecorator::new(
+                // // fcl_decorators::TreeLikeDecorator::new(
                 //     writer,
                 //     None, None, None))))))
-                fcl_decorators::CodeLikeDecorator::new(
+                crate::decorators::CodeLikeDecorator::new(
+                // fcl_decorators::CodeLikeDecorator::new(
                     writer,
                     None)))));
             (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
@@ -605,10 +613,12 @@ pub mod instances {
     thread_local! {
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
             let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
+                // crate::decorators::TreeLikeDecorator::new(
                 // fcl_decorators::TreeLikeDecorator::new(
                 //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                 //     None, None, None))))))
-                fcl_decorators::CodeLikeDecorator::new(
+                crate::decorators::CodeLikeDecorator::new(
+                // fcl_decorators::CodeLikeDecorator::new(
                     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                     None)))));
             match (*THREAD_GATEKEEPER).lock() {

@@ -1,7 +1,18 @@
 use std::io::{Write, stdout};
 
 use code_commons::{CoderunNotifiable, ItemKind, RepeatCountCategory};
-use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
+// use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
+
+/// Trait to be implemented by the instances that handle any thread specifics.
+pub trait ThreadSpecifics {
+    /// Sets the thread code run output indentation. E.g. if there are 2 threads,
+    /// one thread's output can be logged in the left half of the console,
+    /// and the other thread's output can be logged in the right half,
+    /// or _indented_ by half of the console width.
+    fn set_thread_indent(&mut self, thread_indent: String);
+}
+
+pub trait CoderunThreadSpecificNotifyable: CoderunNotifiable + ThreadSpecifics {}
 
 struct CommonDecorator {
     writer: Box<dyn Write>,
@@ -44,9 +55,6 @@ impl CodeLikeDecorator {
             line_end_pending: false,
         }
     }
-}
-
-impl CoderunDecorator for CodeLikeDecorator {
     fn get_indent_string(&self, call_depth: usize) -> String {
         let mut indent_string = String::with_capacity(8);
         for _ in 0..call_depth {
@@ -55,6 +63,16 @@ impl CoderunDecorator for CodeLikeDecorator {
         indent_string
     }
 }
+
+// impl CoderunDecorator for CodeLikeDecorator {
+//     fn get_indent_string(&self, call_depth: usize) -> String {
+//         let mut indent_string = String::with_capacity(8);
+//         for _ in 0..call_depth {
+//             indent_string.push_str(self.indent_step);
+//         }
+//         indent_string
+//     }
+// }
 
 const LOOPBODY_NAME: &str = &"Loop body";
 
@@ -194,9 +212,6 @@ impl TreeLikeDecorator {
             indent_step_parent : indent_step_parent .unwrap_or(&"| ")
         }
     }
-}
-
-impl CoderunDecorator for TreeLikeDecorator {
     fn get_indent_string(&self, call_depth: usize) -> String {
         let mut indent_string = String::with_capacity(8);
         for _ in 0..call_depth {
@@ -205,6 +220,16 @@ impl CoderunDecorator for TreeLikeDecorator {
         indent_string
     }
 }
+
+// impl CoderunDecorator for TreeLikeDecorator {
+//     fn get_indent_string(&self, call_depth: usize) -> String {
+//         let mut indent_string = String::with_capacity(8);
+//         for _ in 0..call_depth {
+//             indent_string.push_str(self.indent_step_parent);
+//         }
+//         indent_string
+//     }
+// }
 
 impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {

@@ -1,17 +1,36 @@
 #![feature(specialization)]
 
+mod traits;
 pub mod call_log_infra;
+pub mod decorators;
 #[cfg(not(feature = "singlethreaded"))]
 pub mod multithreaded;
 mod output_sync;
 #[cfg(feature = "singlethreaded")]
 pub mod singlethreaded;
-mod writer;
+// // TODO: Consider mving `#[cfg(not(feature = "minimal_writer"))]` to here from mod writer.
+// mod writer;
 
-#[cfg(feature = "singlethreaded")]
-use fcl_traits::CallLogger;
+// #[cfg(feature = "singlethreaded")]
+// use fcl_traits::CallLogger;
 
 use call_log_infra::instances::THREAD_LOGGER;
+
+pub trait CallLogger {
+    fn push_logging_is_on(&mut self, is_on: bool);
+    fn pop_logging_is_on(&mut self);
+    fn logging_is_on(&self) -> bool;
+    fn set_logging_is_on(&mut self, is_on: bool);
+
+    fn set_thread_indent(&mut self, _thread_indent: String) {}
+
+    fn log_call(&mut self, name: &str, param_vals: Option<String>);
+    fn log_ret(&mut self, ret_val: Option<String>);
+    fn flush(&mut self) {}
+    fn maybe_flush(&mut self);
+    fn log_loopbody_start(&mut self);
+    fn log_loopbody_end(&mut self);
+}
 
 pub trait MaybePrint {
     fn maybe_print(&self) -> String;

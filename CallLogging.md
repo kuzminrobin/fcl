@@ -1,6 +1,8 @@
 # TODO:
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
+  * Move writer.rs
+  * Remove traits.rs
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
 * Test
   * Testing

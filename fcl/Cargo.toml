@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-fcl_traits = { path = "../fcl_traits" }
-fcl_decorators = { path = "../fcl_decorators" }
+#fcl_traits = { path = "../fcl_traits" }
+#fcl_decorators = { path = "../fcl_decorators" }
 code_commons = { path = "../code_commons" }
-fcl_proc_macros = { path = "../fcl_proc_macros" }
+#fcl_proc_macros = { path = "../fcl_proc_macros" }
 filedescriptor = "0.8.3"
 tempfile = "3.20.0"
 

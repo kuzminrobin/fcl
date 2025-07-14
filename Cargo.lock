@@ -39,36 +39,17 @@ name = "fcl"
 version = "0.1.0"
 dependencies = [
  "code_commons",
- "fcl_decorators",
- "fcl_proc_macros",
- "fcl_traits",
  "filedescriptor",
  "tempfile",
-]
-
-[[package]]
-name = "fcl_decorators"
-version = "0.1.0"
-dependencies = [
- "code_commons",
- "fcl_traits",
 ]
 
 [[package]]
 name = "fcl_proc_macros"
 version = "0.1.0"
 dependencies = [
- "fcl_traits",
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "fcl_traits"
-version = "0.1.0"
-dependencies = [
- "code_commons",
 ]
 
 [[package]]
@@ -205,7 +186,6 @@ version = "0.1.0"
 dependencies = [
  "fcl",
  "fcl_proc_macros",
- "fcl_traits",
 ]
 
 [[package]]
@@ -213,9 +193,7 @@ name = "user_all"
 version = "0.1.0"
 dependencies = [
  "fcl",
- "fcl_decorators",
  "fcl_proc_macros",
- "fcl_traits",
 ]
 
 [[package]]

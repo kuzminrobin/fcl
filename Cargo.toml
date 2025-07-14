@@ -3,7 +3,15 @@
 resolver = "3"
 
 members = [ "code_commons",
-    "fcl", "fcl_decorators",                  # Rust code.
-    "fcl_proc_macros", "fcl_traits",      # Proc macros. Compiled before the actual compilation of other crates. 
-    "user", "user_all",                 # Bin crate to run/test the fcl.
+    # Rust code.
+    "fcl", 
+    #"fcl_decorators", 
+    #"fcl_traits",      
+    
+    # Proc macros. Compiled before the actual compilation of other crates.                  
+    "fcl_proc_macros", 
+
+    # Bin crates to run/test the fcl.
+    "user", 
+    "user_all",                 
 ]
