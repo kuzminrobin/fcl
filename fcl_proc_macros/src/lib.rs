@@ -355,7 +355,6 @@ fn quote_as_expr_closure(
         #or1_token #inputs #or2_token #output
         {
             use fcl::{CallLogger, MaybePrint};
-            // use fcl_traits::CallLogger;
             let param_val_str = #input_vals;
             let mut optional_callee_logger = None;
 
@@ -1523,7 +1522,6 @@ fn traversed_block_from_sig(
                 }
 
                 use fcl::{CallLogger, MaybePrint};
-                // use fcl_traits::CallLogger;
                 let param_val_str = #inputs;
                 let mut callee_logger =
                     fcl::FunctionLogger::new(&generic_func_name, param_val_str);

@@ -64,16 +64,6 @@ impl CodeLikeDecorator {
     }
 }
 
-// impl CoderunDecorator for CodeLikeDecorator {
-//     fn get_indent_string(&self, call_depth: usize) -> String {
-//         let mut indent_string = String::with_capacity(8);
-//         for _ in 0..call_depth {
-//             indent_string.push_str(self.indent_step);
-//         }
-//         indent_string
-//     }
-// }
-
 const LOOPBODY_NAME: &str = &"Loop body";
 
 impl CoderunNotifiable for CodeLikeDecorator {
@@ -220,16 +210,6 @@ impl TreeLikeDecorator {
         indent_string
     }
 }
-
-// impl CoderunDecorator for TreeLikeDecorator {
-//     fn get_indent_string(&self, call_depth: usize) -> String {
-//         let mut indent_string = String::with_capacity(8);
-//         for _ in 0..call_depth {
-//             indent_string.push_str(self.indent_step_parent);
-//         }
-//         indent_string
-//     }
-// }
 
 impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {

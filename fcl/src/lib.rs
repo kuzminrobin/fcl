@@ -7,11 +7,6 @@ pub mod multithreaded;
 mod output_sync;
 #[cfg(feature = "singlethreaded")]
 pub mod singlethreaded;
-// // TODO: Consider mving `#[cfg(not(feature = "minimal_writer"))]` to here from mod writer.
-// mod writer;
-
-// #[cfg(feature = "singlethreaded")]
-// use fcl_traits::CallLogger;
 
 use call_log_infra::instances::THREAD_LOGGER;
 

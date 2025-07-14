@@ -2,7 +2,9 @@
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Cleanup
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
+* Consider breaking-up proc_macros/lib into multiple files (expr, item, patterns).
 * Customizable params and ret_val logging enabling/disabling (global, per-case).  
+  * Feature skip_params, skip_ret_val.
 * Test
   * Testing
     * Features

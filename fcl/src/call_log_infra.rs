@@ -586,11 +586,9 @@ pub mod instances {
 
             let logging_infra = Box::new(CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // crate::decorators::TreeLikeDecorator::new(
-                // // fcl_decorators::TreeLikeDecorator::new(
                 //     writer,
                 //     None, None, None))))))
                 crate::decorators::CodeLikeDecorator::new(
-                // fcl_decorators::CodeLikeDecorator::new(
                     writer,
                     None)))));
             (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
@@ -614,11 +612,9 @@ pub mod instances {
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
             let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
                 // crate::decorators::TreeLikeDecorator::new(
-                // fcl_decorators::TreeLikeDecorator::new(
                 //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                 //     None, None, None))))))
                 crate::decorators::CodeLikeDecorator::new(
-                // fcl_decorators::CodeLikeDecorator::new(
                     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
                     None)))));
             match (*THREAD_GATEKEEPER).lock() {

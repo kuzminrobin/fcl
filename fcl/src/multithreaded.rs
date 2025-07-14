@@ -3,7 +3,6 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::call_log_infra::CallLoggerArbiter;
 use crate::CallLogger;
-// use fcl_traits::CallLogger;
 
 /// #### Examples
 /// ```rs

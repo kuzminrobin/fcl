@@ -5,8 +5,6 @@ resolver = "3"
 members = [ "code_commons",
     # Rust code.
     "fcl", 
-    #"fcl_decorators", 
-    #"fcl_traits",      
     
     # Proc macros. Compiled before the actual compilation of other crates.                  
     "fcl_proc_macros", 
