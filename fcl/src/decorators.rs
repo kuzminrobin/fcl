@@ -1,10 +1,13 @@
-use std::io::{Write, stdout};
+use std::{
+    cell::RefCell,
+    io::{Write, stdout},
+    rc::Rc,
+};
 
 use code_commons::{CoderunNotifiable, ItemKind, RepeatCountCategory};
-// use fcl_traits::{CoderunDecorator, CoderunThreadSpecificNotifyable, ThreadSpecifics};
 
 /// Trait to be implemented by the instances that handle any thread specifics.
-pub trait ThreadSpecifics {
+pub trait ThreadSpecific {
     /// Sets the thread code run output indentation. E.g. if there are 2 threads,
     /// one thread's output can be logged in the left half of the console,
     /// and the other thread's output can be logged in the right half,
@@ -12,16 +15,24 @@ pub trait ThreadSpecifics {
     fn set_thread_indent(&mut self, thread_indent: String);
 }
 
-pub trait CoderunThreadSpecificNotifyable: CoderunNotifiable + ThreadSpecifics {}
+pub trait WriterPossessor {
+    fn set_writer(&mut self, _writer: Rc<RefCell<dyn Write>>) {}
+}
 
+pub trait LogDecorator: CoderunNotifiable + ThreadSpecific + WriterPossessor {}
+
+enum Writer {
+    Actual(Box<dyn Write>),
+    Substitute(Rc<RefCell<dyn Write>>),
+}
 struct CommonDecorator {
-    writer: Box<dyn Write>,
+    writer: Writer, //Box<dyn Write>,
     thread_indent: String,
 }
 impl CommonDecorator {
     fn new(writer: Option<Box<dyn Write>>) -> Self {
         Self {
-            writer: writer.unwrap_or(Box::new(stdout())),
+            writer: Writer::Actual(writer.unwrap_or(Box::new(stdout()))),
             thread_indent: String::from(""),
         }
     }
@@ -32,12 +43,24 @@ impl CommonDecorator {
     fn get_thread_indent(&self) -> String {
         self.thread_indent.clone()
     }
+
+    fn set_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
+        self.writer = Writer::Substitute(writer);
+    }
 }
 
 // By example of `println!()`.
 macro_rules! decorator_write {  // TODO: Condsider renaming to `writer_write()`.
     ($self:ident, $($arg:tt)*) => {{
-        let _result = write!($self.common.writer, $($arg)*);
+        let writer = match &mut $self.common.writer {
+        // let _ignore_result = match &mut $self.common.writer {
+            Writer::Actual(writer) => &mut **writer,
+            Writer::Substitute(writer) => &mut *writer.borrow_mut(),
+            // Writer::Actual(writer) => write!(writer, $($arg)*),
+            // Writer::Substitute(writer) => write!(writer.borrow_mut(), $($arg)*)
+        };
+        let _ignore_result = write!(writer, $($arg)*);
+        // let _ignore_result = write!($self.common.writer, $($arg)*);
     }};
 }
 
@@ -62,6 +85,12 @@ impl CodeLikeDecorator {
         }
         indent_string
     }
+    fn get_indents(&self, call_depth: usize) -> (String, String) {
+        (
+            self.common.get_thread_indent(),
+            self.get_indent_string(call_depth),
+        )
+    }
 }
 
 const LOOPBODY_NAME: &str = &"Loop body";
@@ -77,11 +106,14 @@ impl CoderunNotifiable for CodeLikeDecorator {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
         }
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}{}({}) {{",
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0,
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             name,
             param_vals
                 .as_ref()
@@ -104,11 +136,14 @@ impl CoderunNotifiable for CodeLikeDecorator {
         if !has_nested_calls && self.line_end_pending {
             decorator_write!(self, "}}{}\n", ret_val_str); // "}\n"
         } else {
+            let indents = self.get_indents(call_depth);
             decorator_write!(
                 self,
                 "{}{}}}{} // {}().\n", // E.g. "<thread_indent><indent>} -> RetVal // sibling().\n".
-                self.common.get_thread_indent(),
-                self.get_indent_string(call_depth),
+                indents.0, 
+                indents.1,
+                // self.common.get_thread_indent(),
+                // self.get_indent_string(call_depth),
                 ret_val_str,
                 name
             );
@@ -125,11 +160,14 @@ impl CoderunNotifiable for CodeLikeDecorator {
             ItemKind::Call { name, .. } => format!("{}()", name),
             ItemKind::Loopbody { .. } => String::from(LOOPBODY_NAME), //"Loop body"),
         };
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}// {} repeats {} time(s).\n", // E.g. "<thread_indent><indent>// sibling() repeats 8 time(s).\n"
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0, 
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             item_name,
             count.to_string()
         );
@@ -138,34 +176,46 @@ impl CoderunNotifiable for CodeLikeDecorator {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
         }
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}{{ // {} start.\n",
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0, 
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             LOOPBODY_NAME,
         ); // E.g. "<thread_indent><indent>{ // Loop body start."
         self.line_end_pending = false;
     }
     fn notify_loopbody_end(&mut self, call_depth: usize) {
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}}} // {} end.\n", // E.g. "<thread_indent><indent>} // Loop body end.\n".
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0, 
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             LOOPBODY_NAME,
         );
         self.line_end_pending = false;
     }
 }
 
-impl ThreadSpecifics for CodeLikeDecorator {
+impl ThreadSpecific for CodeLikeDecorator {
     fn set_thread_indent(&mut self, thread_indent: String) {
         self.common.set_thread_indent(thread_indent);
     }
 }
 
-impl CoderunThreadSpecificNotifyable for CodeLikeDecorator {}
+impl WriterPossessor for CodeLikeDecorator {
+    fn set_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
+        self.common.set_writer(writer);
+    }
+}
+
+impl LogDecorator for CodeLikeDecorator {}
 
 // TreeLikeDecorator Log           Explanation
 // -----------------------------------------------
@@ -209,15 +259,24 @@ impl TreeLikeDecorator {
         }
         indent_string
     }
+    fn get_indents(&self, call_depth: usize) -> (String, String) {
+        (
+            self.common.get_thread_indent(),
+            self.get_indent_string(call_depth),
+        )
+    }
 }
 
 impl CoderunNotifiable for TreeLikeDecorator {
     fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}{}{}({})\n",
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0,
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             self.indent_step_call,
             name,
             param_vals
@@ -239,22 +298,28 @@ impl CoderunNotifiable for TreeLikeDecorator {
             ItemKind::Call { name, .. } => name.clone(),
             ItemKind::Loopbody { .. } => String::from(LOOPBODY_NAME), //"Loop body"),
         };
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}{}{} repeats {} time(s).\n", // E.g. "<thread_indent><indent> sibling repeats 8 time(s).\n"
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0,
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             self.indent_step_noncall,
             item_name,
             count.to_string()
         );
     }
     fn notify_loopbody_start(&mut self, call_depth: usize) {
+        let indents = self.get_indents(call_depth);
         decorator_write!(
             self,
             "{}{}{}{}\n",
-            self.common.get_thread_indent(),
-            self.get_indent_string(call_depth),
+            indents.0,
+            indents.1,
+            // self.common.get_thread_indent(),
+            // self.get_indent_string(call_depth),
             self.indent_step_call,
             LOOPBODY_NAME,
         ); // E.g."<thread_indent><indent>+-Loop body", "| | | | +-Loop body"
@@ -263,10 +328,16 @@ impl CoderunNotifiable for TreeLikeDecorator {
     // NOTE: Reusing the default implementation of `notify_loopbody_end()` that does nothing.
 }
 
-impl ThreadSpecifics for TreeLikeDecorator {
+impl ThreadSpecific for TreeLikeDecorator {
     fn set_thread_indent(&mut self, thread_indent: String) {
         self.common.set_thread_indent(thread_indent);
     }
 }
 
-impl CoderunThreadSpecificNotifyable for TreeLikeDecorator {}
+impl WriterPossessor for TreeLikeDecorator {
+    fn set_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
+        self.common.set_writer(writer);
+    }
+}
+
+impl LogDecorator for TreeLikeDecorator {}

@@ -137,3 +137,6 @@ impl Drop for LoopbodyLogger {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

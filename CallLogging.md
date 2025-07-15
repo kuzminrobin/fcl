@@ -1,12 +1,9 @@
 # TODO:
-* Consider merging all the FCL crates into a single proc_macro crate.
-  * Cleanup
-  * Restructure to a minimal set of crates (fcl, proc_macros, commons).
-* Consider breaking-up proc_macros/lib into multiple files (expr, item, patterns).
-* Customizable params and ret_val logging enabling/disabling (global, per-case).  
-  * Feature skip_params, skip_ret_val.
+* LazyCell (if used instead of LazyLock) to the diagrams 
+* THREAD_DECORATOR to diagrams.
 * Test
   * Testing
+    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
     * Features
       * minimal_writer
       * singlethreaded
@@ -15,7 +12,6 @@
       * CodeLike
       * TreeLike
     * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
-    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
     * Log to string/Vector and compare.
     * Basics (from user/main.rs).
     * std output and panic sync.
@@ -43,7 +39,11 @@
         log thread func or not).
       * Customizing the thread indent.
 * Overall clean-up.
-  * [Rename the types (from C++-like) according to Rust. E.g. `Decorator` -> `Decorate`]
+  * Rename the traits (from C++-like) according to Rust. E.g. 
+    *`Decorator` -> `Decorate`
+    * `Writer` -> `Log[Write]`
+    * CoderunNotifiable -> CoderunNotify
+    * CallLogger -> LogCalls
 * Consider toolchain stable or document why inachievable.
 * (Low priority) Bug: If the single-threaded feature is the default, then multithreaded user, when causing a panic 
   in both threads, has `main()` destructors reporting the returns during stack unwinding:
@@ -77,6 +77,9 @@
 * [Consider loggin the ret val in the TreeLikeDecorator]
 * Reader practice: Come up with the ideas of what's not covered in FCL (but is achievable).
 * Consider removing all the occurrences of `unwrap()`.
+* Consider breaking-up proc_macros/lib into multiple files (expr, item, patterns).
+* Customizable params and ret_val logging enabling/disabling (global, per-case).  
+  * Feature skip_params, skip_ret_val, skip_generics.
 * ---
 * TACTICS
   * Develop
@@ -1256,3 +1259,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
 * Consider merging all the FCL crates into a single proc_macro crate.
   * Move writer.rs
   * Remove traits.rs
+  * Cleanup
+  * Restructure to a minimal set of crates (fcl, proc_macros, commons).

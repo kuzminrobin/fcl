@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock, thread};
 
 use crate::CallLogger;
-use crate::decorators::{CoderunThreadSpecificNotifyable, ThreadSpecifics};
+use crate::decorators::{LogDecorator, ThreadSpecific};
 use code_commons::{CallGraph, CoderunNotifiable};
 
 #[cfg(not(feature = "minimal_writer"))]
@@ -24,14 +24,14 @@ macro_rules! NO_LOGGER_ERR_STR {
 
 pub struct CallLogInfra {
     logging_is_on: Vec<bool>, // Enabled by default (if empty).
-    thread_specifics: Rc<RefCell<dyn ThreadSpecifics>>,
+    thread_specifics: Rc<RefCell<dyn ThreadSpecific>>,
     call_graph: CallGraph,
 }
 
 impl CallLogInfra {
-    pub fn new(thread_spec_notifyable: Rc<RefCell<dyn CoderunThreadSpecificNotifyable>>) -> Self {
+    pub fn new(thread_spec_notifyable: Rc<RefCell<dyn LogDecorator>>) -> Self {
         let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone();
-        let thread_specifics: Rc<RefCell<dyn ThreadSpecifics>> = thread_spec_notifyable;
+        let thread_specifics: Rc<RefCell<dyn ThreadSpecific>> = thread_spec_notifyable;
         Self {
             logging_is_on: Vec::with_capacity(4),
             thread_specifics,
@@ -578,19 +578,36 @@ static mut ORIGINAL_PANIC_HANDLER: LazyCell<
 pub mod instances {
     use super::*;
     thread_local! {
-        pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
+        pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {
             #[cfg(not(feature = "minimal_writer"))]
             let writer: Option<Box<dyn Write>> = Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone())));
             #[cfg(feature = "minimal_writer")]
             let writer: Option<Box<dyn Write>> = None;
 
-            let logging_infra = Box::new(CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
+            std::rc::Rc::new(std::cell::RefCell::new(
                 // crate::decorators::TreeLikeDecorator::new(
                 //     writer,
                 //     None, None, None))))))
                 crate::decorators::CodeLikeDecorator::new(
                     writer,
-                    None)))));
+                    None)))
+        };
+
+        pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
+            // #[cfg(not(feature = "minimal_writer"))]
+            // let writer: Option<Box<dyn Write>> = Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone())));
+            // #[cfg(feature = "minimal_writer")]
+            // let writer: Option<Box<dyn Write>> = None;
+
+            let logging_infra = Box::new(CallLogInfra::new(
+                THREAD_DECORATOR.with(|decorator| decorator.clone())));
+                // std::rc::Rc::new(std::cell::RefCell::new(
+                // // crate::decorators::TreeLikeDecorator::new(
+                // //     writer,
+                // //     None, None, None))))))
+                // crate::decorators::CodeLikeDecorator::new(
+                //     writer,
+                //     None)))));
             (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
 
             RefCell::new((*CALL_LOGGER_ARBITER).clone())
@@ -609,20 +626,53 @@ pub mod instances {
             )))
         });
     thread_local! {
+/*
+        pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
+            // #[cfg(not(feature = "minimal_writer"))]
+            // let writer: Option<Box<dyn Write>> = Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone())));
+            // #[cfg(feature = "minimal_writer")]
+            // let writer: Option<Box<dyn Write>> = None;
+
+            let logging_infra = Box::new(CallLogInfra::new(
+                THREAD_DECORATOR.with(|decorator| decorator.clone())));
+                // std::rc::Rc::new(std::cell::RefCell::new(
+                // // crate::decorators::TreeLikeDecorator::new(
+                // //     writer,
+                // //     None, None, None))))))
+                // crate::decorators::CodeLikeDecorator::new(
+                //     writer,
+                //     None)))));
+            (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
+
+            RefCell::new((*CALL_LOGGER_ARBITER).clone())
+        };
+ */        
+        pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {
+            std::rc::Rc::new(std::cell::RefCell::new(
+            // crate::decorators::TreeLikeDecorator::new(
+            //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+            //     None, None, None))))))
+            crate::decorators::CodeLikeDecorator::new(
+                Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                None)))
+        };
+
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
-            let logging_infra = Box::new(/*fcl::call_log_infra::*/CallLogInfra::new(std::rc::Rc::new(std::cell::RefCell::new(
-                // crate::decorators::TreeLikeDecorator::new(
+            let logging_infra = Box::new(CallLogInfra::new(
+                THREAD_DECORATOR.with(|decorator| decorator.clone())));
+                // std::rc::Rc::new(std::cell::RefCell::new(
+                // // crate::decorators::TreeLikeDecorator::new(
+                // //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
+                // //     None, None, None))))))
+                // crate::decorators::CodeLikeDecorator::new(
                 //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                //     None, None, None))))))
-                crate::decorators::CodeLikeDecorator::new(
-                    Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                    None)))));
+                //     None)))));
             match (*THREAD_GATEKEEPER).lock() {
                 Ok(mut gatekeeper) => gatekeeper.add_thread_logger(logging_infra),
                 Err(e) => {
                     println!("(stdout) FCL Internal Error: Thread panicked while holding a mutex ({}).", e);
                     eprintln!("(stderr) FCL Internal Error: Thread panicked while holding a mutex ({}).", e);
-                    debug_assert!(false, "FCL Internal Error: Thread panicked while holding a mutex ({}).", e);
+                    debug_assert!(false, "FCL Internal Error: Thread panicked while holding a mutex ({}).", e); // TODO: Consider recovering the poison mutex or panicking.
                 }
             }
             RefCell::new(Box::new(ThreadGateAdapter::new((*THREAD_GATEKEEPER).clone())))

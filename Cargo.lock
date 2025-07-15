@@ -39,6 +39,7 @@ name = "fcl"
 version = "0.1.0"
 dependencies = [
  "code_commons",
+ "fcl_proc_macros",
  "filedescriptor",
  "tempfile",
 ]
