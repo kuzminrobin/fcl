@@ -594,20 +594,8 @@ pub mod instances {
         };
 
         pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
-            // #[cfg(not(feature = "minimal_writer"))]
-            // let writer: Option<Box<dyn Write>> = Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone())));
-            // #[cfg(feature = "minimal_writer")]
-            // let writer: Option<Box<dyn Write>> = None;
-
             let logging_infra = Box::new(CallLogInfra::new(
                 THREAD_DECORATOR.with(|decorator| decorator.clone())));
-                // std::rc::Rc::new(std::cell::RefCell::new(
-                // // crate::decorators::TreeLikeDecorator::new(
-                // //     writer,
-                // //     None, None, None))))))
-                // crate::decorators::CodeLikeDecorator::new(
-                //     writer,
-                //     None)))));
             (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
 
             RefCell::new((*CALL_LOGGER_ARBITER).clone())
@@ -626,27 +614,6 @@ pub mod instances {
             )))
         });
     thread_local! {
-/*
-        pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
-            // #[cfg(not(feature = "minimal_writer"))]
-            // let writer: Option<Box<dyn Write>> = Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone())));
-            // #[cfg(feature = "minimal_writer")]
-            // let writer: Option<Box<dyn Write>> = None;
-
-            let logging_infra = Box::new(CallLogInfra::new(
-                THREAD_DECORATOR.with(|decorator| decorator.clone())));
-                // std::rc::Rc::new(std::cell::RefCell::new(
-                // // crate::decorators::TreeLikeDecorator::new(
-                // //     writer,
-                // //     None, None, None))))))
-                // crate::decorators::CodeLikeDecorator::new(
-                //     writer,
-                //     None)))));
-            (*CALL_LOGGER_ARBITER).borrow_mut().add_thread_logger(logging_infra);
-
-            RefCell::new((*CALL_LOGGER_ARBITER).clone())
-        };
- */        
         pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {
             std::rc::Rc::new(std::cell::RefCell::new(
             // crate::decorators::TreeLikeDecorator::new(
@@ -660,13 +627,6 @@ pub mod instances {
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
             let logging_infra = Box::new(CallLogInfra::new(
                 THREAD_DECORATOR.with(|decorator| decorator.clone())));
-                // std::rc::Rc::new(std::cell::RefCell::new(
-                // // crate::decorators::TreeLikeDecorator::new(
-                // //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                // //     None, None, None))))))
-                // crate::decorators::CodeLikeDecorator::new(
-                //     Some(Box::new(WriterAdapter::new((*THREAD_SHARED_WRITER).clone()))),
-                //     None)))));
             match (*THREAD_GATEKEEPER).lock() {
                 Ok(mut gatekeeper) => gatekeeper.add_thread_logger(logging_infra),
                 Err(e) => {
