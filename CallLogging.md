@@ -1,9 +1,61 @@
 # TODO:
-* LazyCell (if used instead of LazyLock) to the diagrams 
-* THREAD_DECORATOR to diagrams.
+* Implement endless logging (see "mdBook.md").
+* Double-check the case of a thread switch immediately after the repeat count increment,
+  i.e. there is a non-flushed repeat count that needs to be flushed before the next thread's logging.
+* Double-check all the doc comments with ChatGPT.
+* (Unsorted)
+  When FCL can be useful. 
+  I was using similar functionality in hardware simulation. Combined with the virtual hardware log (showing which value has been written to or read from a hardware register) I was able to evaluate the behavior, quickly identify the fragment of interest, turn more verbose logging for virtual hardware during that fragment, and figure out the issue. In a number of cases it let me avoid debugging.
+  In that project I was using a very similar call graph and logging part. But it was implemented in C. During firmware execution on a virtual hardware the virtual CPU was catching the function call and return machine instructions (including the interrupts) and was triggering the calls to update the call graph and log.
+  If you are using something like OpenOCD for your own hardware bring-up (not necessarily in Rust), you can reuse at least the call graph and logging part for a function call logging feature of your toolset.
+* (Unsorted)
+  Add to documentation.
+  The single mutex can significantly distort the thread constext switch picture. E.g. one thread locks the mutex and starts updating the call graph. The thread context switches to a different thread. The other thread makes a call and tries to lock the mutex to log that call, and starts waiting for the mutex, returning the context back to the one owning the mutex. The mutext owner releases the mutex and then can log a few calls more, and again get interrupted while the mutex is locked. This can happen a number of times.
+  To summarize, the log can show that the thread switch happened later and with one attempt,
+  but in reality there could be a number of imperfect attempts to switch the thread ctx earlier than what the log shows.
+  The user should know details about how the thread switch picture gets tistorted.
+  How large is the distortion? Depends on the code. If there are lengthy fragments without loops and calls, then the distortion is minimal. But the more often the code execution passes through the loop, function, and closure starts and ends the larger is the distortion (and the slow-down because of logging).
+* (Unsorted. Consider) When the overall repeat count reaches MAX, flush the call and clear both the overall and flushed repeat count.
+* (Not completed) Consider moving the thread_local use deeper into the call.
+  Such that a {Call|Closure}Logger is created unconditionally.
+  ```rs
+    #[cfg(feature = "singlethreaded")]
+    let thread_logger_access = quote! {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            if logger.borrow().borrow().logging_is_on() {
+                optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str))
+            }
+        })
+    };
+    #[cfg(not(feature = "singlethreaded"))]
+    let thread_logger_access = quote! {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            if logger.borrow().logging_is_on() {
+                optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str))
+            }
+        })
+    };
+  ```
 * Test
   * Testing
-    * Test with {file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+    * Basics (from user/main.rs).
+      * Log to string/Vector and compare.
+      * Generics
+    * Test coverage
+      * All branches of all the code.
+      * user, user_all
+      * Code coverage
+        * mod
+        * trait / fn with default impl
+        * impl
+          * T
+          * Trait for
+        * fn
+          * local
+        * closure
+    * Test with {vec, file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
     * Features
       * minimal_writer
       * singlethreaded
@@ -11,11 +63,12 @@
     * Decorators
       * CodeLike
       * TreeLike
+    * Code
+      * Single-threaded
+      * Multithreaded
     * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
-    * Log to string/Vector and compare.
-    * Basics (from user/main.rs).
     * std output and panic sync.
-    * Enable/disable logging.
+    * [Temporarily] Enable/disable logging. 
     * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
     * ```rs
       // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
@@ -91,10 +144,14 @@
     * miri
     * valgrind
   * Write the documentation
+    * LazyCell (if used instead of LazyLock) to the diagrams 
+    * THREAD_DECORATOR to diagrams.
     * Extract fcl_doc into something separate.
     * On the diagrams consider using `+` for `pub` and `-` for private.
     * ReadMe.md
       * User Manual
+        * What is FCL for?
+          * Testing. Make sure that a certain sequence of cunction calls has taken place.
         * Document that sequential loops can be logged as a single loop (if the iterations are equal).
         * Document that loop ret val loggign has been deprioritized.
         * If there are multiple binary crates in the workspace and one library crate with features 
@@ -221,6 +278,21 @@
 * [Graph clearing (upon allocation failure?). User practice]
 
 # Notes
+Doc-comment checklist
+* See [string.rs](https://doc.rust-lang.org/src/alloc/string.rs.html) example.
+* File doc-commnent.
+* Struct doc-comment.
+* Method doc-comment.
+  * What does
+    * Onew sentence.
+    * More sentences
+  * \# Errors (the order is questionalble)
+  * \# Safety (the order is questionalble)
+  * \# Panics
+  * \# Leaking
+  * No Parameters?
+  * \# Examples
+
 * Macro
   * [Decl Macro](https://veykril.github.io/tlborm/decl-macros/building-blocks/parsing.html#function)
   * Attr Proc-Macro.
@@ -1261,3 +1333,5 @@ Let me know if you want a complete working example with both `stdout` and `stder
   * Remove traits.rs
   * Cleanup
   * Restructure to a minimal set of crates (fcl, proc_macros, commons).
+
+

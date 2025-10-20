@@ -229,6 +229,7 @@ fn quote_as_expr_call(
     if is_print_func_name {
         #[cfg(feature = "singlethreaded")]
         let thread_logger_access = quote! {
+            use std::borrow::BorrowMut;
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow_mut().borrow_mut().maybe_flush();
             })

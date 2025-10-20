@@ -2,7 +2,7 @@
 pub fn main() {
     // fcl::_single_threaded_otimization!();
     // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
-    fcl::set_thread_indent!(String::from("                "));
+    // fcl::set_thread_indent!(String::from("                "));
     let _a = Some(0);
 
     use root::*;
@@ -90,6 +90,65 @@ pub fn main() {
 
         fn fs(&[a, b, ref i @ .., y, z]: &[i32; 6]) {}
         fs(&[0, 1, 2, 3, 4, 5]); // main()::fs(& [a: 0, b: 1, i: [2, 3], y: 4, z: 5]) {}
+    }
+    {
+        use fcl_proc_macros::loggable;
+        #[loggable]  // The instrumenting macro for `my_func()`.
+        fn my_func() {
+            f(); // Function `my_func()` invokes function `f()` 3 times.
+            f();
+            f();
+            m::g(5); // Then function `g()` from module `m` (see below).
+
+            #[derive(std::fmt::Debug)]
+            struct MyStruct { // Structure defined locally in `my_func()`.
+                _field: u8
+            }
+            impl MyStruct {
+                fn my_method(&mut self) { // `my_method()` also gets instrumented automatically.
+                    struct MyPoint {
+                        x: i32,
+                        y: i32
+                    }
+                    let mut p = MyPoint {
+                        x: 2,
+                        y: -4
+                    };
+                    // The closure below also gets instrumented automatically.
+                    let my_closure = |param: u16, &mut MyPoint{ x, y }| { 
+                        x + y
+                    };
+                    let _ = my_closure(1, &mut p);
+
+                    eprintln!("This is a sample stderr output.");
+                }
+            }
+            let mut s = MyStruct{ _field: 3 };
+            s.my_method(); // Function `my_func()` invokes function `MyStruct::my_method()`.
+        }
+
+        // The instrumenting macro for the whole `mod m` below, 
+        // all the internals get instrumented automatically.
+        #[loggable] 
+        mod m {
+            pub fn g(param: i32) {
+                for _ in 0..1000 {
+                    h();
+                    i();
+                }
+            }
+            fn h() {}
+            fn i() -> f32 {
+                j();
+                -1.23
+            }
+            fn j() {}
+        }
+
+        #[loggable] // The instrumenting macro for `f()`.
+        fn f() {}
+
+        my_func(); // Invocation of the function.
     }
 }
 

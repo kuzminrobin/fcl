@@ -7,7 +7,8 @@ edition = "2024"
 code_commons = { path = "../code_commons" }
 filedescriptor = "0.8.3"
 tempfile = "3.20.0"
-fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
+fcl_proc_macros = { path = "../fcl_proc_macros" }
+#fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
 
 [features]
 singlethreaded = []

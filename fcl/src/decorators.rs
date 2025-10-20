@@ -7,8 +7,9 @@ use std::{
 use code_commons::{CoderunNotifiable, ItemKind, RepeatCountCategory};
 
 /// Trait to be implemented by the instances that handle any thread specifics.
+/// For example, the thread's output can be shifted by half of the console.
 pub trait ThreadSpecific {
-    /// Sets the thread code run output indentation. E.g. if there are 2 threads,
+    /// Sets the thread's output indentation. E.g. if there are 2 threads,
     /// one thread's output can be logged in the left half of the console,
     /// and the other thread's output can be logged in the right half,
     /// or _indented_ by half of the console width.

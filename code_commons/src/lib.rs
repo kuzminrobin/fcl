@@ -31,7 +31,7 @@ pub trait CoderunNotifiable {
     /// Loop body has stopped being cached.
     fn notify_loopbody_start(&mut self, _call_depth: usize);
 
-    /// Loop body has ended (but not necessarily the whole loop).
+    /// Loop body (iteration) has ended (but not necessarily the whole loop).
     fn notify_loopbody_end(&mut self, _call_depth: usize) {}
 }
 
