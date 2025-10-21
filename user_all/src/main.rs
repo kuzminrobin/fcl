@@ -132,7 +132,7 @@ pub fn main() {
         #[loggable] 
         mod m {
             pub fn g(param: i32) {
-                for _ in 0..1000 {
+                for _ in 0..100 {
                     h();
                     i();
                 }

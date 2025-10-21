@@ -9,6 +9,7 @@ filedescriptor = "0.8.3"
 tempfile = "3.20.0"
 fcl_proc_macros = { path = "../fcl_proc_macros" }
 #fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
+serial_test = "3.2.0"
 
 [features]
 singlethreaded = []
