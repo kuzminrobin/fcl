@@ -4,6 +4,7 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 use crate::call_log_infra::CallLoggerArbiter;
 use crate::CallLogger;
 
+/// Sets a specific thread indent different from the default for the invoking thread.
 /// #### Examples
 /// ```rs
 /// fcl::set_thread_indent!(String::from("                "));
@@ -11,11 +12,12 @@ use crate::CallLogger;
 #[macro_export]
 macro_rules! set_thread_indent {
     ($expr:expr) => {
-        fcl::call_log_infra::instances::THREAD_LOGGER
+        fcl::call_log_infra::instances::THREAD_LOGGER   // TODO: Consider removing `::call_log_infra::instances` for the pub entities (like `THREAD_LOGGER`) accessible from the user code.
             .with(|logger| logger.borrow_mut().set_thread_indent($expr))
     };
 }
 
+/// Temporarily enables or disables the call logging for the invoking thread.
 /// #### Examples
 /// ```rs
 /// fcl::push_logging_is_on!(true); // Temporarily enable logging.
@@ -32,6 +34,7 @@ macro_rules! push_logging_is_on {
     };
 }
 
+/// Reverts to the previous logging state (enabled/disabled) for the invoking thread.
 /// #### Examples
 /// ```rs
 /// fcl::push_logging_is_on!(true); // Temporarily enable logging.
@@ -48,6 +51,8 @@ macro_rules! pop_logging_is_on {
     };
 }
 
+/// Tells if call logging is enabled (by returning `true`) or disabled (by returning `false`) 
+/// for the invoking thread.
 /// #### Examples
 /// ```rs
 /// let on = fcl::logging_is_on!();
@@ -59,6 +64,8 @@ macro_rules! logging_is_on {
     };
 }
 
+/// Enables (if the argument is `true`) or disables (if the argument is `false`) the call logging
+/// for the invoking thread.
 /// #### Examples
 /// ```rs
 /// fcl::set_logging_is_on!(false); // Disable logging.
@@ -90,6 +97,7 @@ impl ThreadGatekeeper {
         self.call_logger_arbiter.borrow_mut().remove_thread_logger()
     }
 }
+// TODO: Add `CallLogger for ThreadGatekeeper` to the chart or remove `CallLogger for ThreadGatekeeper`.
 impl CallLogger for ThreadGatekeeper {
     fn push_logging_is_on(&mut self, is_on: bool) {
         self.call_logger_arbiter
@@ -149,9 +157,9 @@ impl ThreadGateAdapter {
                 return guard;
             }
             Err(poison_error) => {
-                println!(
+                println!( // TODO: Consider -> eprintln (complain to stderr).
                     "Internal Error: A poisoned mutex detected (a thread has panicked while holding that mutex): '{:?}'. {}",
-                    poison_error, "Trying to recover the mutex."
+                    poison_error, "Trying to recover the mutex"
                 );
                 return poison_error.into_inner();
             }

@@ -227,9 +227,10 @@ fn calls() {
 fn thread_func() {
     fcl::set_logging_is_on!(true);
     // fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(false)); // Turn logging on.
-    fcl::set_thread_indent!(String::from(
-        "                                                  "
-    ));
+    
+    // fcl::set_thread_indent!(String::from(
+    //     "                                                  "
+    // ));
 
     // THREAD_LOGGER.with(|logger| {
     //     logger
