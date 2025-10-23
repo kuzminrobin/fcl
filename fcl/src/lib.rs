@@ -21,7 +21,7 @@ pub trait CallLogger {
     fn log_call(&mut self, name: &str, param_vals: Option<String>);
     fn log_ret(&mut self, ret_val: Option<String>);
     fn flush(&mut self) {}
-    fn maybe_flush(&mut self);
+    fn maybe_flush(&mut self); // TODO: Whats' the diff from `flush()`?
     fn log_loopbody_start(&mut self);
     fn log_loopbody_end(&mut self);
 }
@@ -54,7 +54,11 @@ impl FunctionLogger {
         let mut call_logged = false;
 
         THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
+            // TODO: Consider 
+            // let mut logger_borrow = logger.borrow_mut();
+            // #[cfg(feature = "singlethreaded")]
+            // let mut logger_borrow = logger_borrow.borrow_mut();
+            #[cfg(feature = "singlethreaded")] 
             let intermediate_borrow = logger.borrow_mut();
             #[cfg(feature = "singlethreaded")]
             let mut logger_borrow = intermediate_borrow.borrow_mut();

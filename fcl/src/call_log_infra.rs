@@ -570,7 +570,10 @@ impl CallLogger for CallLoggerArbiter {
         #[cfg(not(feature = "minimal_writer"))]
         self.sync_fcl_and_std_output(false);
     }
-    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
+    fn flush(&mut self) {
+        #[cfg(not(feature = "minimal_writer"))]
+        self.sync_fcl_and_std_output(true);
+    }
     fn log_loopbody_start(&mut self) {
         #[cfg(not(feature = "minimal_writer"))]
         self.sync_fcl_and_std_output(false);

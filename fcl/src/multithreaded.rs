@@ -9,6 +9,21 @@ use crate::CallLogger;
 /// ```rs
 /// fcl::set_thread_indent!(String::from("                "));
 /// ```
+//// TODO: Consider extracting `set_thread_indent` from "singlethreaded.rs" and "multithreaded.rs" 
+//// into one file with the following def-n:
+// #[macro_export]
+// macro_rules! set_thread_indent {
+//     ($expr:expr) => {
+//         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+//             let mut logger = logger.borrow_mut();
+//
+//             #[cfg(feature = "singlethreaded")]
+//             let mut logger = logger.borrow_mut();
+//
+//             logger.set_thread_indent($expr)
+//         })
+//     };
+// }
 #[macro_export]
 macro_rules! set_thread_indent {
     ($expr:expr) => {
@@ -198,7 +213,9 @@ impl CallLogger for ThreadGateAdapter {
     fn maybe_flush(&mut self) {
         self.get_gatekeeper().maybe_flush();
     }
-    // NOTE: Reuses the trait's `fn flush(&mut self) {}` that does nothing.
+    fn flush(&mut self) {
+        self.get_gatekeeper().flush();
+    }
     fn log_loopbody_start(&mut self) {
         self.get_gatekeeper().log_loopbody_start()
     }
