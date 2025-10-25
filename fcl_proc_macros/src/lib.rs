@@ -3,6 +3,42 @@ use std::str::FromStr;
 use quote::quote;
 use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, *};
 
+/// Suppresses the automatic recursive instrumentation of an item as `#[loggable]`.
+///
+/// For example, if a struct implementation is marked as `#[loggable]` then
+/// the associated funtions defined in that struct implementation will automatically be
+/// instrumented as `#[loggable]`. The `#[non_loggable]` attribute added to an
+/// associated funtion suppresses that instrumentation.
+///
+/// # Examples
+/// ```compile_fail, E0432, E0433, E0599
+/// use fcl_proc_macros::{loggable, non_loggable};
+///
+/// struct MyStruct;
+///
+/// #[loggable] // Automatically recursively instruments the nested items.
+/// impl MyStruct {
+///     // This associated function gets instrumented automatically:
+///     fn assoc_func_loggable(&self) {}
+///
+///     #[non_loggable] // Suppresses the automatic instrumentation during recursion.
+///     fn assoc_func_non_loggable(&self) { // This associated function doesn't get instrumented.
+///         let _v = Some(1).map(
+///             |val| val + 1   // This closure doesn't get instrumented.
+///         );
+///
+///         #[loggable] // Automatically recursively instruments the item.
+///         fn local_func() { // This function gets instrumented recursively.
+///             let _v2 = Some(2).map(
+///                 |val| val + 2   // This closure gets automatically instrumented recursively.
+///                 // TODO: Test this.
+///             );
+///         }
+///
+///         local_func();
+///     }
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn non_loggable(
     _attr_args: proc_macro::TokenStream,
@@ -11,6 +47,29 @@ pub fn non_loggable(
     attributed_item
 }
 
+/// Instruments the item and nested definitions recursively to be logged
+/// by the Function Call Logger (FCL).
+/// # Examples
+/// ```compile_fail, E0432, E0433, E0599
+/// use fcl_proc_macros::{loggable, non_loggable};
+///
+/// #[loggable] // Automatically instruments the nested items.
+/// mod my_module {
+///
+///     struct MyStruct;
+///
+///     impl MyStruct {
+///         fn assoc_func_loggable(&self) { // This associated function gets instrumented.
+///             let v = Some(1).map(
+///                 |val| val + 1   // This closure gets instrumented.
+///             );
+///         }
+///         
+///         #[non_loggable] // Suppresses the automatic instrumentation.
+///         fn assoc_func_non_loggable(&self) {} // This associated function doesn't get instrumented.
+///     }
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn loggable(
     attr_args: proc_macro::TokenStream,
@@ -42,6 +101,20 @@ pub fn loggable(
     ret_val.into()
 }
 
+/// Removes spaces from a string, except around 'as' (in framgents like "\<MyType as MyTrait>").
+///
+/// Returns a copy of an argument with spaces removed, except around 'as'.
+///
+/// NOTE: If the argument contains sequences of '$as$', those will be replaced with ' as '.
+///
+/// # Examples
+///
+/// ```ignore
+/// assert_eq!(
+///     remove_spaces(&"<MyType as MyTrait> :: my_func"),
+///     "<MyType as MyTrait>::my_func" // The spaces around '::' are removed, but around 'as' are not.
+/// );
+/// ```
 fn remove_spaces(s: &str) -> String {
     // Preserve spaces in fragments like `<MyType as MyTrait>`.
     let tmp_str: String = s

@@ -1,4 +1,5 @@
 # TODO:
+* Pseudonode (TODO: Consider -> pseudoroot)
 * Implement endless logging (see "mdBook.md").
 * Double-check the case of a thread switch immediately after the repeat count increment,
   i.e. there is a non-flushed repeat count that needs to be flushed before the next thread's logging.

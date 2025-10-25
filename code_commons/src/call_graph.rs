@@ -180,14 +180,14 @@ impl core::cmp::PartialEq for RepeatCount {
 ///
 /// Typically the call graph of a program or a thread is a tree
 /// with the `main()` or a thread function being the root.
-/// But if the logging starts later than the call to `main()` 
+/// But if the logging starts later than the call to `main()`
 /// (but before the return from `main()`), then the call graph
 /// can be not a tree but a sequence of trees (e.g., a sequence of functions called by `main()`).
 ///
 /// E.g. if `main()` calls `f()` and then `g()`,
 /// but logging gets enabled after `main()` and before `f()`,
 /// then `f()` will be the first-most call to be added to the call graph, and then `g()`.
-/// The `f()` followed by `g()`, including their nested calls, will be a sequence of two call trees 
+/// The `f()` followed by `g()`, including their nested calls, will be a sequence of two call trees
 /// added to the call graph.
 ///
 /// To unify and simplify handling, a _pseudonode_ is always added to the call graph as a root,
@@ -223,6 +223,7 @@ pub struct CallGraph {
 }
 
 impl CallGraph {
+    /// Creates a new `CallGraph` instance.
     pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
         let pseudo_node = Rc::new(RefCell::new(CallNode::new(ItemKind::Call {
             name: String::from(""),
@@ -236,9 +237,11 @@ impl CallGraph {
         }
     }
 
-    /// Adds a child call to the currently running function. This results in
-    /// * an update to the call graph
-    /// * and, if caching is not active, the child call logging.
+    /// Adds a child call (a function or a closure) to the current function in the call graph
+    /// (a function on top of the call stack). This results in
+    /// * an update to the call graph,
+    /// * if the child call has the same name as the preceding sibling, the cachign start,
+    /// * if caching is not active, the child call logging.
     ///
     // By the moment of this call (`add_call()`):
     // Log State (logged or cached):
@@ -359,18 +362,28 @@ impl CallGraph {
         self.current_node = new_sibling.clone();
     }
 
-    /// Adds the return of the currently running function.
+    /// Adds the return to the current function in the call graph
+    /// (a function on top of the call stack). This results or can result in 
+    /// * an update in the call graph,
+    /// * a flush of the returning function's latest child's repeat count, if caching is not active,
+    /// * if the returning function repeats the previous sibling 
+    ///   (including the nested calls, their order, and repeat counts recursively), 
+    ///   then the removal of the returning function from 
+    ///   the call graph, increment of the previous sibling's repeat count, caching stop 
+    ///   (if caching started during the call to this returning function).
     // By the moment of this call (`add_ret()`) the call graph state is:
     // parent { // The call or the loopbody.
     //     [...]
+    //
     //     [previous_sibling() {...}
-    //      [// previous_sibling() repeats 99 time(s). // Not yet flushed.]] // TODO: Something is wrong here. This must already be flushed (if caching is not active).
+    //      [// previous_sibling() repeats 99 time(s). // Not yet flushed.]] // NOTE: The returning function can get removed and increment this repreat count.
     //     || (or)
     //     [{ // Loop body start.
     //          child() {...}
     //          [// child() repeats 10 time(s).]
     //      } // Loop body end.
     //      [// Loop body repeats 6 time(s). // Flushed.]]
+    //
     //     returning_sibling() {        // current. call_stack: [..., parent, returning_sibling].
     //        [... // Nested calls (children).
     //         [// last_child() repeats 9 time(s). // Not yet flushed. ]]
@@ -824,16 +837,17 @@ impl CallGraph {
     }
 
     /// Flushes the data cached in the call graph.
-    /// Flushing is done upon 
+    /// Flushing is done upon
     /// * thread context switch,
-    /// * log synchronization with stdoutput (`stdout` and `stderr`) and panic output. 
-    /// 
+    /// * log synchronization with stdoutput (`stdout` and `stderr`) and panic output.
+    ///
     /// **Parameters**
-    /// * `flush_notifiable`: Flush the notifiable. For example, if the notifiable is the call-like decorator, 
-    /// and the flushed log ends with `f() {` then the decorator needs to output `"\n"` before the other entity 
+    /// * `flush_notifiable`: Flush the notifiable. For example, if the notifiable is the call-like decorator,
+    /// and the flushed log ends with `f() {` then the decorator needs to output `"\n"` before the other entity
     /// (the other thread, stdoutput, panic handler) starts logging.
     // TODO: Reformat the {param doc-comment} according to standards.
-    pub fn flush(&mut self, flush_notifiable: bool) {   // TODO: Consider flush_notifiable -> flush_the_notifiable
+    pub fn flush(&mut self, flush_notifiable: bool) {
+        // TODO: Consider flush_notifiable -> flush_the_notifiable
         // If call caching is active:
         // * the caching model_node - the previous sibling node (for non-loopbody caching case) - can have a non-zero non-flushed repeat count
         // * and the subsequent (current) sibling (with its children) is being added to the call graph (is being cached).
@@ -906,13 +920,13 @@ impl CallGraph {
         self.caching_info.is_active()
     }
 
-    /// Tells if the two subtrees of the call graph are equal recursively, i.e. 
+    /// Tells if the two subtrees of the call graph are equal recursively, i.e.
     /// including the nested calls (children), their names, order, repeat counts,
     /// but not including the parameters and return values.
     /// #### Parameters
-    /// * `a` specifies one subtree to compare, typically the caching model node 
+    /// * `a` specifies one subtree to compare, typically the caching model node
     ///   with potentially non-zero repeat count.
-    /// * `b` specifies another subtree to compare, typically the node being cached, 
+    /// * `b` specifies another subtree to compare, typically the node being cached,
     ///   with always-zero repeat count.
     /// * `compare_root_repeat_count` tells to compare the repeat count for the subtree roots.
     ///   Expected to be `false` for the caching model node and the node being cached, but `true`
