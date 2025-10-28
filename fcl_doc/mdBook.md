@@ -309,7 +309,7 @@ Periodically the need arises to jump from a leave towards the root. The links to
 
 If we look carefully, we will notice that the need to jump towards the root arises at specific moments and at specific places of the call tree. In particular when the algorithm needs to jump from the current function to its parent. For example, when the function `e()` returns, the algorithm needs to jump to function `c()`, such that the subsequent call to function `f()` is added as a child to the function `c()` rather than to function `e()`.
 
-For such jumps to the parent the algorithm uses the second part of the call graph — the _call stack_. The call stack can be considered as a singly linked list where each node has a pointer to the corresponding call tree node on the path from the root to the current function. For example, if function `e()` is the current function, then the call stack has pointers to `a()`, `c()`, and `e()`. 
+For such jumps to the parent the algorithm uses the second part of the call graph — the _call stack_. The call stack contains pointers to the corresponding call tree nodes on the path from the root to the current function. For example, if function `e()` is the current function, then the call stack has pointers to `a()`, `c()`, and `e()`. 
 ```
 The Call Tree during      The Call Stack during
 the call to `e()`         the call to `e()`
@@ -330,14 +330,14 @@ f() {
   g() {} // (iteration 1)
   . . .
   g() {} // (iteration 99)
-}
+} // f()
 ```
-I personally as a user would prefer to see about the following.
-```
+I personally as a user would prefer to see about the following in the log.
+```rs
 f() {
   g() {}
   // g() repeats 99 time(s).
-}
+} // f()
 ```
 For such a functionality the FCL algorithm needs to use _caching_.
 
@@ -360,7 +360,7 @@ If the repeated call's subtree is different, then the caching stops, which means
 * the latest call stays in the call graph,
 * the preceding call's repeat count is flushed to the log,
 * and the latest call's subtree is also flushed.
-```
+```rs
 f() {
   g() {}
   // g() repeats 3 time(s). // (This repeat count is flushed upon return of the subsequent call to g())
@@ -368,9 +368,20 @@ f() {
     h() {} // (This nested call is the difference from the previous calls to g())
   } // (The whole latest subtree of g() is flushed to the log upon this return and is retained in the call graph)
 ```
-Making a step back, let's imagine that in the picture above after the first 4 identical calls to `g()` caching has started during the fifth (latest) call to `g()` (when the repeat count of the previous `g()` is 3), and that call has nested repeated calls to `h()`. The caching continues until the fifth (latest) call to `g()` returns. This means that if the second call to `h()` (not shown in the picture) has a subtree different form the subtree of the first call to `h()`, then the second call to `h()` will stay in the call tree, without incrementing the repeat count of the first call to `h()`, but none of the calls to `h()`, their subtrees, and their repeat counts will be flushed to the log until caching stops upon return from the latest `g()`.
+Making a step back, let's imagine that in the picture above after the first 4 identical calls to `g()`, caching has started upon the fifth (latest) call to `g()` (when the repeat count of the previous `g()` is 3), and that call has nested repeated calls to `h()`. 
+```rs
+f() {
+  g() {}
+  // g() repeats 3 time(s).
+  g() {
+    h() {}
+    h() {
+      ...
+    }
+  } // g()
+```
+The caching continues until the fifth (latest) call to `g()` returns. This means that if the second call to `h()` has a subtree different form the subtree of the first call to `h()`, then the second call to `h()` will stay in the call tree, without incrementing the repeat count of the first call to `h()`, but none of the calls to `h()`, their subtrees, and their repeat counts will be flushed to the log until caching stops upon return from the latest `g()`.
 
-TODO: Loop bodies.
 ### The Loops
 
 Let's imagine that function `f()` has a loop with 100 iterations, and the loop body calls the functions `g()`, `h()`, and `i()`. Having the algorithm so far, the log will contain all the iterations of the loop since the sequence of `g()`, `h()`, and `i()` is not a sequence of repeated calls:
@@ -383,7 +394,7 @@ f() {
   g() {} // (Iteration 99)
   h() {}
   i() {}
-}
+} // f()
 ```
 I as a user would prefer to see about the following:
 ```rs
@@ -394,7 +405,7 @@ f() {
     i() {}
   } // Loop body ends.
   // Loop body repeats 99 time(s).
-}
+} // f()
 ```
 For the repeated loop bodies the similar considerations are applicable as for the repeted calls. If the later loop body's subtree is identical to that of the earlier loop body, then the later subtree gets removed from the call graph and the repeat count for the earler loop body gets incremented.
 
@@ -403,7 +414,7 @@ But if it turns out that the loop body does not make any calls, then I would pre
 f() {} // The loop does not make any calls even though those calls 
        // can be present in the loop body, but the condition (of `if`) is not satisified.
 ```
-To summarize, for the loop bodies, as opposed to the repeated function calls, the caching starts with the first loop body. That loop body is called _initial_ in the algorithm. If the initial loop body ends without the function calls then it is removed from the call fraph, and the subsequent loop body, if any, becomes initial.
+To summarize, for the loop bodies, as opposed to the repeated function calls, the caching starts with the first loop body. That loop body is called _initial_ in the algorithm. If the initial loop body ends without calling any function then it is removed from the call fraph, and the subsequent loop body, if any, becomes initial.
 
 As soon as a function call happens in the initial loop body, the initial loop body's caching stops, that loop body's subtree is flushed:
 ```rs
@@ -420,7 +431,7 @@ f() {
     i() {}
   } // Loop body ends.
 ```
-The subsequent loop body, if any, is cached similar to the repeated function calls. If, upon end, its subtree is identical to that of the preceeding loop body, then the repeating loop body is removed from the call graph and the repeat count of the preceding loop body is incremented. If, upon end, the subsequent loop body's subtree differs, then 
+The subsequent loop body, if any, is cached similar to the repeated function calls. If, upon end, that loop body's subtree is identical to that of the preceeding loop body, then the repeating loop body is removed from the call graph and the repeat count of the preceding loop body is incremented. If, upon end, the subsequent loop body's subtree differs, then 
 * it is retained in the call graph,
 * the repeat count of the preceding loop body is flushed to the log,
 * the latest loop body's subtree is flushed.
@@ -448,7 +459,7 @@ init()  ...      ...
  / \    / \      / \
  ...    ...      ...
 ```
-(the `main()` calls a number of functions each of which is a subtree of calls)
+(the `main()` function calls a number of functions each of which is a subtree of calls)
 
 Now let's imagine that the logging is enabled after the call to `main()` but before the call to `init()`.
 The node for `init()` will be created as a root of the call tree, and the pointer to that root will be added to the bottom of the call stack. 
@@ -471,9 +482,9 @@ The Call Tree             The Call Stack
 ```
 All the subsequent nodes, including `main()`, are added as children, grandchildren, and other successors of the pseudonode. 
 
-Thus the topology of calls is _always a tree_, even if the logging gets enabled after the call to `main()`, in which case the first call to `init()` is added as a child of pseudonode, upon return is retained in the call tree, and the subsequent repeated calls to `init()` are cached and can end up in incrementing its repeat count. 
+Thus the topology of calls is _always a tree_, even if the logging gets enabled after the call to `main()`, in which case the first call to `init()` is added as a child of pseudonode, upon return is retained in the call tree, and the subsequent repeated calls to `init()` are cached and can end up in incrementing the first `init()`'s repeat count. 
 
-In my experience there were embedded systems where `main()` was returning and was called again. If the logging gets enabled before the call to `main()` then the repeated calls to `main()` will be cached and may result in incrementing the repeat count of the preceding call to `main()`. 
+In my experience there were embedded systems where `main()` was returning and was called again. In such systems if the logging gets enabled before the call to `main()` then the repeated calls to `main()` will be cached and may end up in incrementing the repeat count of the preceding call to `main()`. 
 
 ### The Logging Indent
 
@@ -515,19 +526,19 @@ In some environments or cases it is hard to generate a core (crash) dump or catc
 
 The situation becomes a bit tricky when the software, such as a daemon or an embedded firmware, is running endlessly, and the failure happens rarely, like once a month.
 
-As for the log storage, the FCL, customized by the user, can log the function calls (interleaved with the binary's own debugging output) not only to a terminal but to a file or memory in a circular manner, such that the oldest log entries are overwritten with the new ones. When the failure happens the developer can see the log of the last 7 or 30 days, etc., depending on the settings and available storage.
+As for the log storage, the FCL, _customized by the user_, can log the function calls (interleaved with the binary's own debugging output) not only to a terminal but to a file or memory in a circular manner, such that the oldest log entries are overwritten with the new ones. When the failure happens the developer can see the log of the last 7 or 30 days, etc., depending on the settings and available storage.
 
-But what does happen to the dynamic memory? Based on the logic so far the call graph grows endlessly. This will exhaust the memory. How can FCL log endlessly but still retain all the functionality?
+But what does happen to the dynamic memory occupied by the call graph? Based on the logic so far the call graph grows endlessly. This will exhaust the memory. How can FCL log endlessly but still retain all the functionality?
 
 Let's consider a simple `main()` function. Let's imagine that it calls `init()`, then in a loop it calls `work()`. During logging the `main()` gets added as a child to the pseudonode. Then `init()` is added as a child of `main()`, then the `work()` (with its children) is added after `init()`, the repeated `work()` increments the repeat count of the first `work()` and gets removed from the call graph. The `work()` with the subtree different from the one of the first `work()`, gets added to the call graph, and so on.
 
-At any moment the FCL algorithm analyses the two latest calls to `work()` in order to make a decision whether to leave the latest `work()` in the graph and log it, or to remove it and increment the repeat count of the preceding `work()`.
+During the loop the FCL algorithm analyses the two latest calls to `work()` in order to make a decision whether to leave the latest `work()` in the graph and log it, or to remove it and increment the repeat count of the preceding `work()`.
 
-In that decision-making the `init()` is not needed in the call graph and can potentially be removed (it is already logged). But if we remove it, then the list of children of `main()` will be distorted. This will affect the rare implementations where `main()`, upon certain condition or periodically, can return, and then get called again. And upon return from the second `main()` the FCL needs to compare the second `main()`'s subtree with the first `main()`'s subtree and either log the second `main()`'s subtree or remove it and increment the repeat count for the first `main()`. But if the FCL's algorithm removes the `main()`'s child `init()`, then the comparison of the two adjacent subtrees of `main()` will be distorted becuase those subtrees can differ in nested `init()` subtrees or their repeat count.
+In that decision-making the `init()` is not needed in the call graph and can potentially be removed (it is already logged). But if we remove it, then the list of children of `main()` will be distorted. This will affect the rare implementations where `main()`, upon certain condition or periodically, can return, and then get called again. And upon return from the second (repeated) `main()` the FCL needs to compare the second `main()`'s subtree with the first `main()`'s subtree and either log the second `main()`'s subtree or remove it and increment the repeat count for the first `main()`. But if the FCL's algorithm removes the `main()`'s child `init()`, then the comparison of the two adjacent subtrees of `main()` will be distorted becuase those subtrees can differ in nested `init()` subtrees or their repeat count.
 
 To summarize, for the common case we cannot remove `init()` from the call graph (when we proceed to hadling the calls to `work()`), because the `init()` particiaptes in comparing the adjacent subtrees of `main()`.
 
-But what if `main()` is not added to the call graph? What if logging starts after the call to `main()` but before the call to `init()`? In that case the `init()` will be added to the call graph and logged as the first child of the pseudonode. Then upon the first call to `work()` the algorighm will see that the `work()` has a name different from `init()`, thus the caching will not be triggered, the `work()` will be added to the call graph, logged right away without caching, and the `init()` will not be needed any more in the call graph. That is why the `init()` can be removed from the list of children of the pseudonode, and the `work()` can be added as the first child instead.  
+But what if `main()` is not added to the call graph? What if logging starts after the call to `main()` but before the call to `init()`? In that case the `init()` will be added to the call graph and logged as the first child of the pseudonode. Then upon the first call to `work()` the algorighm will see that the `work()` has a name different from `init()`, thus the caching will not be triggered, the `work()` will be added to the call graph, logged without caching, and the `init()` will not be needed in the call graph starting with the call to `work()`. That is why, upon the first call to `work()`, the `init()` can be removed from the list of pseudonode's children , and the `work()` can be added as the first child instead.  
 (TODO: Not yet implemented. Reader Practice?)
 
 The repeated calls to `work()` will increment the repeat count of the first `work()`.
@@ -540,24 +551,24 @@ Any different call to `work()`, the one having subtree different from that of th
 
 (TODO: Not yet implemented. Reader Practice?)
 
-This can continue endlessly. For that to work the `main()` must not be logged. I.e. 
+This can continue endlessly. For that to work the `main()` must not be logged. That is, 
 * either the `main()` must not be instrumented with `#[loggable]`, 
-* or the automatic unstrumentation of `main()` must be suppressed with `#[non_loggable]`,
-* or the logging must be enabled after the call to `main()`.
+* or the logging must be enabled after the call to `main()`,
+* or, if `main()` is inside of a module marked as `#[loggable]`, the automatic unstrumentation of `main()` must be suppressed with `#[non_loggable]`.
 
 ### Logging the Threads Forever
 
 The same is also applicable to the _thread functions (and nested functions) running for a long time_ (comparable to `main()`). A thread function is the top-level function that is invoked when a thread is spawned. The thread function, if logged, stays in the call graph until it returns. Upon the thread function return (thread termination) the thread's call graph is destroyed as part of the thread-local data and the dynamic memory is deallocated.
 
-The more threads are spawned and logged in parallel, the higher is the chance of exhausting the dynamic memory. If the thread function is logged then its subtree stays in memory until the thread function return. But if the thread function is not logged (but its children are), then only its 1 or 2 latest children's subtrees stay in memory.
+The more threads are spawned and logged in parallel, the higher is the chance of exhausting the dynamic memory. If the thread function is logged then its subtree stays in memory until the thread function return. But if the thread function is not logged, but its children are, then only its 1 or 2 latest children's subtrees stay in memory.
 
 To summarize, 
-* if the long-living thread functions and their long-living successors are not logged (but their short-living nested calls are) 
+* if the long-living thread functions and their long-living successors are not logged (but their short-living nested calls are),
 * or the threads terminate quickly
 
-then the logging can last forever.
+then the thread logging can last forever.
 
-TODO: Not needed node removal from the pseudonode children is not yet implemented.
+TODO: Unneeded node removal from the pseudonode children is not yet implemented.
 
 ## Thread Switch Distortion
 (Unsorted. Requires knowledge of the architecture, in particular the single mutex approach)
