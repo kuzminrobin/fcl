@@ -3,6 +3,10 @@ use std::{cell::RefCell, rc::Rc};
 
 type Link = Rc<RefCell<CallNode>>;
 
+/// The call tree node. Represents one of the following items
+/// * function
+/// * closure
+/// * loop body.
 struct CallNode {
     // TODO: Consider CallNode -> ItemNode or CallGraphItemNode.
     /// A call (a function or a closure, with name and optional parameter values), a loop body.
@@ -16,14 +20,16 @@ struct CallNode {
     repeat_count: RepeatCount,
     /// Flag that tells, during the cache flushing, that the function/closure has returned
     /// or the loopbody (loop iteration) has ended.
-    /// Tells to log the item return in case of a `flush`
-    /// upon thread context switch or {std output and panic} sync, e.g.
+    ///
+    /// During flush upon thread context switch or {std output and panic} sync
+    /// tells whether to to log the item return, e.g.
     /// * `} // function().`
     /// * `} // closure().`
     /// * `} // Loop body end.`
     has_ended: bool,
 }
 impl CallNode {
+    /// Creates a new call tree node.
     fn new(kind: ItemKind) -> Self {
         Self {
             kind: kind,
@@ -33,9 +39,11 @@ impl CallNode {
             has_ended: false,
         }
     }
+    /// Sets the string representation of the value returned by the function, closure or `loop` iteration.
     fn set_ret_val(&mut self, output: Option<String>) {
         self.ret_val = output;
     }
+    /// Provides access to the string representation of the value returned by the function, closure or `loop` iteration.
     fn get_ret_val(&self) -> &Option<String> {
         &self.ret_val
     }
@@ -82,18 +90,38 @@ impl CachingInfo {
     }
 }
 
-/// Function call repeat count data type.
+/// Repeat count data type for Function/closure call or loop body.
 type RepeatCountType = usize;
-/// The maximum value (saturation value) for the function call repeat count data type.
+/// The maximum value (saturation value) for the repeat count data type.
 /// The function can be called in a loop endlessly, such that the function call repeat count can potentially overflow.
 /// The algorithm increments that count to the maximum (saturation) value and then stops incrementing.
 const REPEAT_COUNT_MAX: RepeatCountType = RepeatCountType::MAX;
 
+/// The category of the repeat count.
+///
+/// The call tree item repeat count consists of 2 parts:
+/// * `overall` - how many times the item repeats, participates in the subtree comparison,
+/// * `flushed` - the last flushed value of the `overall`, affects the repeat count value shown
+/// during the next flush as a difference `overall - flushed`.
+/// The `flushed` must never be greater than `overall`.
+///
+/// Any of them can reach saturation - `REPEAT_COUNT_MAX` - that affects
+/// the repeat count value shown during the next flush. This category of the repeat count
+/// tells which part has reached the saturation.
+//
+// TODO: Consider RepeatCountCategory -> RepeatCountInfo (since also contains a value).
 pub enum RepeatCountCategory {
     // For `CallNode::repeat_count::{overall,flushed}`.
-    Exact(RepeatCountType), // Repeats 6 time(s). // None is REPEAT_COUNT_MAX.
-    AtLeast(RepeatCountType), // Repeats 6+ time(s). // The `overall` is REPEAT_COUNT_MAX.
-    Unknown,                // Repeats ? time(s). // Both are REPEAT_COUNT_MAX.
+    /// Neither `overall` nor `flushed` reached saturation. During next flush the repeat count value
+    /// is to be shown as `overall - flushed`, e.g. `// Repeats 6 time(s).`.
+    Exact(RepeatCountType),
+    /// The `overall` has reached saturation (and stopped incremeting) but the `flushed` has not.
+    /// During next flush the repeat count value is to be shown as _at least_ `overall - flushed`,
+    /// e.g. `// Repeats 6+ time(s).`.
+    AtLeast(RepeatCountType),
+    /// Both `overall` and `flushed` have reached saturation. During next flush the repeat count value
+    /// is to be shown as _unknown_, e.g. `// Repeats ? time(s).`.
+    Unknown,
 }
 impl RepeatCountCategory {
     pub fn to_string(&self) -> String {
@@ -105,7 +133,9 @@ impl RepeatCountCategory {
     }
 }
 
-/// Call graph's item kind: a call (function or closure), a loop body.
+/// Call tree's item kind, one of the following:
+/// * a call (function or closure),
+/// * a loop body.
 #[derive(Clone)]
 pub enum ItemKind {
     /// The item is a function or a closure (with name and optional parameter values).
@@ -117,6 +147,7 @@ pub enum ItemKind {
     Loopbody,
 }
 impl ItemKind {
+    /// Tells if the call tree item is a call (a function or a closure) as opposed to the loop body.
     pub fn is_call(&self) -> bool {
         if let Self::Call { .. } = self {
             true
@@ -124,6 +155,7 @@ impl ItemKind {
             false
         }
     }
+    // TODO: Seems redundant (just a negtion of `is_call()`), consider removing.
     pub fn is_loopbody(&self) -> bool {
         if let Self::Loopbody { .. } = self {
             true
@@ -133,21 +165,26 @@ impl ItemKind {
     }
 }
 
-/// The function call repeat count. Consists of the two parts.
+/// The call tree item repeat count. Consists of the two parts.
 /// * Actual repeat count. Stops incrementing upon reaching `REPEAT_COUNT_MAX` (saturates).
 /// * The flushed part of the actual repeat count. Value less than or equal to the actual repeat count.
 #[derive(Clone, Copy)]
 pub struct RepeatCount {
+    /// Tells how many times the call tree item repeats, participates in the subtree comparison.
     overall: RepeatCountType,
+    /// Tells the last flushed value of the `overall`, affects the repeat count value shown
+    /// during the next flush as a difference `overall - flushed`. Must never be greater than `overall`.
     flushed: RepeatCountType, // flushed <= overall
 }
 impl RepeatCount {
+    /// Creates a new repeat count.
     pub fn new() -> Self {
         Self {
             overall: 0,
             flushed: 0,
         }
     }
+    /// Returns the repeat count category and the value to be used during flush.
     pub fn non_flushed(&self) -> RepeatCountCategory {
         if self.overall < REPEAT_COUNT_MAX {
             return RepeatCountCategory::Exact(self.overall - self.flushed);
@@ -156,27 +193,37 @@ impl RepeatCount {
         }
         RepeatCountCategory::Unknown
     }
+    /// Tells (if `true`) if there have definitely not been repeat count increments since the last flush
+    /// (in other words the non-flushed value of the repeat count is zero).
+    /// If both `overall` and `flushed` have reached saturation, then there potentially could be increments,
+    /// `false` is returned.
     pub fn non_flushed_is_empty(&self) -> bool {
         // Equal but not both are saturated:
         self.overall == self.flushed && self.flushed < REPEAT_COUNT_MAX
     }
+    /// Increments the `overall` repeat count part if it hasn't saturated.
     pub fn inc(&mut self) {
         if self.overall < REPEAT_COUNT_MAX {
             self.overall += 1
         }
     }
+    /// Marks the current repeat count value as flushed.
+    /// In other words updates the repeat count `flushed` part with the `overall` value.
     pub fn mark_flushed(&mut self) {
         self.flushed = self.overall
     }
 }
 impl core::cmp::PartialEq for RepeatCount {
+    /// Tells if the two repeat counts are equal (during the subtree comparison).
     fn eq(&self, other: &Self) -> bool {
         self.overall.eq(&other.overall)
     }
 }
 
+/// The thread's call graph.
+///
 /// The per-thread instance of this type contains the full information about
-/// the thread's function calls (the thread's call graph).
+/// the thread's function and closure calls, loop bodies, their order, and repeat counts.
 ///
 /// Typically the call graph of a program or a thread is a tree
 /// with the `main()` or a thread function being the root.
@@ -184,7 +231,7 @@ impl core::cmp::PartialEq for RepeatCount {
 /// (but before the return from `main()`), then the call graph
 /// can be not a tree but a sequence of trees (e.g., a sequence of functions called by `main()`).
 ///
-/// E.g. if `main()` calls `f()` and then `g()`,
+/// For eample, if `main()` calls `f()` and then `g()`,
 /// but logging gets enabled after `main()` and before `f()`,
 /// then `f()` will be the first-most call to be added to the call graph, and then `g()`.
 /// The `f()` followed by `g()`, including their nested calls, will be a sequence of two call trees
@@ -195,30 +242,38 @@ impl core::cmp::PartialEq for RepeatCount {
 ///
 /// But if logging gets enabled before `main()` then `main()` gets added as a child to the pseudonode.
 pub struct CallGraph {
-    /// The call stack, i.e. a stack of links to the call graph nodes.
+    /// The call stack.
+    ///
+    /// In particular a stack of links to the call graph nodes.
     /// In other words a stack of links to the nodes on the path
     /// from the root to the currently active call node in the call graph.
     /// Is used for returning to the parent at any moment in a singly linked call tree.
+    ///
     /// The link to a pseudonode always exists at the bottom of the call stack.
     /// The pseudonode is not to be logged. Its children have the call depth of 0.
     /// In other words the call depth of a call is `call_stack.len() - 1` when
     /// the call is not yet on the call stack.
     call_stack: Vec<Link>,
 
+    /// The pointer to the current node in the call tree. That node represents
+    /// the currently running function in the instrumented user code.
+    /// The nested calls are added as children to the node pointed by this field.
+    ///
     /// Repeats the `self.call_stack.last()` for quick access and brevity
     /// (strictly speaking is not required).
-    /// The node that represents the currently running function.
-    /// The nested calls are added as children to the node pointed by this link.
     current_node: Link,
 
-    /// The instance containing the info necessary for caching the calls before logging.
-    /// The cache is used for
-    /// * repeating call or empty loop body removal,
-    /// * flushing of the cache upon thread context switch or {std output/panic} sync.
+    /// Contains the info necessary for caching the calls before logging.
+    /// The cache is used for repeated call or empty loop body removal.
+    /// The cache is flushed upon thread context switch or synchronization with the
+    /// instrumented user code's own std output and panic hook output.
     caching_info: CachingInfo,
 
-    /// An instance (in particular a decorator) that gets notified
-    /// about changes in the call graph which ends up in the call logging.
+    /// A pointer to an instance implementing the `CoderunNotifiable` trait
+    /// (for example a decorator) that gets notified
+    /// about changes in the call graph.
+    ///
+    /// Those notifications can end up in the call logging.
     coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>,
 }
 
@@ -237,12 +292,12 @@ impl CallGraph {
         }
     }
 
-    /// Adds a child call (a function or a closure) to the current function in the call graph
+    /// Adds a call (a function or a closure) as a child to the current function in the call graph
     /// (a function on top of the call stack). This results in
     /// * an update to the call graph,
-    /// * if the child call has the same name as the preceding sibling, the cachign start,
-    /// * if caching is not active, the child call logging.
-    ///
+    /// * a potential caching start, if the added child call has the same name as the preceding sibling,
+    /// * a potential child call logging, if caching is not active.
+    //
     // By the moment of this call (`add_call()`):
     // Log State (logged or cached):
     // parent {
@@ -362,15 +417,15 @@ impl CallGraph {
         self.current_node = new_sibling.clone();
     }
 
-    /// Adds the return to the current function in the call graph
-    /// (a function on top of the call stack). This results or can result in 
+    /// Adds a return to the current function in the call graph
+    /// (a function on top of the call stack). This results in
     /// * an update in the call graph,
-    /// * a flush of the returning function's latest child's repeat count, if caching is not active,
-    /// * if the returning function repeats the previous sibling 
-    ///   (including the nested calls, their order, and repeat counts recursively), 
-    ///   then the removal of the returning function from 
-    ///   the call graph, increment of the previous sibling's repeat count, caching stop 
+    /// * a potential flush of the returning function's latest child's repeat count, if caching is not active,
+    /// * if the returning function's subtree repeats that of the previous sibling,
+    ///   then the removal of the returning function's subtree from
+    ///   the call graph, increment of the previous sibling's repeat count, caching stop
     ///   (if caching started during the call to this returning function).
+    //
     // By the moment of this call (`add_ret()`) the call graph state is:
     // parent { // The call or the loopbody.
     //     [...]
@@ -507,11 +562,11 @@ impl CallGraph {
 
     /// Adds the loop body start to the call graph.
     // By the moment of this call (`add_loopbody_start()`) the call graph state is:
-    // { `parent() {` | `{ // (TODO: Enclosing?) Loop body start` } // `current`. `call_stack`: [..., parent]. `current.children`: [..., {previous_sibling | [enclosing_?]loopbody}].
+    // Either `parent() {` or `{ // (TODO: Enclosing?) Loop body start`.  // `current`. `call_stack`: [..., parent]. `current.children`: [..., {previous_sibling | [enclosing_?]loopbody}]. // TODO: Smth is wrong about `current.children`, should be just optional previous_sibling: `current.children`: [..., [previous_sibling] ]
     //     [...]
     //     [{ // Loop body start. // The body of the previous loop.
     //        . . .
-    //        loop_nested_sibling() { .. }  // At least one mandatory function call (otherwise the loop would not be logged).
+    //        loop_nested_sibling() { .. }  // At least one mandatory function call (otherwise the loop would not be logged and would be removed from the call graph).
     //         [// loop_nested_sibling() repeats 2 time(s).]
     //        . . .
     //     } // Loop body end.
@@ -839,7 +894,8 @@ impl CallGraph {
     /// Flushes the data cached in the call graph.
     /// Flushing is done upon
     /// * thread context switch,
-    /// * log synchronization with stdoutput (`stdout` and `stderr`) and panic output.
+    /// * log synchronization with the instrumented user code's own stdoutput (`stdout` and `stderr`) 
+    /// and panic output.
     ///
     /// **Parameters**
     /// * `flush_notifiable`: Flush the notifiable. For example, if the notifiable is the call-like decorator,
@@ -903,13 +959,13 @@ impl CallGraph {
         self.caching_info.clear();
     }
 
-    /// Returns the call depth, starting with 0 when pseudonode is in,
+    /// Returns the call depth (`0` when the pseudonode only is in)
     /// in the call graph for the currently running function's children.
-    /// When a node is added to the call stack, the call depth starts reflecting the indent of its children.
-    /// E.g. before adding `main()` the call depth is 0 (the indent for printing `main()` who is a child of pseudonode).
-    /// After adding `main()` the call depth is 1 (the indent for printing the `main()`'s children).
+    /// E.g. before adding `main()` the call depth is `0` (the call depth of pseudonode's children).
+    /// After adding `main()` the call depth is `1` (the call depth of `main()`'s children).
+    //
+    // TODO: Consider call_depth -> children_call_depth.
     pub fn call_depth(&self) -> usize {
-        // TODO: Consider call_depth -> children_call_depth.
         let call_depth = self.call_stack.len();
         debug_assert!(call_depth >= 1); // Pseudo-node.
         call_depth - 1
@@ -920,18 +976,20 @@ impl CallGraph {
         self.caching_info.is_active()
     }
 
-    /// Tells if the two subtrees of the call graph are equal recursively, i.e.
+    /// Tells if the two subtrees of the call tree are equal recursively,
     /// including the nested calls (children), their names, order, repeat counts,
     /// but not including the parameters and return values.
     /// #### Parameters
-    /// * `a` specifies one subtree to compare, typically the caching model node
+    /// * `a` specifies the first subtree to compare, typically the caching model node
     ///   with potentially non-zero repeat count.
-    /// * `b` specifies another subtree to compare, typically the node being cached,
+    /// * `b` specifies the second subtree to compare, typically the node being cached,
     ///   with always-zero repeat count.
     /// * `compare_root_repeat_count` tells to compare the repeat count for the subtree roots.
     ///   Expected to be `false` for the caching model node and the node being cached, but `true`
     ///   for their nested calls (children).
-    // TODO: Reformat the params doc comments according to the standards.
+    // TODO: Reformat the params doc comments according to the standards 
+    // (ideally such that the param names are not mentioned in the doc comments (no dup), 
+    // otherwise renaming gets complicated).
     fn trees_are_equal(a: &Link, b: &Link, compare_root_repeat_count: bool) -> bool {
         let a = a.borrow();
         let b = b.borrow();
@@ -966,8 +1024,10 @@ impl CallGraph {
         true
     }
 
+    /// Flushes to the log the call subtree rooted at the node passed as an argument.
+    /// 
     /// Traverses the call subtree recursively and calls the notification callbacks,
-    /// thus notifying that the subtree has stopped being cached.
+    /// thus loggign the subtree.
     fn flush_tree(&mut self, current_node: &Link, call_depth: usize) {
         let mut current_node = current_node.borrow_mut();
         let item_children = &current_node.children;

@@ -1,0 +1,1 @@
+The items that can be reused in the other projects and strictly speaking are not part of the Function Call Logger.
