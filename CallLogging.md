@@ -1,4 +1,5 @@
 # TODO:
+* In .md break-up long lines to short ones.
 * Pseudonode (TODO: Consider -> pseudoroot)
 * Implement endless logging (see "mdBook.md").
 * Double-check the case of a thread switch immediately after the repeat count increment,

@@ -18,10 +18,13 @@ mod writer;
 
 macro_rules! NO_LOGGER_ERR_STR {
     () => {
-        "Internal Error: Unexpected lack of logger"
+        "FCL Internal Error: Unexpected lack of logger"
     };
 }
 
+/// Per-thread instance of the call logging infrastructure.
+/// 
+/// Contians the call graph, logging enabling/diabling mechanism, and some other thread-specific functionality.
 pub struct CallLogInfra {
     /// The stack whose top entry tells if logging is anabled or disabled.
     /// If empty then the logging is
@@ -29,11 +32,14 @@ pub struct CallLogInfra {
     /// The loggign can be temporarily enabled or disabled by pushing an entry to this stack,
     /// and the previous state can be recovered by popping an entry.
     logging_is_on: Vec<bool>, // Enabled by default (if empty).
+    /// The thread-specific functionality not related to the other parts of the logging infrastructure.
     thread_specifics: Rc<RefCell<dyn ThreadSpecific>>,
+    /// The thread's call graph.
     call_graph: CallGraph,
 }
 
 impl CallLogInfra {
+    /// Creates the new call logging infrastructure instance.
     pub fn new(thread_spec_notifyable: Rc<RefCell<dyn LogDecorator>>) -> Self {
         let coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>> = thread_spec_notifyable.clone();
         let thread_specifics: Rc<RefCell<dyn ThreadSpecific>> = thread_spec_notifyable;
