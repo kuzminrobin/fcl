@@ -34,7 +34,7 @@ pub trait CallLogger {
     /// 
     /// In other words pushes to the On/Off Stack a new state specified by the argument.
     fn push_logging_is_on(&mut self, is_on: bool);
-    /// Recover the previous logging on/off state.
+    /// Recovers the previous logging on/off state.
     /// 
     /// In other words pops an entry from the On/Off Stack, if it isn't empty.
     fn pop_logging_is_on(&mut self);
