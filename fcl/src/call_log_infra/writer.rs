@@ -24,8 +24,9 @@ pub enum WriterKind {
 
 // TODO: Consider removing `Shared` from the type name. There is nothing sharing-specific. Nothing
 // prevents different threads from having separate instances of this Writer.
-// TODO: Consider reviewing FclWriter, WriterKind, and ThreadSharedWriter[::set_writer()] against unifying/deduping, 
-// preserving invariants, and choosing a more optimal place for Box<dyn Write>.
+// TODO: Consider reviewing FclWriter, WriterKind, and ThreadSharedWriter[::set_writer()] 
+// against unifying/deduping, 
+// preserving invariants (see below), and choosing a more optimal place for Box<dyn Write>.
 pub struct ThreadSharedWriter {
     writer_kind: WriterKind,
     writer: Box<dyn Write>,

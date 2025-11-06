@@ -7,7 +7,7 @@ use tempfile::NamedTempFile;
 
 /// The standard output redirector - the container of the resources necessary for
 /// * redirecting the std output (`stdout` or `stderr`) to a temporary file,
-/// * reading those data,
+/// * reading the data that has been output to that file,
 /// * and recovering the state that was before the redirection.
 pub struct StdOutputRedirector {
     /// Stores the original std output file descriptor.
@@ -23,6 +23,10 @@ pub struct StdOutputRedirector {
 impl StdOutputRedirector {
     /// Creates an instance of the standard output redirector for the standard output (`stdout` or `stderr`)
     /// specified by the passed argument.
+    /// 
+    /// Returns the `std::io::Result<StdOutputRedirector>` with 
+    /// * the redirector instance (in `Ok()`) 
+    /// * or the redirection error `std::io::error::Error` (in `Err()`).
     fn make(stdio: StdioDescriptor) -> io::Result<Self> {
         // Create the temporary file:
         let tempfile = NamedTempFile::new()?;
@@ -46,10 +50,18 @@ impl StdOutputRedirector {
         })
     }
     /// Creates the `stdout` output redirector.
+    /// 
+    /// Returns the `std::io::Result<StdOutputRedirector>` with 
+    /// * the redirector instance (in `Ok()`) 
+    /// * or the redirection error `std::io::error::Error` (in `Err()`).
     pub fn new_stdout() -> io::Result<Self> {
         Self::make(StdioDescriptor::Stdout)
     }
     /// Creates the `stderr` output redirector.
+    /// 
+    /// Returns the `std::io::Result<StdOutputRedirector>` with 
+    /// * the redirector instance (in `Ok()`) 
+    /// * or the redirection error `std::io::error::Error` (in `Err()`).
     pub fn new_stderr() -> io::Result<Self> {
         Self::make(StdioDescriptor::Stderr)
     }
@@ -67,7 +79,7 @@ impl StdOutputRedirector {
     pub fn get_buffer_reader(&mut self) -> &mut dyn Read {
         &mut self.tmpfile_for_fcl_to_read_from
     }
-    /// Reads the content of the temporary file (the redirected std output) since last read,
+    /// Reads the content of the temporary file (the redirected user's std output) since last read,
     /// and writes, if any, to the original std output file descriptor.
     pub fn flush(&mut self) {
         let mut buf_content = String::new();

@@ -718,8 +718,117 @@ You understand what I mean... what should happen to C and C++ code... ;-DDD
 
 The single mutex can significantly distort the thread constext switch picture. 
 
-For example, the first thread locks the mutex and starts updating the call graph. The thread context switches to the second thread (or the second thread is running in parallel on a different CPU core). The second thread makes a call and tries to lock the mutex to log that call, but the mutex is already locked, so the second thread starts waiting for the mutex, returning the execution back to the first thread. Depending on the operating system's approach to the thread synchronization, in some scenarios as soon as the first thread releases the mutex the thread context can immediately be switched to the second thread waiting for the mutex. But in other scenarios the first thread after releasing the mutex can continue the execution until the expiration of the time quantum, can log a few calls more, and again get interrupted while the mutex is locked. The second thread will again have to wait for the mutex. This can happen an unpredictable number of times.
+For example, the first thread locks the mutex and starts updating the call graph.
+The thread context switches to the second thread (or the second thread is running in parallel on a different CPU core).
+The second thread makes a function call and tries to lock the mutex to log that call,
+but the mutex is already locked, so the second thread starts waiting for the mutex,
+returning the execution back to the first thread. 
+Depending on the operating system's approach to the thread synchronization, 
+in some scenarios as soon as the first thread releases the mutex the thread context can immediately be switched to the second thread waiting for the mutex.
+But in other scenarios the first thread after releasing the mutex can continue the execution
+until the expiration of the time quantum, can log a few calls more, and again get interrupted 
+while the mutex is locked. The second thread will have to wait for the mutex again without moving forward. 
+This can repeat an unpredictable number of times.
 
 To summarize, the log can show that the thread switch happened later relative to the first thread's log, and with one attempt, but in reality there could be a number of unsuccessful attempts to switch the thread context earlier than what the log shows. The user should be ready for such a distortion of the thread context switch picture and understand that certain timing-dependent scenarios can be affected by the FCL.
 
 How large is the distortion? Depends on the thread synchrinization approach of the operating system and on the code being logged. If there are lengthy fragments without loops and calls, then the distortion is minimal. But the more often the code execution passes through the starts and ends of the loops, functions, and closures the larger is the distortion (and the slow-down because of logging. TODO: explain the slow-down in the Performance Impact chapter).
+
+### Minimizing the Thread Switch Distortion
+(Raw, draft)  
+Consider placing the thread synchronization mechanism (ThreadGatekeeper and CallLoggerArbiter)
+after the CallLogInfra, such that the threads can access their own CallLogInfra in parallel.
+Then, when a CallLogInfra tries to flush, it locks the ThreadGatekeeper/CallLoggerArbiter mutex, 
+and through the ThreadGatekeeper/CallLoggerArbiter flushes all the threads' cache 
+(in all the CallLogInfra instances) in the order of updates.
+For that to work, 
+* each CallLogInfra instance needs to have an extra mutex that synchronizes the access between the 
+  thread (updating the call graph) and the flush by the ThreadGatekeeper/CallLoggerArbiter running 
+  in the context of the other thread (Footnote A);
+* every update to the call graph needs to have an update count/ID acquired from the global thread-shared 
+  atomic counter.  
+
+Algorithm (see picture/chart below).
+* Thread 0 accesses its CallLogInfra instance (CallLogInfra 0). For this the thread acquires the mutex 0.  
+  The CallLogInfra 0 gets from the global thread-shared atomic counter the update count `n` (and the counter
+  increments). The CallLogInfra 0 adds an update with the update count of `n` to its call graph
+  and releases the mutex 0.
+* In parallel to that the thread 1 acquires mutex 1 and adds the update with the update count of `n + 1` 
+  to its call graph in CallLogInfra 1. Then releases the mutex 1.
+* Then the thread 0 adds the update `n + 2` to its call graph.
+* Then the thread 1 adds the update `n + 3` to its call graph.
+* Then the thread 0 adds an update `n + 4` which results in a flush. The thread 0's CallLogInfra
+  acquires the ThredGateKeeper/CallLoggerArbiter mutex, and passes to the arbiter the updates `n`, `n + 2`, `n + 4` 
+  (the updates since the last flush of thread 0), the ThredGateKeeper/CallLoggerArbiter polls all the other 
+  instances of CallLogInfra and asks to provide their flush data - the updates since the last flush. The 
+  CallLogInfra instance of thread 1 responds with the updates `n + 1` and `n + 3`. 
+  The ThredGateKeeper/CallLoggerArbiter orders all those updates by ID (n, n + 1, n + 2, n + 3, n + 4) and flushes those to the corresponding decorators (the access to those is exclusive). That is  
+  * update n goes to decorator 0,
+  * update n + 1 goes to decorator 1,
+  * update n + 2 goes to decorator 0,
+  * update n + 3 goes to decorator 1,
+  * update n + 4 goes to decorator 0.
+
+  (different decorators can use different colors for different threads if they add up to an HTML writer, for example)
+
+(Requires the knowledge of output sync)  
+Every std output (in the user's code) will still need to trigger the overall flush.
+
+How to handle the situation when the threads enter the long loops with the repeating iterations? 
+That is, the updates to their call graphs take place in parallel, updating the repeat counts without a flush.  
+The currently implemented algo shows all those thread context switches, and flushes the cache upon every switch
+(even if the new thread does not log anything, in which case instead of `f() {}` we can see the picture
+```rs
+f() {
+}
+```
+That is, between the call `{` and the return `}` the thread conext switches to another thread, that logs nothing, and back).
+
+But if we use the algo described above, then some of the updates (or groups of them) will get removed 
+together with the node being cached, when 
+incrementing the repeat count. Every repeat count inc needs to have a separate update count?  
+In that case upon nearest flush the output is expected to be  
+(thread 0 calls `thread_0_f()` repeatedly, thread 1 calls `thread_1_g()` repeatedly)
+```
+. . .                          
+                              . . .
+thread_0_f() {}
+// thread_0_f() repeats 3 time(s).
+                              // thread_1_g() repeats 5 time(s).
+// thread_0_f() repeats 4 time(s).
+                              // thread_1_g() repeats 6 time(s).
+```
+instead of the actual
+```
+. . .                          
+                              . . .
+thread_0_f() {}
+// thread_0_f() repeats 3 time(s).
+thread_0_f() {
+                              } // thread_1_g().
+                              // thread_1_g() repeats 4 time(s).
+                              thread_1_g() {
+} // thread_0_f().
+// thread_0_f() repeats 3 time(s).
+                              } // thread_1_g().
+                              // thread_1_g() repeats 5 time(s).
+```
+This will be a different distortion but a higher share of the threads' code will be running 
+in parallel without blocking [each other]. I.e. the performance will be higher.
+
+Footnote A.  
+The chart fragment may look suspicious. The thread 0 has a pointer to mutex 0 to access the CallLogInfra 0. 
+The CallLogInfra 0 has a pointer to mutex of the ThreadGatekeeper/CallLoggerArbiter.
+The ThreadGatekeeper/CallLoggerArbiter has a poiner back to the mutex 0.  
+The same for every thread.  
+To summarize, there are 2 mutexes in the same loop of pointers, which is grounds for 
+* an attempt to lock the same mutex (0) twice by the same thread for _mutable_ access 
+  (for an update by the thread, and for a flush by the ThreadGatekeeper/CallLoggerArbiter).
+  At a glance one might think that the recursive mutex can solve the problem, but 
+  the recursive mutex does not provide the _mutable_ access in Rust.  
+
+This means that an extra knowledge needs to be kept in mind that when the thread 0 has acquired the mutex 0
+and accessed CallLogInfra 0, the flush, accessing the ThreadGatekeeper/CallLoggerArbiter, must already
+provide to the ThreadGatekeeper/CallLoggerArbiter the cached updates of the CallLogInfra 0
+(n, n + 2, n + 4), such that 
+the ThreadGatekeeper/CallLoggerArbiter asks for the updates (n + 1, n + 3) from all other CallLogInfra instances, but does not access the mutex of CallLogInfra 0 while that mutex is already locked.

@@ -28,23 +28,23 @@ use call_log_infra::instances::THREAD_LOGGER;
 /// 3. The implementing instance has a notion of logging the functions/closures, loop bodies, 
 /// and flushing the log cache.
 pub trait CallLogger {
-    /// Temporarily switches logging
+    /// For the calling thread temporarily switches logging
     /// * on, if the passed argument is `true`, 
     /// * or off, if `false`.
     /// 
     /// In other words pushes to the On/Off Stack a new state specified by the argument.
     fn push_logging_is_on(&mut self, is_on: bool);
-    /// Recovers the previous logging on/off state.
+    /// Recovers the previous logging on/off state for the calling thread.
     /// 
     /// In other words pops an entry from the On/Off Stack, if it isn't empty.
     fn pop_logging_is_on(&mut self);
-    /// Tells if logging is 
+    /// Tells if logging for the calling thread is 
     /// * on, by returning `true`,
     /// * or off, by returning `false`.
     /// 
     /// In other words returns a copy of the On/Off Stack top.
     fn logging_is_on(&self) -> bool;
-    /// Switches logging
+    /// For the calling thread switches logging
     /// * on, if the passed argument is `true`, 
     /// * or off, if `false`.
     /// 
@@ -53,35 +53,39 @@ pub trait CallLogger {
 
     /// Sets the indent for the calling thread's log.
     /// 
+    /// Is used to visually separate the logs by different threads. 
     /// For example, if the instrumented user's code has 2 threads, then it makes sense to log 
     /// the spawned thread indented by half of the console width 
     /// to visually separate the spawned thread's log from the `main()` thread's log.
     fn set_thread_indent(&mut self, _thread_indent: String) {}
 
-    /// Updates the call graph with a function or closure call and potentially logs that call.
+    /// For the calling thread updates the call graph with a function or closure call 
+    /// and potentially logs that call.
     /// # Parameters
     /// * Function or closure name.
     /// * Optional string representation of the parameter names and values.
     fn log_call(&mut self, name: &str, param_vals: Option<String>);
 
-    /// Updates the call graph with a function or closure return and potentially logs that return.
+    /// For the calling thread updates the call graph with a function or closure return 
+    /// and potentially logs that return.
     /// # Parameters
     /// * Optional string representation of the returned value.
     fn log_ret(&mut self, ret_val: Option<String>);
 
-    /// Unconditionally flushes the data cached in the call graph. 
+    /// Unconditionally flushes the data cached in the call graph 
+    /// (TODO: likely "of the previous thread", see below).
     /// 
     /// Is called, for example,
     /// upon thread context switch. If the new thread tries to log something then 
-    /// the previous thread's log cache is flushed.
+    /// the previous thread's log cache is flushed first.
     fn flush(&mut self) {}
     /// Flushes the data cached in the call graph upon certain condition, such as 
-    /// the instrumented user's code own output or panic handling output.
+    /// the instrumented user's code own output or panic hook output.
     fn maybe_flush(&mut self);
 
-    /// Updates the call graph with a loop body start and potentially logs that start.
+    /// Updates the call graph of the calling thread with a loop body start and potentially logs that start.
     fn log_loopbody_start(&mut self);
-    /// Updates the call graph with a loop body end and potentially logs that end.
+    /// Updates the call graph of the calling thread with a loop body end and potentially logs that end.
     fn log_loopbody_end(&mut self);
 }
 

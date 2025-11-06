@@ -1,4 +1,9 @@
 # TODO:
+
+* Why does every thread have a separate Decorator and WriterAdapter? Access to them is exclusive any way.
+  Explain that both in the code and in the docs.
+  Answer: for decorating different threads with different colors with an HTML writer (or to different writers). Document that.
+* Convert every occurrence to either "stdout and/or stderr" or "stdoutput" or "std output".
 * In .md break-up long lines to short ones.
 * Pseudonode (TODO: Consider -> pseudoroot)
 * Implement endless logging (see "mdBook.md").
@@ -293,6 +298,7 @@ Doc-comment checklist
   * \# Panics
   * \# Leaking
   * No Parameters?
+  * ["Returns ...", if not described above]
   * \# Examples
 
 * Macro
