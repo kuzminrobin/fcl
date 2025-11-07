@@ -4,18 +4,20 @@ pub use call_graph::{CallGraph, ItemKind, RepeatCountCategory};
 
 /// A trait to be implemented by the instances that need to be notified about the code run events
 /// (such as function or closure calls, returns, etc.).
+/// 
+/// Is used by the call graph to notify its decorator.
 pub trait CoderunNotifiable {
     /// Notifies about a function or a closure call.
     /// # Parameters
     /// * The call depth.
-    /// * The call name.
+    /// * The function or closure name.
     /// * The optional string representation of the parameter names and values.
     fn notify_call(&mut self, _call_depth: usize, _name: &str, _param_vals: &Option<String>) {}
 
     /// Notifies about a function or a closure return.
     /// # Parameters
     /// * The call depth.
-    /// * The call name.
+    /// * The function or closure name.
     /// * Flag telling if the call has nested calls.
     /// * The optional string representation of the return value.
     fn notify_return(
@@ -40,7 +42,7 @@ pub trait CoderunNotifiable {
     }
 
     /// Notifies about a flush.
-    /// Any output cached by this trait implementor needs to be flushed.
+    /// Any output cached by the trait implementor needs to be flushed.
     fn notify_flush(&mut self) {}
 
     /// Notifies about a loop body start.

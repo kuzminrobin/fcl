@@ -1,5 +1,6 @@
 # TODO:
 
+* Writer opening and closing (to open/close HTML).
 * Why does every thread have a separate Decorator and WriterAdapter? Access to them is exclusive any way.
   Explain that both in the code and in the docs.
   Answer: for decorating different threads with different colors with an HTML writer (or to different writers). Document that.

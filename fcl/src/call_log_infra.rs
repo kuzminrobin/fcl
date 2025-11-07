@@ -16,6 +16,7 @@ use writer::{THREAD_SHARED_WRITER, ThreadSharedWriterPtr, WriterAdapter, WriterK
 #[cfg(not(feature = "minimal_writer"))]
 mod writer;
 
+/// A macro containing the error message in case of an unexpected absence of a logger for the corresponding thread.
 macro_rules! NO_LOGGER_ERR_STR {
     () => {
         "FCL Internal Error: Unexpected lack of logger"
@@ -748,7 +749,6 @@ impl CallLogger for CallLoggerArbiter {
 }
 
 /// Global `CallLoggerArbiter` instance shared by all the threads.
-// Global data shared by all the threads:
 pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
     LazyLock::new(|| {
         Rc::new(RefCell::new({
@@ -781,6 +781,12 @@ static mut ORIGINAL_PANIC_HANDLER: LazyCell<
 pub mod instances {
     use super::*;
     thread_local! {
+        /// Thread-local decorator.
+        /// 
+        /// Used by the tests to repace the default writer with the one that enables the analysis
+        /// against the expected values.
+        /// 
+        /// To be used by the users to replace the default writer with the custom one.
         // TODO: Update the chart with this info.
         pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {
             #[cfg(not(feature = "minimal_writer"))]
@@ -798,6 +804,9 @@ pub mod instances {
                     None)))
         };
 
+        /// The thread-local name used by the `FunctionLogger` and `LoopbodyLogger` for logging
+        /// * the function and closure calls and returns
+        /// * and loop body begins and ends.
         pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
             let logging_infra = Box::new(CallLogInfra::new(
                 THREAD_DECORATOR.with(|decorator| decorator.clone())));
@@ -810,7 +819,7 @@ pub mod instances {
 
 #[cfg(not(feature = "singlethreaded"))]
 pub mod instances {
-    //TODO: Consider instances -> multithreading_specific_instances.
+    //TODO: Consider instances -> multithreading_specific_instances or threading_instances.
     use super::*;
     use crate::multithreaded::*;
     /// Shared by all the threads global thread synchronization primitive
@@ -822,6 +831,12 @@ pub mod instances {
             )))
         });
     thread_local! {
+        /// Thread-local decorator.
+        /// 
+        /// Used by the tests to repace the default writer with the one that enables the analysis
+        /// against the expected values.
+        /// 
+        /// To be used by the users to replace the default writer with the custom one.
         // TODO: Update the chart with this info.
         pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {
             // TODO: Consider making the default decorator type a macro in a separate file of defaults.
@@ -834,6 +849,9 @@ pub mod instances {
                     None)))
         };
 
+        /// The thread-local name used by the `FunctionLogger` and `LoopbodyLogger` for logging
+        /// * the function and closure calls and returns
+        /// * and loop body begins and ends.
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {
             let logging_infra = Box::new(CallLogInfra::new(
                 THREAD_DECORATOR.with(|decorator| decorator.clone())));

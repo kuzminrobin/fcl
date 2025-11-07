@@ -9,8 +9,8 @@ use crate::CallLogger;
 /// ```rs
 /// fcl::set_thread_indent!(String::from("                "));
 /// ```
-//// TODO: Consider extracting `set_thread_indent` from "singlethreaded.rs" and "multithreaded.rs" 
-//// into one file with the following def-n:
+// // TODO: Consider extracting `set_thread_indent` from "singlethreaded.rs" and "multithreaded.rs" 
+// // into one file with the following def-n:
 // #[macro_export]
 // macro_rules! set_thread_indent {
 //     ($expr:expr) => {
@@ -94,20 +94,29 @@ macro_rules! set_logging_is_on {
     };
 }
 
+/// The instance of this type provides to the multiple threads the access to the `CallLoggerArbiter`.
 pub struct ThreadGatekeeper {
+    /// The pointer to the `CallLoggerArbiter`.
     call_logger_arbiter: Rc<RefCell<CallLoggerArbiter>>,
 }
 impl ThreadGatekeeper {
+    /// Creates a new `ThreadGatekeeper` with the `CallLoggerArbiter` provided from outside.
     pub fn new(call_logger_arbiter: Rc<RefCell<CallLoggerArbiter>>) -> Self {
         Self {
             call_logger_arbiter,
         }
     }
+    /// Adds to the `CallLoggerArbiter` the pointer to the thread's instance 
+    /// implementing `CallLogger` - the `CallLogInfra`.
+    /// 
+    /// Is called upon thread creation and its thread-local data initialization.
     pub fn add_thread_logger(&mut self, thread_logger: Box<dyn CallLogger>) {
         self.call_logger_arbiter
             .borrow_mut()
             .add_thread_logger(thread_logger)
     }
+    /// Removes from the `CallLoggerArbiter` the pointer to the thread's instance 
+    /// implementing `CallLogger` - the `CallLogInfra`, and removes that instance.
     pub fn remove_thread_logger(&mut self) {
         self.call_logger_arbiter.borrow_mut().remove_thread_logger()
     }

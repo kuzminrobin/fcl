@@ -89,7 +89,7 @@ pub trait CallLogger {
     fn log_loopbody_end(&mut self);
 }
 
-/// The trait to be used for logging the parameters and return values.
+/// A trait to be used for logging the parameters and return values.
 pub trait MaybePrint {
     /// Returns the string representation of the instance.
     fn maybe_print(&self) -> String;
@@ -124,9 +124,9 @@ pub struct FunctionLogger {
 }
 
 impl FunctionLogger {
-    /// Creates a new instance to log the function/closure's call and return.
+    /// Creates a new `FunctionLogger` and logs the function/closure's call and return if logging is enabled.
     /// # Parameters.
-    /// * The optional string representation of the user's function's parameters and their values.
+    /// * The optional string representation of the user function's parameters and their values.
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         let mut call_logged = false;
 
@@ -161,6 +161,7 @@ impl FunctionLogger {
     }
 }
 impl Drop for FunctionLogger {
+    /// Logs the function or closure return if the call has been logged.
     fn drop(&mut self) {
         if self.common.call_logged {
             THREAD_LOGGER.with(|logger| {
@@ -178,11 +179,13 @@ impl Drop for FunctionLogger {
     }
 }
 
+/// The type to instrument a user's loop body to be logged.
 pub struct LoopbodyLogger {
     common: LoggerCommon,
 }
 
 impl LoopbodyLogger {
+    /// Creates a new `LoopbodyLogger` and logs the loop body start if logging is enabled.
     pub fn new() -> Self {
         let mut call_logged = false;
         THREAD_LOGGER.with(|logger| {
@@ -205,9 +208,11 @@ impl LoopbodyLogger {
     }
 }
 impl Drop for LoopbodyLogger {
+    /// Logs the loop body end if the start has been logged.
     fn drop(&mut self) {
         if self.common.call_logged {
             THREAD_LOGGER.with(|logger| {
+                // TODO: Try to dedup below.
                 #[cfg(feature = "singlethreaded")]
                 let intermediate_borrow = logger.borrow_mut();
                 #[cfg(feature = "singlethreaded")]

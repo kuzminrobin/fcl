@@ -100,7 +100,7 @@ const REPEAT_COUNT_MAX: RepeatCountType = RepeatCountType::MAX;
 /// The category of the repeat count.
 ///
 /// The call tree item repeat count consists of 2 parts:
-/// * `overall` - how many times the item repeats, participates in the subtree comparison,
+/// * `overall` - how many times the item repeats; participates in the subtree comparison;
 /// * `flushed` - the last flushed value of the `overall`, affects the repeat count value shown
 /// during the next flush as a difference `overall - flushed`.
 /// The `flushed` must never be greater than `overall`.
@@ -124,6 +124,16 @@ pub enum RepeatCountCategory {
     Unknown,
 }
 impl RepeatCountCategory {
+    /// Converts `RepeatCountCategory` to `String`, e.g.,
+    /// * `"5"`  for `RepeatCountCategory::Exact`  
+    ///   (neither `overall` nor `flushed` reached saturation, 
+    ///   the difference between them tells _exactly_ how many times the call repeats since the last flush),
+    /// * `"5+"` for `RepeatCountCategory::AtLeast`  
+    ///   (`overall` reached saturation, the difference between 
+    ///   `overall` and `flushed` tells how many times _at least_ the call repeats since the last flush),
+    /// * `"?"`  for `RepeatCountCategory::Unknown`  
+    ///   (both reached saturation, the difference between 
+    ///   `overall` and `flushed` doesn't tell anything about how many times the call repeats since the last flush).
     pub fn to_string(&self) -> String {
         match self {
             RepeatCountCategory::Exact(exact) => exact.to_string(),
