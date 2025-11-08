@@ -24,6 +24,7 @@ pub enum WriterKind {
 
 // TODO: Consider removing `Shared` from the type name. There is nothing sharing-specific. Nothing
 // prevents different threads from having separate instances of this Writer.
+// TODO: Consider Thread[Shared]Writer -> LogWriter (since not only threads write/log to it but also the user code's std output)
 // TODO: Consider reviewing FclWriter, WriterKind, and ThreadSharedWriter[::set_writer()] 
 // against unifying/deduping, 
 // preserving invariants (see below), and choosing a more optimal place for Box<dyn Write>.
@@ -78,33 +79,44 @@ impl Write for ThreadSharedWriter {
     }
 }
 
-pub type ThreadSharedWriterPtr = Arc<RefCell<ThreadSharedWriter>>; // TODO: Consider -> Arc<RefCell<Write>>.
+pub type ThreadSharedWriterPtr = Arc<RefCell<ThreadSharedWriter>>; // TODO: Consider -> Arc<RefCell<dyn Write>>.
 
-/// Threads' personal adapter for the thread-shared writer.
+/// The adapter for the writer.
+/// 
+/// Is used per-thread in the environements with the writer access sinchronization, 
+/// in particular the environments multi-threaded and/or having 
+/// the user code's `stdout` and `stderr` output. 
 pub struct WriterAdapter {
+    /// The writer used by the adapter.
     writer: ThreadSharedWriterPtr,
 }
 
 impl WriterAdapter {
+    /// Creates new `WriterAdapter` with the writer passed as an argument.
     pub fn new(writer: ThreadSharedWriterPtr) -> Self {
         Self { writer }
     }
 }
 
 impl Write for WriterAdapter {
+    /// Forwards the call to the writer's `Write::write()`.
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.writer.borrow_mut().write(buf)
     }
+    /// Forwards the call to the writer's `Write::flush()`.`
     fn flush(&mut self) -> std::io::Result<()> {
         self.writer.borrow_mut().flush()
     }
 }
 
-// Global data shared by all the threads:
+/// The global writer shared by all the threads. It participates in synchronization 
+/// with the user code's `stdout`/`stderr` output.
+// TODO: Consider THREAD_SHARED_WRITER -> COMMON_WRITER since it is shared not only by the threads 
+// but also by the user code's stdout and astderr output.
 pub static mut THREAD_SHARED_WRITER: LazyLock<ThreadSharedWriterPtr> = LazyLock::new(|| {
     Arc::new(RefCell::new(ThreadSharedWriter::new(Some(
         FclWriter::Stdout, // TODO: Consider either `None` or 
         // fully creating the writer outside of ThreadSharedWriter and passing to ThreadSharedWriter::new().
-        // Such that the ThreadSharedWriter works with whatever `Write` provided from outside.
+        // Such that the ThreadSharedWriter works with whatever `dyn Write` provided from outside.
     ))))
 });

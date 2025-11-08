@@ -1,5 +1,12 @@
 # TODO:
 
+* Minimization Guide
+  * If the implementation is single-threaded and no need to sync with std output (and panic) 
+    then the CallLoggerArbiter is not needed and the THREAD_LOGGER can be directly pointing 
+    to the CallLogInfra (after the type adjustment). Reflect on the chart 
+    and in the "The Minimal Writer Optimization" chapter of the mdBook.
+  * 
+* In the docs replace all the `std::io::stdio::stdout()` with the `std::io::stdout()`.
 * Writer opening and closing (to open/close HTML).
 * Why does every thread have a separate Decorator and WriterAdapter? Access to them is exclusive any way.
   Explain that both in the code and in the docs.

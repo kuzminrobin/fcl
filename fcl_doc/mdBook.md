@@ -182,14 +182,13 @@ f() {
   g() {}
   g() { // This call is being cached. Not logged yet.
 ```
-When the second call to `g()` returns, the algorithm needs to compare the second call to `g()` with the first call to `g()`, including the nested calls (children), their order, and their numer of repeated calls. 
+When the second call to `g()` returns, the algorithm needs to compare the second call to `g()` with the first call to `g()`, including the nested calls (children), their order, and their numer of repeated calls. That is, the algorithm needs to compare the two subtrees rooted in the first and the second `g()` correspondingly.
+
 ```rs
 f() {
   g() { . . . }
   g() { . . . } // This call is cached. Not logged yet.
 ```
-That is, the algorithm needs to compare the two subtrees rooted in the first and the second `g()` correspondingly.
-
 If the two subtrees are identical, then the second subtree gets removed from the call tree, and the repeat count for the first call to `g()` gets incremented (from 0 to 1 at this moment).
 ```rs
 f() {
@@ -711,9 +710,144 @@ And I will _hospitably_ reply: "For that case I have an excellent solution below
 **Reader Pracice.**  
 You understand what I mean... what should happen to C and C++ code... ;-DDD
 
+## The Architecture
+
+The default architecture is shown on the chart below.
+
+(Full Architecture Chart)
+
+It is _full_ architecture. It supports multiple threads and the output synchronization between the threads 
+and the user code's `stdout`/`stderr` output. For brevity it shows the data for 2 threads only,
+one of who is the `main()` thread.
+
+The chart has 2 horizontal dashed lines breaking the chart up into 3 layers.
+The middle layer shows the global data shared by all the threads, 
+the upper layer shows the data for the `main()` thread, 
+and the lower layer shows the per-thread data for each spawned thread. 
+
+The `main()` thread's data (the upper layer) have nothing specific to `main()`. 
+The `main()`'s data are the same as for any other thread (see the lower layer).
+
+The full architecture is supposed to work for all the cases but 
+* it may distort the multithreaded log,
+* does not provide the highest parallelization, 
+* and for some cases it is redundant,
+
+all of which is described below.
+
+### The Single-Threaded Optimization
+
+If the user's program is single-threaded then the full architecture can be minimized down to the 
+_single-threaded_ architecture shown on the chart below (includes the red blocks and arrows but does 
+not include the dotted arrow).
+
+(Single-Threaded Architecture Chart)
+
+This architecture 
+* does not have `ThreadGateAdapter`, `ThreadGatekeeper` (with mutex),
+* and the `THREAD_LOGGER` is connected directly to the `CallLoggerArbiter`.
+
+It supports a single thread (`main()`) and the function call log synchronization with the user code's 
+`stdout`/`stderr` output.
+
+This optimizaton is chosen if the feature `"singlethreaded"` is on for both `fcl` and `fcl_proc_macros` crates.
+
+TODO: What if `fcl`'s one is on, but `fcl_proc_macros`' one is not? And vice versa.
 
 
-## Thread Switch Distortion
+### The Minimal Writer Optimization
+
+If the user's program is single-threaded and does not use `stdout`/`stderr` output 
+then the output synchronization mechanism, see the red blocks and arrows, can be excluded from the FCL architecture, and the decorator (`CodeLikeDecorator` on the chart) can have 
+a direct pointer to the output stream (`stdout()` on the chart), see the dotted line from the
+`CodeLikeDecorator` to `stdout()`.
+
+TODO: The `CallLoggerArbiter` should be red too, 
+and the `THREAD_LOGGER` should have a dotted arrow to the `CallLogInfra` directly.
+
+This optimizaton is chosen if 
+* the `fcl` crate is used with the feature `"minimal_writer"` on
+(that includes the feature `"singlethreaded"` and automatically turns it on too),
+* the `fcl_proc_macros` crate is used with the feature `"singlethreaded"` on.
+
+TODO: What if `fcl`'s `"minimal_writer"` is on, but `fcl_proc_macros`' `"singlethreaded"` is not?
+
+## How the Logging Works
+
+Just in case I'll remind that if in the user's Rust code the attribute `#[fcl_proc_macros::loggable]`
+has been added to an item (module, trait implementation, function, etc.) then before compilation 
+that item is parsed recursively and all the functions, closures, and loop bodies in it 
+get instrumented for logging. That is, by example of a function `f()`, in the beginning of `f()` 
+the code is added that creates an instance of the `FunctionLogger`. 
+What happens during the execution of `f()` is easier to understand while looking at the chart.
+
+When `f()` gets called, 
+* the constructor of `FunctionLogger` instance in the beginning of `f()` uses the thread-local name 
+  `THREAD_LOGGER` (top-left box on the chart) to call `ThreadGateAdapter::log_call()`
+  (i.e. the associated function `log_call()` that is a part of the `CallLogger` trait 
+  implemented by `ThreadGateAdapter`).
+* The `ThreadGateAdapter::log_call()` acquires the mutex and forwards the call 
+  to the `ThreadGatekeeper::log_call()`.
+* The `ThreadGatekeeper::log_call()` forwards the call to the `CallLoggerArbiter::log_call()`,
+* who forwards the call to `CallLogInfra::log_call()`.
+
+Here the node for `f()` is added to the call graph and the `CallLogInfra` calls 
+the `CodeLikeDecorator::notify_call()` to log the call to `f()`. 
+The `CodeLikeDecorator` generates the line `"f() {"` prepended with the corresponding indents 
+(thread-dependent and call-depth-dependent) and calls the `WriterAdapter::write()`,
+who forwards the call to `ThreadSharedWriter::write()`, who forwards that call to the output stream 
+that is `std::io::stdout()` by defualt.
+
+When `f()` returns, the destructor of `FunctionLogger` uses `THREAD_LOGGER` again
+to call `ThreadGateAdapter::log_ret()` and in a similar chain of calls the return from `f()` 
+is added to the call graph in the `CallLogInfra` and logged by the `ThreadSharedWriter`.
+
+The repeated calls to `f()` increment the `f()`'s repeat count in the call graph in the `CallLogInfra`
+without logging. The other calls cause `CallLogInfra` to flush to the `CodeLikeDecorator` 
+the `f()`'s repeat count and the call to the new function. 
+
+## The Logging Infrastructure Creation
+
+The middle layer of the chart (the gloabl data) is created first.
+
+Then, upon thread start the thread-local data are created for that thread. See the upper layer of the chart.  
+The `THREAD_SHARED_WRITER` is cloned and passed to the constructor of `WriterAdapter`. 
+The instance of the `WriterAdapter` is wrapped into a `Box` and passed to the `CodeLikeDecorator` constructor,
+whose instance is wrapped into `Rc` and saved under the thread-local name `THREAD_DECORATOR`.
+
+Then the `THREAD_DECORATOR` is cloned and passed to the `CallLogInfra` constructor, 
+the instance of which is wrapped into a `Box` and passed to the `CallLoggerArbiter`'s container 
+(through the `ThreadGatekeeper` after acquiring the `THREAD_GATEKEEPER`'s mutex).
+
+Then the `THREAD_GATEKEEPER`'s internal `Arc`-pointer is cloned, 
+passed to the `ThreadGateAdapter`'s constructor, instance of which is wrapped into a `Box`
+and saved under the thread-local name `THREAD_LOGGER`.
+
+## The Logging Infrastructure Destruction
+
+Look at the multithreaded chart. There are 2 horizontal dashed lines on it. Below the lower of them 
+there are the data of the spawned thread.
+
+Upon thread termination its thread-local data are destroyed, including the `THREAD_LOGGER` 
+(bottom left on the chart). 
+Its destructor calls `Drop::drop()` of the `ThreadGateAdapter`, that calls (through the `ThreadGatekeeper`)
+the `CallLoggerArbiter::remove_thread_logger()` (TODO: Double-check the name). 
+That removes from the container the `Box` pointer to the thread's `CallLogInfra` and destroys it. 
+The `CallLogInfra`'s destructor destroys the decorator (`CodeLikeDecorator`), 
+who destroys the `WriterAdapter` that detaches from the `ThreadSharedWriter`.
+
+To summarize, upon thread termination during the destruction of the thread-local data 
+everything below the lower dashed line 
+* (in particular `CallLogInfra`) stops being pointed to from the middle layer of the chart, 
+* stops pointing to the middle layer (`ThreadGatekeeper` on the left and `ThreadSharedWriter` on the right)
+* and gets destroyed.
+
+The same is applicable to the `main()` thread, whose data are shown above the upper dashed line.
+
+Upon program termination the middle layer (the global data) is destroyed.
+
+## The Log Distortion During the Thread Switch 
+
 (Unsorted. Requires knowledge of the architecture, in particular the single mutex approach)
 
 The single mutex can significantly distort the thread constext switch picture. 
@@ -734,7 +868,7 @@ To summarize, the log can show that the thread switch happened later relative to
 
 How large is the distortion? Depends on the thread synchrinization approach of the operating system and on the code being logged. If there are lengthy fragments without loops and calls, then the distortion is minimal. But the more often the code execution passes through the starts and ends of the loops, functions, and closures the larger is the distortion (and the slow-down because of logging. TODO: explain the slow-down in the Performance Impact chapter).
 
-### Minimizing the Thread Switch Distortion
+### Minimizing the Log Distortion
 (Raw, draft)  
 Consider placing the thread synchronization mechanism (ThreadGatekeeper and CallLoggerArbiter)
 after the CallLogInfra, such that the threads can access their own CallLogInfra in parallel.

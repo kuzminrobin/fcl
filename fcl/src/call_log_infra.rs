@@ -197,8 +197,9 @@ struct OutputSync {
     main_thread_id: thread::ThreadId,
 }
 
-/// The thread arbiter that synchronizes the output to the thread-shared writer by multiple threads.
-pub struct CallLoggerArbiter {
+/// The arbiter that synchronizes the output to the writer by multiple threads
+/// and user code's `stdout` and `stderr` output.
+pub struct CallLoggerArbiter { // TODO: Consider -> Arbiter or SyncArbiter (Synchronization Arbiter)
     /// Collection of thread loggers and thread indent IDs used by the corresponding threads.
     thread_loggers: HashMap<thread::ThreadId, (Box<dyn CallLogger>, ThreadIndentId)>, // TODO: thread_loggers -> thread_log_info?
     /// The ID of the last thread that was updating its log.
@@ -748,8 +749,8 @@ impl CallLogger for CallLoggerArbiter {
     }
 }
 
-/// Global `CallLoggerArbiter` instance shared by all the threads.
-pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
+/// Global arbiter instance shared by all the threads.
+pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> = // TODO: Consider -> ARBITER or SYNC_ARBITER or OUTPUT_ARBITER.
     LazyLock::new(|| {
         Rc::new(RefCell::new({
             #[cfg(not(feature = "minimal_writer"))]
@@ -824,7 +825,7 @@ pub mod instances {
     use crate::multithreaded::*;
     /// Shared by all the threads global thread synchronization primitive
     /// for accessing the thread-shared `CallLoggerArbiter` instance.
-    static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> =
+    static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = // TODO: Consider -> ARBITER_GATEKEEPER
         LazyLock::new(|| unsafe {
             Arc::new(Mutex::new(ThreadGatekeeper::new(
                 (*CALL_LOGGER_ARBITER).clone(),

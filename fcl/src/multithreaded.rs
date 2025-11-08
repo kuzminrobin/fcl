@@ -95,7 +95,7 @@ macro_rules! set_logging_is_on {
 }
 
 /// The instance of this type provides to the multiple threads the access to the `CallLoggerArbiter`.
-pub struct ThreadGatekeeper {
+pub struct ThreadGatekeeper { // TODO: Consider -> ArbiterGatekeeper
     /// The pointer to the `CallLoggerArbiter`.
     call_logger_arbiter: Rc<RefCell<CallLoggerArbiter>>,
 }
@@ -168,21 +168,26 @@ impl CallLogger for ThreadGatekeeper {
     // fn set_loop_ret_val(&mut self, ret_val: String);
 }
 
-pub struct ThreadGateAdapter {
-    gatekeeper: Arc<Mutex<ThreadGatekeeper>>,
+/// Arbiter per-thread adapter used for synchronizing the thread access to the arbiter
+/// and destruction of the thread's logging infrastructure upon thread termination.
+pub struct ThreadGateAdapter { // TODO: Consider -> ArbiterAdapter
+    gatekeeper: Arc<Mutex<ThreadGatekeeper>>, // TODO: Consider -> Arc<Mutex<dyn CallLogger>>
 }
 impl ThreadGateAdapter {
+    /// Creates a new arbiter adapter pointing to the gatekeeper passed as an argument.
     pub fn new(gatekeeper: Arc<Mutex<ThreadGatekeeper>>) -> Self {
         Self { gatekeeper }
     }
-    fn get_gatekeeper(&self) -> MutexGuard<'_, ThreadGatekeeper> {
+    /// Acquires the gatekeeper mutex and returns the `MutexGuard`.
+    fn get_gatekeeper(&self) -> MutexGuard<'_, ThreadGatekeeper> {  // TODO: Consider -> lock_gatekeeper.
         match self.gatekeeper.lock() {
             Ok(guard) => {
                 return guard;
             }
             Err(poison_error) => {
                 println!( // TODO: Consider -> eprintln (complain to stderr).
-                    "Internal Error: A poisoned mutex detected (a thread has panicked while holding that mutex): '{:?}'. {}",
+                    "Internal Error: A poisoned mutex detected ({}): '{:?}'. {}",
+                    "a thread has panicked while holding that mutex",
                     poison_error, "Trying to recover the mutex"
                 );
                 return poison_error.into_inner();
@@ -191,6 +196,8 @@ impl ThreadGateAdapter {
     }
 }
 impl Drop for ThreadGateAdapter {
+    /// Removes the thread's logging infrastructure from the gatekeeper/arbiter
+    /// (to destroy the thread's logging heap data upon thread termination).
     fn drop(&mut self) {
         self.get_gatekeeper().remove_thread_logger();
     }
