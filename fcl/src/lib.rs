@@ -115,7 +115,32 @@ struct LoggerCommon {
     /// For example, during the user's function call the logging was enabled.
     call_logged: bool, // TODO: Consider -> is_logged or has_been_logged.
 }
-/// The type to instrument a user's function or a closure to be logged.
+/// The type for instrumenting a user's function or a closure to be logged.
+/// 
+/// Its constructor logs the function or closure call, and the destructor logs the return.
+/// ## Examples
+/// The instrumented user's function and closure:
+/// ```
+/// #[fcl_proc_macros::loggable] // The procedural macro that does the instrumetation.
+/// fn f() { // The user's function definition.
+///     let _c = Some(5).map(
+///         |value| true    // The user's closure definition.
+///     ); 
+/// }
+/// ```
+/// The result of the macro expansion:
+/// ```
+/// fn f() {
+///     // TODO: 
+///     let _c = Some(5).map(
+///         |value| {
+///             // TODO:
+///             true    
+///         }
+///     ); 
+/// }
+/// ```
+// TODO: Consider FunctionLogger -> FunctionOrClousreLogger or CallableLogger
 pub struct FunctionLogger {
     /// The common part.
     common: LoggerCommon,
@@ -124,7 +149,7 @@ pub struct FunctionLogger {
 }
 
 impl FunctionLogger {
-    /// Creates a new `FunctionLogger` and logs the function/closure's call and return if logging is enabled.
+    /// Creates a new `FunctionLogger` and logs the function/closure's call if logging is enabled.
     /// # Parameters.
     /// * The optional string representation of the user function's parameters and their values.
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {

@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use tempfile::NamedTempFile;
 
-/// The standard output redirector - the container of the resources necessary for
+/// The redirector of the standard output - the container of the resources necessary for
 /// * redirecting the std output (`stdout` or `stderr`) to a temporary file,
 /// * reading the data that has been output to that file,
 /// * and recovering the state that was before the redirection.

@@ -1,5 +1,176 @@
 # TODO:
 
+* Redundancy:
+  * Either create the cloure logger UNCONDITIONALLY, like function logger (regardless of whether logging is on), The ctor and dtor will check the enabledness;
+  * or create both closure and function loggers conditionally and don't check the condition in the ctor and dtor.
+  * In the former - less code in the func (enabledness is checked in one place - ctor), but more calls, works slower, and higher load for the stack (and heap?) because the instance is created unconditionally.  
+  In the latter case - function/cloure code bloat (every function checks the enabledness) but works faster.
+  * No. Looks like in the latter case we can retain the top performace when the logging is disabled, 
+  since 
+    * if logging is disabled then only the function body is executed (which is nearly the same perf as non-instrumented),  
+    * otherwise (all at run time)
+      * generic function name calculation,
+      * param string calculation,
+      * logger instance creation, call graph update, logging,
+      * ret val string calculation and memorization
+      * logger destruction, call graph update, logging,
+  * To summarize:
+    ```rs
+    fn f() {
+      if logging_disbaled {
+        return <func_body>
+      }
+      // Else (loggign is enabled):
+      generic function name calculation,
+      param string calculation,
+      logger instance creation, call graph update, logging,
+      
+      <func_body>
+      
+      ret val string calculation and memorization
+      logger destruction, call graph update, logging,
+    }
+    ```
+  * To do:
+    * See "To summarize".
+    * remove condition form the ctor and dtor
+
+Now:
+```rs
+#[fcl_proc_macros::loggable] // The procedural macro that does the instrumetation.
+fn f() { // The user's function definition.
+    let _c = Some(5).map(
+        |value| true    // The user's closure definition.
+    ); 
+}
+```
+```rs
+fn f() {
+    let mut generic_func_name = String::with_capacity(64);
+    generic_func_name.push_str("f");
+    if !true {
+        generic_func_name.push_str("<");
+        let generic_arg_names_vec: Vec<&'static str> = alloc::vec::Vec::new();
+        for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+            if idx != 0 {
+                generic_func_name.push_str(",");
+            }
+            generic_func_name.push_str(generic_arg_name);
+        }
+        generic_func_name.push_str(">");
+    }
+    use fcl::{CallLogger, MaybePrint};
+    let param_val_str = None;
+    let mut callee_logger = fcl::FunctionLogger::new(&generic_func_name, param_val_str);
+    let ret_val = (move || {
+        let _c = Some(5).map(|value| {
+            use fcl::{CallLogger, MaybePrint};
+            let param_val_str = Some(alloc::__export::must_use({
+                let res = alloc::fmt::format(alloc::__export::format_args!(
+                    "value: {}",
+                    value.maybe_print(),
+                ));
+                res
+            }));
+            let mut optional_callee_logger = None;
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                if logger.borrow().logging_is_on() {
+                    optional_callee_logger = Some(fcl::FunctionLogger::new(
+                        "f()::closure{1,1:1,0}",
+                        param_val_str,
+                    ))
+                }
+            });
+            let ret_val = (move || true)();
+            let ret_val_str = alloc::__export::must_use({
+                let res =
+                    alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()));
+                res
+            });
+            if let Some(callee_logger) = optional_callee_logger.as_mut() {
+                callee_logger.set_ret_val(ret_val_str);
+            };
+            ret_val
+        });
+    })();
+    if false {
+        let ret_val_str = alloc::__export::must_use({
+            let res =
+                alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()));
+            res
+        });
+        callee_logger.set_ret_val(ret_val_str);
+    }
+    ret_val
+}
+```
+Should be:
+```rs
+fn f() {
+    let mut generic_func_name = String::with_capacity(64);
+    generic_func_name.push_str("f");
+    if !true {
+        generic_func_name.push_str("<");
+        let generic_arg_names_vec: Vec<&'static str> = alloc::vec::Vec::new();
+        for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+            if idx != 0 {
+                generic_func_name.push_str(",");
+            }
+            generic_func_name.push_str(generic_arg_name);
+        }
+        generic_func_name.push_str(">");
+    }
+    use fcl::{CallLogger, MaybePrint};
+    let param_val_str = None;
+    let mut callee_logger = fcl::FunctionLogger::new(&generic_func_name, param_val_str);
+    let ret_val = (move || {
+        let _c = Some(5).map(|value| {
+            use fcl::{CallLogger, MaybePrint};
+
+            let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                if ! logger.borrow().logging_is_on() {
+                  return (move || true)();
+                }
+
+                // Else (logging is off):
+                let param_val_str = Some(alloc::__export::must_use({
+                    let res = alloc::fmt::format(alloc::__export::format_args!(
+                        "value: {}",
+                        value.maybe_print(),
+                    ));
+                    res
+                }));
+                let mut callee_logger = Some(fcl::FunctionLogger::new(
+                        "f()::closure{1,1:1,0}",
+                        param_val_str,
+                    ));
+
+                let ret_val = (move || true)();
+
+                let ret_val_str = alloc::__export::must_use({
+                    let res =
+                        alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()));
+                    res
+                });
+                callee_logger.set_ret_val(ret_val_str);
+                ret_val
+            }
+            ret_val
+        });
+    })();
+    if false {
+        let ret_val_str = alloc::__export::must_use({
+            let res =
+                alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()));
+            res
+        });
+        callee_logger.set_ret_val(ret_val_str);
+    }
+    ret_val
+}
+```
+
+
 * Minimization Guide
   * If the implementation is single-threaded and no need to sync with std output (and panic) 
     then the CallLoggerArbiter is not needed and the THREAD_LOGGER can be directly pointing 
