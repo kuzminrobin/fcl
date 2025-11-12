@@ -109,13 +109,6 @@ impl<T: std::fmt::Debug> MaybePrint for T {
     }
 }
 
-/// The common part of the instances used for instrumenting the user's code.
-// struct LoggerCommon {
-//     /// Tells if the function/closure call or loop body start has been logged.
-//     /// For example, during the user's function call the logging was enabled.
-//     call_logged: bool, // TODO: Consider -> is_logged or has_been_logged.
-// }
-
 /// The type for instrumenting a user's function or a closure to be logged.
 /// 
 /// Its constructor logs the function or closure call, and the destructor logs the return.
@@ -153,8 +146,6 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 /// ```
 // TODO: Consider FunctionLogger -> CalleeLogger, like `callee_logger` in proc macro (or FunctionOrClousreLogger or CallableLogger)
 pub struct FunctionLogger {
-    /// The common part.
-    // common: LoggerCommon,
     /// The optional string representation of the returned value.
     ret_val_str: Option<String>,
 }
@@ -164,8 +155,6 @@ impl FunctionLogger {
     /// ### Parameters.
     /// * The optional string representation of the user function's parameters and their values.
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
-        // let mut call_logged = false;
-
         THREAD_LOGGER.with(|logger| {
             // TODO: Consider 
             // let mut logger_borrow = logger.borrow_mut();
@@ -179,14 +168,10 @@ impl FunctionLogger {
             #[cfg(not(feature = "singlethreaded"))]
             let mut logger_borrow = logger.borrow_mut();
 
-            // if logger_borrow.logging_is_on() {
-                logger_borrow.log_call(func_name, param_vals);
-                // call_logged = true;
-            // }
+            logger_borrow.log_call(func_name, param_vals);
         });
 
         Self {
-            // common: LoggerCommon { call_logged },
             ret_val_str: None,
         }
     }
@@ -199,31 +184,6 @@ impl FunctionLogger {
 impl Drop for FunctionLogger {
     /// Logs the function or closure return if the call has been logged.
     fn drop(&mut self) {
-        // if self.common.call_logged {
-            THREAD_LOGGER.with(|logger| {
-                #[cfg(feature = "singlethreaded")]
-                let intermediate_borrow = logger.borrow_mut();
-                #[cfg(feature = "singlethreaded")]
-                let mut logger_borrow = intermediate_borrow.borrow_mut();
-
-                #[cfg(not(feature = "singlethreaded"))]
-                let mut logger_borrow = logger.borrow_mut();
-
-                logger_borrow.log_ret(self.ret_val_str.take());
-            });
-        // }
-    }
-}
-
-/// The type to instrument a user's loop body to be logged.
-pub struct LoopbodyLogger {
-    // common: LoggerCommon,
-}
-
-impl LoopbodyLogger {
-    /// Creates a new `LoopbodyLogger` and logs the loop body start if logging is enabled.
-    pub fn new() -> Self {
-        let mut call_logged = false;
         THREAD_LOGGER.with(|logger| {
             #[cfg(feature = "singlethreaded")]
             let intermediate_borrow = logger.borrow_mut();
@@ -233,32 +193,45 @@ impl LoopbodyLogger {
             #[cfg(not(feature = "singlethreaded"))]
             let mut logger_borrow = logger.borrow_mut();
 
-            if logger_borrow.logging_is_on() {
-                logger_borrow.log_loopbody_start();
-                call_logged = true;
-            }
+            logger_borrow.log_ret(self.ret_val_str.take());
         });
-        Self {
-            // common: LoggerCommon { call_logged },
-        }
+    }
+}
+
+/// The type to instrument a user's loop body to be logged.
+pub struct LoopbodyLogger;
+
+impl LoopbodyLogger {
+    /// Creates a new `LoopbodyLogger` and logs the loop body start if logging is enabled.
+    pub fn new() -> Self {
+        THREAD_LOGGER.with(|logger| {
+            #[cfg(feature = "singlethreaded")]
+            let intermediate_borrow = logger.borrow_mut();
+            #[cfg(feature = "singlethreaded")]
+            let mut logger_borrow = intermediate_borrow.borrow_mut();
+
+            #[cfg(not(feature = "singlethreaded"))]
+            let mut logger_borrow = logger.borrow_mut();
+
+            logger_borrow.log_loopbody_start();
+        });
+        Self
     }
 }
 impl Drop for LoopbodyLogger {
     /// Logs the loop body end if the start has been logged.
     fn drop(&mut self) {
-        // if self.common.call_logged {
-            THREAD_LOGGER.with(|logger| {
-                // TODO: Try to dedup below.
-                #[cfg(feature = "singlethreaded")]
-                let intermediate_borrow = logger.borrow_mut();
-                #[cfg(feature = "singlethreaded")]
-                let mut logger_borrow = intermediate_borrow.borrow_mut();
-                #[cfg(not(feature = "singlethreaded"))]
-                let mut logger_borrow = logger.borrow_mut();
+        THREAD_LOGGER.with(|logger| {
+            // TODO: Try to dedup below.
+            #[cfg(feature = "singlethreaded")]
+            let intermediate_borrow = logger.borrow_mut();
+            #[cfg(feature = "singlethreaded")]
+            let mut logger_borrow = intermediate_borrow.borrow_mut();
+            #[cfg(not(feature = "singlethreaded"))]
+            let mut logger_borrow = logger.borrow_mut();
 
-                logger_borrow.log_loopbody_end();
-            });
-        // }
+            logger_borrow.log_loopbody_end();
+        });
     }
 }
 
