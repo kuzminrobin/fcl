@@ -1,18 +1,24 @@
 # TODO:
 
 * Bug
-`cargo r --bin user`
-
-```rs
-        g(i: 6) {}
-      } // f().
-    } // Loop body end.
-    // Loop body repeats 2 time(s).   // MUST BE 1.
-    { // Loop body start.
-      f(i: 8) {
-        g(i: 8) {
-Sample stderr output in main()
-```
+  `cargo r --bin user`
+  ```rs
+          g(i: 6) {}
+        } // f().
+      } // Loop body end.
+      // Loop body repeats 2 time(s).   // MUST BE 1.
+      { // Loop body start.
+        f(i: 8) {
+          g(i: 8) {
+  Sample stderr output in main()
+  ```
+  Suspicion:
+  Upon end of the repeated loop body the node is removed from the tree 
+  and the previous node's overall repeat count gets incremented.  
+  But if that repeated loop body caching has stopped earlier (because of thread switching or std output) 
+  then the flushed repeat count should also increment. Otherwise later there will be 1 extra non-flushed repeat logged.  
+  In other words, if upon repeated loop body end the caching is not active,
+  then both the overall and flushed repeat counts need to be incremented.
 * User practice: For speed, suppress the logging of 
   * parameters and ret val;
   * generic params.
