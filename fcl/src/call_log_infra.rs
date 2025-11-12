@@ -454,9 +454,9 @@ impl CallLoggerArbiter {
             // * will log the panic to the `stderr`
             // * and invoke the (aborting or unwinding) panic runtime.
             // In case of an unwinding panic runtime the destructors of the panicking thread will be executed,
-            // including those of the `FunctionLogger` and `LoopbodyLogger` instances, that will try to
+            // including those of the `CalleeLogger` and `LoopbodyLogger` instances, that will try to
             // log the function/closure returns and loop body ends
-            // but will fail since the thread loggers are removed above.
+            // but will silently fail since the thread loggers are removed above.
             (*ORIGINAL_PANIC_HANDLER)
                 .borrow()
                 .as_ref()
@@ -690,7 +690,7 @@ impl CallLogger for CallLoggerArbiter {
     fn log_ret(&mut self, ret_val: Option<String>) {
         let current_thread_id = thread::current().id();
 
-        // Potentially a call (from a `FunctionLogger` destructor) during stack unwinding in the unwinding panic runtime.
+        // Potentially a call (from a `CalleeLogger` destructor) during stack unwinding in the unwinding panic runtime.
         // In that case suppress flushing and {logging that looks like fake returns in the panicking thread}
         // (by removing the thread's logger from the HashMap in the FCL's panic hook
         // and ignoring the absence of the thread's logger in the code below).
@@ -703,8 +703,8 @@ impl CallLogger for CallLoggerArbiter {
             logger.log_ret(ret_val);
             self.last_fcl_update_thread = Some(current_thread_id);
         } // else (no logger) the stack unwinding of the current thread is in progress. That is, this function 
-        // has been called from a `FunctionLogger` destructor invoked by the unwinding panic runtime in the context
-        // of the panicing thread.
+        // has been called from a `CalleeLogger` destructor invoked by the unwinding panic runtime in the context
+        // of the panicking thread.
         // Do nothing (suppress the fake return logging).
     }
     fn maybe_flush(&mut self) {
@@ -805,7 +805,7 @@ pub mod instances {
                     None)))
         };
 
-        /// The thread-local name used by the `FunctionLogger` and `LoopbodyLogger` for logging
+        /// The thread-local name used by the `CalleeLogger` and `LoopbodyLogger` for logging
         /// * the function and closure calls and returns
         /// * and loop body begins and ends.
         pub static THREAD_LOGGER: RefCell<Rc<RefCell<CallLoggerArbiter>>> = unsafe {
@@ -850,7 +850,7 @@ pub mod instances {
                     None)))
         };
 
-        /// The thread-local name used by the `FunctionLogger` and `LoopbodyLogger` for logging
+        /// The thread-local name used by the `CalleeLogger` and `LoopbodyLogger` for logging
         /// * the function and closure calls and returns
         /// * and loop body begins and ends.
         pub static THREAD_LOGGER: RefCell<Box<dyn CallLogger>> = unsafe {

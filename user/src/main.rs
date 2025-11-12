@@ -51,10 +51,10 @@ fn calls() {
     // let mut _l = None;
     // CALL_LOG_INFRA.with(|infra| {
     //     if infra.borrow_mut().logging_is_on() {
-    //         _l = Some(FunctionLogger::new("main"))
+    //         _l = Some(CalleeLogger::new("main"))
     //     }
     // });
-    // // let _l = FunctionLogger::new("main");
+    // // let _l = CalleeLogger::new("main");
 
     for _ in 0..10 {
         f();

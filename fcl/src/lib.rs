@@ -129,7 +129,7 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 ///     // The instrumentation. 
 ///     // The instance whose constructor logs the call `f() {`
 ///     // and destructor logs the return `} // f().`.
-///     let mut callee_logger = FunctionLogger::new("f"..);
+///     let mut callee_logger = CalleeLogger::new("f"..);
 ///     . . .
 ///     let _c = Some(5).map(
 ///         |value| {
@@ -137,21 +137,20 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 ///             // The instrumentation. 
 ///             // The instance whose constructor logs the call `f()::closure{4,9:4,20} {`
 ///             // and destructor logs the return `} // f()::closure{4,9:4,20}.`.
-///             let mut callee_logger = fcl::FunctionLogger::new("f()::closure{1,1:1,0}"..);
+///             let mut callee_logger = fcl::CalleeLogger::new("f()::closure{1,1:1,0}"..);
 ///             . . .
 ///             true    
 ///         }
 ///     ); 
 /// }
 /// ```
-// TODO: Consider FunctionLogger -> CalleeLogger, like `callee_logger` in proc macro (or FunctionOrClousreLogger or CallableLogger)
-pub struct FunctionLogger {
+pub struct CalleeLogger {
     /// The optional string representation of the returned value.
     ret_val_str: Option<String>,
 }
 
-impl FunctionLogger {
-    /// Creates a new `FunctionLogger` and logs the function/closure's call.
+impl CalleeLogger {
+    /// Creates a new `CalleeLogger` and logs the function/closure's call.
     /// ### Parameters.
     /// * The optional string representation of the user function's parameter names and values.
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
@@ -181,7 +180,7 @@ impl FunctionLogger {
         self.ret_val_str = Some(ret_val_str);
     }
 }
-impl Drop for FunctionLogger {
+impl Drop for CalleeLogger {
     /// Logs the function or closure return.
     fn drop(&mut self) {
         THREAD_LOGGER.with(|logger| {

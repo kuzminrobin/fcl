@@ -168,14 +168,14 @@ pub fn main() {
 mod root {
 
     // use fcl_proc_macros::loggable;
-    // use fcl::FunctionLogger;
+    // use fcl::CalleeLogger;
 
     // mod m0; // Compiler Error: non-inline modules in proc macro input are unstable. see issue #54727
     mod m1 {}
 
     mod m {
         // use fcl_proc_macros::loggable;
-        // use fcl::FunctionLogger;
+        // use fcl::CalleeLogger;
 
         fn h() {}
         pub fn i() {

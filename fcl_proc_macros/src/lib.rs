@@ -443,7 +443,7 @@ fn quote_as_expr_closure(
                 // Else (logging is on):
 
                 // Log the call, like `f()::closure{3,7:5:11}(param: true) {`:
-                let mut callee_logger = fcl::FunctionLogger::new(
+                let mut callee_logger = fcl::CalleeLogger::new(
                     #log_closure_name_str, param_val_str);
 
                 // Execute the body and catch the return value:
@@ -1653,7 +1653,7 @@ fn traversed_block_from_sig(
                     }
 
                     // Log the call, like `f(param: 5) {`:
-                    let mut callee_logger = fcl::FunctionLogger::new(&generic_func_name, param_val_str);
+                    let mut callee_logger = fcl::CalleeLogger::new(&generic_func_name, param_val_str);
 
                     // Execute the function body and catch the return value:
                     let ret_val = body();
@@ -1665,7 +1665,7 @@ fn traversed_block_from_sig(
                     }
 
                     // Log the return (and the return value), like `} -> 5 // f().`
-                    // in the `FunctionLogger` destructor and return the value to the caller:
+                    // in the `CalleeLogger` destructor and return the value to the caller:
                     ret_val
                 });
                 ret_val
