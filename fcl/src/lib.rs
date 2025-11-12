@@ -112,7 +112,7 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 /// The type for instrumenting a user's function or a closure to be logged.
 /// 
 /// Its constructor logs the function or closure call, and the destructor logs the return.
-/// ## Examples
+/// ### Examples
 /// The instrumented user's function and closure:
 /// ```
 /// #[fcl_proc_macros::loggable] // The procedural macro that adds the instrumentation.
@@ -151,9 +151,9 @@ pub struct FunctionLogger {
 }
 
 impl FunctionLogger {
-    /// Creates a new `FunctionLogger` and logs the function/closure's call if logging is enabled.
+    /// Creates a new `FunctionLogger` and logs the function/closure's call.
     /// ### Parameters.
-    /// * The optional string representation of the user function's parameters and their values.
+    /// * The optional string representation of the user function's parameter names and values.
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         THREAD_LOGGER.with(|logger| {
             // TODO: Consider 
@@ -182,7 +182,7 @@ impl FunctionLogger {
     }
 }
 impl Drop for FunctionLogger {
-    /// Logs the function or closure return if the call has been logged.
+    /// Logs the function or closure return.
     fn drop(&mut self) {
         THREAD_LOGGER.with(|logger| {
             #[cfg(feature = "singlethreaded")]
@@ -198,11 +198,11 @@ impl Drop for FunctionLogger {
     }
 }
 
-/// The type to instrument a user's loop body to be logged.
+/// The type to instrument the user's loop bodies to be logged.
 pub struct LoopbodyLogger;
 
 impl LoopbodyLogger {
-    /// Creates a new `LoopbodyLogger` and logs the loop body start if logging is enabled.
+    /// Creates a new `LoopbodyLogger` and logs the loop body start.
     pub fn new() -> Self {
         THREAD_LOGGER.with(|logger| {
             #[cfg(feature = "singlethreaded")]
@@ -219,7 +219,7 @@ impl LoopbodyLogger {
     }
 }
 impl Drop for LoopbodyLogger {
-    /// Logs the loop body end if the start has been logged.
+    /// Logs the loop body end.
     fn drop(&mut self) {
         THREAD_LOGGER.with(|logger| {
             // TODO: Try to dedup below.
