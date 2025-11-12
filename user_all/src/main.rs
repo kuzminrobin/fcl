@@ -1,65 +1,8 @@
-// fn f() {
-//     let mut generic_func_name = String::with_capacity(64);
-//     generic_func_name.push_str("f");
-//     if !true {
-//         generic_func_name.push_str("<");
-//         let generic_arg_names_vec: Vec<&'static str> = alloc::vec::Vec::new();
-//         for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
-//             if idx != 0 {
-//                 generic_func_name.push_str(",");
-//             }
-//             generic_func_name.push_str(generic_arg_name);
-//         }
-//         generic_func_name.push_str(">");
-//     }
-//     use fcl::{CallLogger, MaybePrint};
-//     let param_val_str = None;
-//     let mut callee_logger = fcl::FunctionLogger::new(&generic_func_name, param_val_str);
-//     let ret_val = (move || {
-//         let _c = Some(5).map(|value| {
-//             use fcl::{CallLogger, MaybePrint};
-//             // let mut optional_callee_logger = None;
-//             let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-//                 if !logger.borrow().logging_is_on() {
-//                     return (move || true)();
-//                 }
-
-//                 // Else (logging is on):
-//                 let param_val_str = Some(format!(
-//                     "value: {}", 
-//                     value.maybe_print(),
-//                 ));
-//                 let mut callee_logger = fcl::FunctionLogger::new(
-//                     "f()::closure{1,1:1,0}",
-//                     param_val_str,
-//                 );
-
-//                 let ret_val = (move || true)();
-
-//                 let ret_val_str = format!("{}", ret_val.maybe_print());
-//                 callee_logger.set_ret_val(ret_val_str);
-
-//                 ret_val
-//             });
-//             ret_val
-//         });
-//     })();
-//     if false {
-//         let ret_val_str = alloc::__export::must_use({
-//             let res =
-//                 alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()));
-//             res
-//         });
-//         callee_logger.set_ret_val(ret_val_str);
-//     }
-//     ret_val
-// }
-
 #[fcl_proc_macros::loggable]
 mod func_and_closure_review {
     pub fn f() { // The user's function definition.
         let _c = Some(5).map(
-            |value| true    // The user's closure definition.
+            |param| true    // The user's closure definition.
         ); 
     }
 }

@@ -1,5 +1,8 @@
 # TODO:
 
+* User practice: For speed, suppress the logging of 
+  * parameters and ret val;
+  * generic params.
 * Redundancy:
   * Either create the cloure logger UNCONDITIONALLY, like function logger (regardless of whether logging is on), The ctor and dtor will check the enabledness;
   * or create both closure and function loggers conditionally and don't check the condition in the ctor and dtor.

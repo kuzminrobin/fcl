@@ -442,17 +442,21 @@ fn quote_as_expr_closure(
             use fcl::{CallLogger, MaybePrint};
 
             let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                if ! #logging_is_on {
-                // if !logger.borrow().logging_is_on() {
-                    return (move || { #body })();
-                }
-
-                // Else (logging is on):
+                // NOTE: Borrows the params, has to be in front of the `body` that moves the params to the `body` closure.
                 let param_val_str = #input_vals;
                 // let param_val_str = Some(format!(
                 //     "value: {}", 
                 //     value.maybe_print(),
                 // ));
+
+                let mut body = move || { #body };
+
+                if ! #logging_is_on {
+                // if !logger.borrow().logging_is_on() {
+                    return body();
+                }
+
+                // Else (logging is on):
                 let mut callee_logger = fcl::FunctionLogger::new(
                     #log_closure_name_str, param_val_str);
                 // let mut callee_logger = fcl::FunctionLogger::new(
@@ -460,7 +464,7 @@ fn quote_as_expr_closure(
                 //     param_val_str,
                 // );
 
-                let ret_val = (move || { #body })();
+                let ret_val = body();
 
                 // Uncondititonally print what closure returns
                 // since if its return type is not specified explicitly
@@ -1613,48 +1617,108 @@ fn traversed_block_from_sig(
         // let prefix = quote!{ #func_name #generics };
         let block = quote_as_block(block, &prefix);
 
-        // The proc_macros (pre-compile) part of the infrastructure for
+        // The proc_macros (the pre-compile) part of the infrastructure for
         // generic parameters substitution with actual generic arguments. <T, U> -> <char, u8>
         let generics_params_iter = generics.type_params();
         let generic_params_is_empty = generics.params.is_empty();
 
         let func_log_name = remove_spaces(&func_log_name.to_string());
 
+        let logging_is_on = quote! {
+            logger.borrow()
+        };
+        #[cfg(feature = "singlethreaded")]
+        let logging_is_on = quote! {
+            #logging_is_on.borrow()
+        };
+        let logging_is_on = quote! {
+            #logging_is_on.logging_is_on()
+        };
+
         quote! {
             {
-                // The run time part of the infrastructure for
-                // generic parameters substitution with actual generic arguments.
-                let mut generic_func_name = String::with_capacity(64);
-                generic_func_name.push_str(#func_log_name);
-                if !#generic_params_is_empty {
-                    generic_func_name.push_str("<");
-                    let generic_arg_names_vec: Vec<&'static str> =
-                        vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-                    for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
-                        if idx != 0 {
-                            generic_func_name.push_str(",");
-                        }
-                        generic_func_name.push_str(generic_arg_name);
-                    }
-                    generic_func_name.push_str(">");
-                }
-
+            // pub fn f() {
                 use fcl::{CallLogger, MaybePrint};
-                let param_val_str = #inputs;
-                let mut callee_logger =
-                    fcl::FunctionLogger::new(&generic_func_name, param_val_str);
+                let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                    // NOTE: Borrows the parameters. Has to be ahead of the `body` that moves the parameters to the `body` closure.
+                    let param_val_str = #inputs;
 
+                    // NOTE: The `block` will be executed (later) as a closure (rather than as is) 
+                    // to handle the `return` in the `block` correctly 
+                    // (i.e. to catch the return value after the `return` and log that return value).
+                    let mut body = move || #block;
 
-                // NOTE: Running the `block` as a closure to handle the `return` in the `block` correctly.
-                let ret_val = (move || #block )();
+                    if !#logging_is_on {
+                    // if !logger.borrow().logging_is_on() {
+                        return body();
+                        // return (move || #block )();
+                    }
 
-                if #returns_something {
-                    let ret_val_str = format!("{}", ret_val.maybe_print());
-                    callee_logger.set_ret_val(ret_val_str);
-                }
+                    // Else (loggign is on):
+                    let mut generic_func_name = String::with_capacity(64);
+                    generic_func_name.push_str(#func_log_name);
+                    if !#generic_params_is_empty {
+                        generic_func_name.push_str("<");
+                        // let generic_arg_names_vec: Vec<&'static str> = /*alloc::vec::*/Vec::new();
+                        let generic_arg_names_vec: Vec<&'static str> =
+                            vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+                        for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+                            if idx != 0 {
+                                generic_func_name.push_str(",");
+                            }
+                            generic_func_name.push_str(generic_arg_name);
+                        }
+                        generic_func_name.push_str(">");
+                    }
 
+                    let mut callee_logger = fcl::FunctionLogger::new(&generic_func_name, param_val_str);
+
+                    let ret_val = body();
+                    // let ret_val = (move || #block )();
+
+                    if #returns_something {
+                        let ret_val_str = format!("{}", ret_val.maybe_print());
+                        callee_logger.set_ret_val(ret_val_str);
+                    }
+
+                    ret_val
+                });
                 ret_val
+            // }
             }
+            //     // The run time part of the infrastructure for
+            //     // generic parameters substitution with actual generic arguments.
+            //     let mut generic_func_name = String::with_capacity(64);
+            //     generic_func_name.push_str(#func_log_name);
+            //     if !#generic_params_is_empty {
+            //         generic_func_name.push_str("<");
+            //         let generic_arg_names_vec: Vec<&'static str> =
+            //             vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+            //         for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+            //             if idx != 0 {
+            //                 generic_func_name.push_str(",");
+            //             }
+            //             generic_func_name.push_str(generic_arg_name);
+            //         }
+            //         generic_func_name.push_str(">");
+            //     }
+
+            //     use fcl::{CallLogger, MaybePrint};
+            //     let param_val_str = #inputs;
+            //     let mut callee_logger =
+            //         fcl::FunctionLogger::new(&generic_func_name, param_val_str);
+
+
+            //     // NOTE: Running the `block` as a closure to handle the `return` in the `block` correctly.
+            //     let ret_val = (move || #block )();
+
+            //     if #returns_something {
+            //         let ret_val_str = format!("{}", ret_val.maybe_print());
+            //         callee_logger.set_ret_val(ret_val_str);
+            //     }
+
+            //     ret_val
+            // }
         }
     };
 
