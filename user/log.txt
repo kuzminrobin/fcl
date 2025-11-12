@@ -2,51 +2,63 @@ main() {
   calls() {
     { // Loop body start.
       f() {
-                                                  thread_func() {
+                                                  thread_func() {        
+                                                    { // Loop body start.
+                                                      f2() {}
+                                                    } // Loop body end.
+                                                    { // Loop body start.
       } // f().
     } // Loop body end.
     { // Loop body start.
-                                                    { // Loop body start.
-                                                      f2() {}
-                                                    } // Loop body end.
-                                                    // Loop body repeats 1 time(s).
-                                                    { // Loop body start.
       f() {
                                                       f2() {}
                                                     } // Loop body end.
-                                                    // Loop body repeats 8 time(s).
-                                                    g() {
-                                                      f() {
+                                                    { // Loop body start.
+                                                      f2() {
       } // f().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
+    { // Loop body start.
+                                                      } // f2().
+                                                    } // Loop body end.
+      f() {
+                                                    // Loop body repeats 5 time(s).
+                                                    { // Loop body start.
+                                                      f2() {}
+      } // f().
+    } // Loop body end.
+    { // Loop body start.
+      f() {
+                                                    } // Loop body end.
+      } // f().
+    } // Loop body end.
+                                                    { // Loop body start.
+    { // Loop body start.
+      f() {
+                                                      f2() {}
+                                                    } // Loop body end.
+                                                    g() {
+      } // f().
+    } // Loop body end.
+                                                      f() {
     { // Loop body start.
       f() {
                                                       } // f().
                                                     } // g().
       } // f().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
-    { // Loop body start.
-      f() {
                                                     ff() {
-      } // f().
-    } // Loop body end.
-    // Loop body repeats 1 time(s).
     { // Loop body start.
       f() {
                                                     } // ff().
-                                                    { // Loop body start.
       } // f().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
     { // Loop body start.
       f() {
+                                                    { // Loop body start.
                                                       g() {
                                                         f() {
       } // f().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
     { // Loop body start.
       f() {
                                                         } // f().
@@ -54,85 +66,79 @@ main() {
                                                     } // Loop body end.
       } // f().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
-    { // Loop body start.
                                                     { // Loop body start.
                                                       g() {
                                                         f() {
+    { // Loop body start.
       f() {
                                                         } // f().
                                                       } // g().
                                                     } // Loop body end.
-                                                    // Loop body repeats 1 time(s).
-      } // f().
-    } // Loop body end.
-    // Loop body repeats 1 time(s).
-    { // Loop body start.
-                                                    { // Loop body start.
-                                                      g() {
-                                                        f() {
-      f() {
-                                                        } // f().
-                                                      } // g().
-                                                    } // Loop body end.
-                                                    // Loop body repeats 1 time(s).
                                                     { // Loop body start.
                                                       g() {
                                                         f() {
       } // f().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
-                                                        } // f().
-                                                      } // g().
-                                                    } // Loop body end.
-                                                    // Loop body repeats 1 time(s).
-    { // Loop body start.
-                                                    { // Loop body start.
-                                                      g() {
-                                                        f() {
-      f() {
-                                                        } // f().
-                                                      } // g().
-                                                    } // Loop body end.
-                                                    // Loop body repeats 1 time(s).
-                                                    _h() {
-      } // f().
-    } // Loop body end.
-    // Loop body repeats 1 time(s).
     g() {
+                                                        } // f().
+                                                      } // g().
+                                                    } // Loop body end.
       f() {
+                                                    { // Loop body start.
+                                                      g() {
+                                                        f() {}
+      } // f().
+                                                      } // g().
+                                                    } // Loop body end.
+    } // g().
+                                                    { // Loop body start.
+                                                      g() {
+                                                        f() {
+    f() {
+                                                        } // f().
+                                                      } // g().
+                                                    } // Loop body end.
+    } // f().
+    { // Loop body start.
+      g() {
+                                                    _h() {
+        f() {
                                                       _i<i32,bool>(_x: 1, _y: 2.0, _z: true) {
                                                         j(_x: 0, _y: 1) {} -> true
                                                       } -> -1.0 // _i<i32,bool>().
                                                     } // _h().
-      } // f().
-    } // g().
-    f() {
-                                                    closure{261,14:268,9}(b: true) {
-                                                      closure{265,21:265,26}(v: true) {} -> false
-                                                    } -> false // closure{261,14:268,9}().
-                                                    MyStruct::new() {
-    } // f().
+        } // f().
+      } // g().
+    } // Loop body end.
     { // Loop body start.
       g() {
+        f() {
+                                                    closure{261,14:268,9}(b: true) {
+        } // f().
+      } // g().
+    } // Loop body end.
+    { // Loop body start.
+                                                      closure{265,21:265,26}(v: true) {} -> false
+                                                    } -> false // closure{261,14:268,9}().
+      g() {
+                                                    MyStruct::new() {
         f() {
                                                     } -> ? // MyStruct::new().
                                                     MyStruct::method<bool,i32>(self: &?) {
         } // f().
       } // g().
     } // Loop body end.
+                                                    } -> false // MyStruct::method<bool,i32>().
     { // Loop body start.
       g() {
         f() {
-                                                    } -> false // MyStruct::method<bool,i32>().
                                                     gen_func<bool,i32>() {}
                                                     MyStruct::trait_method(self: &?) {}
-                                                    MyTrait::trait_method(self: &?) {}
         } // f().
       } // g().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
     { // Loop body start.
+                                                    MyTrait::trait_method(self: &?) {}
       g() {
         f() {
                                                     <MyStruct as MyPureTrait>::pure_method(self: &MyStruct { _b: true, _c: 5 }) {}
@@ -141,121 +147,126 @@ main() {
         } // f().
       } // g().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
-    { // Loop body start.
-      g() {
-        f() {
                                                     LoggableStruct::assoc_funcb<bool>() {}
-        } // f().
-      } // g().
-    } // Loop body end.
-    // Loop body repeats 1 time(s).
     { // Loop body start.
       g() {
         f() {
                                                     LoggableStruct::next(self: &mut ?) {} -> Some(1)
-                                                    LoggableStruct::next(self: &mut ?) {
+                                                    // LoggableStruct::next() repeats 1 time(s).
         } // f().
       } // g().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
-                                                    } -> None // LoggableStruct::next().
     { // Loop body start.
       g() {
         f() {
-                                                    f<user::thread_func::{{closure}}::{{closure}}>(fun: ?, _b: true) {
+                                                    f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>(fun: ?, _b: true) {
                                                       closure{433,11:433,15}() {} -> ()
-                                                    } // f<user::thread_func::{{closure}}::{{closure}}>().
         } // f().
       } // g().
     } // Loop body end.
-    // Loop body repeats 1 time(s).
-    { // Loop body start.
-      g() {
-        f() {
-                                                    ST::f() {}
-                                                    ST::g(self: &?) {}
-                                                    ST::h(self: &mut ?) {}
-                                                    f_with_f<user::thread_func::{{closure}}::{{closure}}>(fun: ?, _b: true) {
-                                                      closure{468,13:468,17}() {} -> ()
-                                                    } // f_with_f<user::thread_func::{{closure}}::{{closure}}>().
-        } // f().
-      } // g().
-    } // Loop body end.
-    // Loop body repeats 1 time(s).
+                                                    } // f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>().
     _h() {
+                                                    ST::f() {}
+      _i<i32,bool>(_x: 1, _y: 2.0, _z: true) {
+        j(_x: 0, _y: 1) {} -> true
+      } -> -1.0 // _i<i32,bool>().
+    } // _h().
+                                                    ST::g(self: &?) {}
+    calls()::closure{74,14:82,9}(b: true) {
+      calls()::closure{74,14:82,9}::closure{79,21:79,26}(v: true) {} -> false
+    } -> false // calls()::closure{74,14:82,9}().
+                                                    ST::h(self: &mut ?) {}
+    MyStruct::new() {
+                                                    f_with_f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>(fun: ?, _b: true) {
+                                                      closure{468,13:468,17}() {} -> ()
+                                                    } // f_with_f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>().
+    } -> ? // MyStruct::new().
+    MyStruct::method<bool,i32>(self: &?) {
                                                     fs(_s: "Abc") {}
                                                     { // Loop body start.
                                                       f(i: 0) {
                                                         g(i: 0) {}
                                                       } // f().
                                                     } // Loop body end.
-                                                    // Loop body repeats 2 time(s).
+                                                    { // Loop body start.
+    } -> false // MyStruct::method<bool,i32>().
+    gen_func<bool,i32>() {}
+                                                      f(i: 1) {
+                                                        g(i: 1) {}
+                                                      } // f().
+                                                    } // Loop body end.
+    MyStruct::trait_method(self: &?) {}
+                                                    { // Loop body start.
+    MyTrait::trait_method(self: &?) {}
+    <MyStruct as MyPureTrait>::pure_method(self: &?) {}
+                                                      f(i: 2) {
+    { // Loop body start.
+                                                        g(i: 2) {}
+                                                      } // f().
+                                                    } // Loop body end.
                                                     { // Loop body start.
                                                       f(i: 3) {
-      _i<i32,bool>(_x: 1, _y: 2.0, _z: true) {
+      calls()::f(i: 0) {
                                                         g(i: 3) {}
                                                       } // f().
                                                     } // Loop body end.
-                                                    // Loop body repeats 2 time(s).
-                                                    { // Loop body start.
-                                                      f(i: 5) {
-                                                        g(i: 5) {
-        j(_x: 0, _y: 1) {} -> true
-      } -> -1.0 // _i<i32,bool>().
-    } // _h().
-                                                        } // g().
-                                                      } // f().
-                                                    } // Loop body end.
-                                                    // Loop body repeats 3 time(s).
-                                                    { // Loop body start.
-                                                      f(i: 8) {
-                                                        g(i: 8) {
-0. stdout: hmm.
-    calls()::closure{74,14:82,9}(b: true) {
-      calls()::closure{74,14:82,9}::closure{79,21:79,26}(v: true) {
-1. stderr: T1 stderr output
-2. stdout: hmm...
-      } -> false // calls()::closure{74,14:82,9}::closure{79,21:79,26}().
-3. stderr: Oh
-    } -> false // calls()::closure{74,14:82,9}().
-                                                        } // g().
-                                                      } // f().
-                                                    } // Loop body end.
                                                     // Loop body repeats 1 time(s).
-    MyStruct::new() {} -> ?
-    MyStruct::method<bool,i32>(self: &?) {
-                                                    // Loop body repeats 1 time(s).
-                                                    g(i: 20) {}
-                                                  } // thread_func().
-    } -> false // MyStruct::method<bool,i32>().
-    gen_func<bool,i32>() {}
-    MyStruct::trait_method(self: &?) {}
-    MyTrait::trait_method(self: &?) {}
-    <MyStruct as MyPureTrait>::pure_method(self: &?) {}
-    { // Loop body start.
-      f(i: 0) {
-        g(i: 0) {}
-      } // f().
+                                                    { // Loop body start.
+        calls()::g(i: 0) {}
+      } // calls()::f().
     } // Loop body end.
+                                                      f(i: 5) {
     // Loop body repeats 7 time(s).
     { // Loop body start.
-      f(i: 8) {
-        g(i: 8) {
+      calls()::f(i: 8) {
+        calls()::g(i: 8) {
 Sample stderr output in main()
-        } // g().
-      } // f().
+                                                        g(i: 5) {}
+                                                      } // f().
+                                                    } // Loop body end.
+        } // calls()::g().
+      } // calls()::f().
     } // Loop body end.
-    // Loop body repeats 2 time(s).
-    g(i: 20) {}
+    // Loop body repeats 1 time(s).
+    calls()::g(i: 20) {}
     f() {
       { // Loop body start.
+                                                    { // Loop body start.
         calls()::g(_i: 0) {
           calls()::ifunc() {}
         } // calls()::g().
+                                                      f(i: 6) {
         calls()::h(_i: 0) {}
       } // Loop body end.
-      // Loop body repeats 2 time(s).
+      { // Loop body start.
+                                                        g(i: 6) {}
+                                                      } // f().
+                                                    } // Loop body end.
+        calls()::g(_i: 1) {
+                                                    // Loop body repeats 1 time(s).
+                                                    { // Loop body start.
+          calls()::ifunc() {}
+        } // calls()::g().
+                                                      f(i: 8) {
+                                                        g(i: 8) {
+0. stdout: hmm.
+        calls()::h(_i: 1) {}
+      } // Loop body end.
+1. stderr: T1 stderr output
+      { // Loop body start.
+2. stdout: hmm...
+        calls()::g(_i: 2) {
+3. stderr: Oh
+          calls()::ifunc() {}
+        } // calls()::g().
+                                                        } // g().
+                                                      } // f().
+                                                    } // Loop body end.
+                                                    // Loop body repeats 1 time(s).
+                                                    g(i: 20) {}
+                                                  } // thread_func().
+        calls()::h(_i: 2) {}
+      } // Loop body end.
 stdout: f()::loop -> 5
     } // f().
     { // Loop body start.

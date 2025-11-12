@@ -16,9 +16,9 @@ main() {
     root::f() {}
   } // Loop body end.
   // Loop body repeats 2 time(s).
-  main()::r(rp: 0x495f0ff67c) {} -> 0x495f0ff67c
-Raw pointer: 0x495f0ff67c
-  main()::ls(head: Some(Node { _next: Some(Node { _next: None }) })) {} -> Some(Node { _next: Some(Node { _next: None }) }) 
+  main()::r(rp: 0x52fcff84c) {} -> 0x52fcff84c
+Raw pointer: 0x52fcff84c
+  main()::ls(head: Some(Node { _next: Some(Node { _next: None }) })) {} -> Some(Node { _next: Some(Node { _next: None }) })
   main()::pattern_param_fn(MyPoint{x: 2, y: _y: -4}) {}
   main()::ref_pattern_param_fn(&mut MyPoint{x: 2, y: _y: -4}) {}
   main()::tp((a: 8, b: false)) {}

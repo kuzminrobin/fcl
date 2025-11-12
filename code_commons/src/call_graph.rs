@@ -741,7 +741,7 @@ impl CallGraph {
     //          // child() repeats 3 time(s). // Not yet flushed]
     //      } // Loop body end.     // The end being handled.
     pub fn add_loopbody_end(&mut self) {
-        // Logic. // TODO: Consider re-writing from scratch (or reviewing to be 100% correct).
+        // Logic. // TODO: Consider re-writing from scratch (or reviewing to be 100% correct) after writing the tests for each case.
         // If no nested function calls {
         //      If caching is active and this loopbody is a node being cached then stop caching.
         //      Remove this loopbody (from call {graph, stack}) and make parent a current node.
@@ -759,10 +759,15 @@ impl CallGraph {
         //          Compare this loopbody to the previous loopbody.
         //          If equal
         //              Remove this loopbody from call graph (thus making parent a current node).
-        //              Increment the previous loopbody repeat count.
+        //              Increment the previous loopbody overall repeat count.
         //              If caching
         //                  If the current loopbody is the node being cached // TODO: Consider doing this before removing the current loopbody?
         //                      Stop caching.
+        //              // { (An update: Bug "Redundant repeat count logged for loop bodies")
+        //              Else (not caching)
+        //                  Increment the previous loopbody flushed repeat count.
+        //              // } (An update: Bug "Redundant repeat count logged for loop bodies").
+        // 
         //              //Return (in the current implementation there is no `return` here).
         //          Otherwise (differs)
         //              If caching and the current node is the one being cached
@@ -802,9 +807,9 @@ impl CallGraph {
                 // self.current_node still points to the ending_loopbody.
                 // Popped the ending (current) loopbody's node from the call stack, but not from graph
                 // (parent or pseudo stays on top of the call stack).
-                None => debug_assert!(false, "FCL Internal Error: Unexpected bottom of call stack"),
+                None => debug_assert!(false, "FCL Internal Error: Unexpected bottom of call stack"), // TODO: Consider postponing the panic until the mutex release.
                 Some(ending_loopbody) => {
-                    debug_assert!(
+                    debug_assert!( // TODO: Consider postponing the panic until the mutex release.
                         ending_loopbody.borrow().kind.is_loopbody(),
                         "Unexpected item kind in the call stack"
                     );
@@ -812,7 +817,7 @@ impl CallGraph {
                     match self.call_stack.last() {
                         // self.current_node still points to the ending_loopbody.
                         None => {
-                            debug_assert!(false, "FCL Internal Error: Unexpected call stack bottom")
+                            debug_assert!(false, "FCL Internal Error: Unexpected call stack bottom") // TODO: Consider postponing the panic until the mutex release.
                         }
                         Some(parent_or_pseudo) => {
                             let parent_or_pseudo = parent_or_pseudo.clone();
@@ -834,7 +839,7 @@ impl CallGraph {
                                     .borrow_mut()
                                     .notify_loopbody_end(self.call_depth()); // parent_or_pseudo is on top of the call stack, so the call_depth corresponds to the ending_loopbody.
                             }
-                            // otherwise (caching is active, starting with parent or earlier)
+                            // otherwise (caching is active, starting with parent or earlier (TODO: What about current node being cached?))
                             //     Do noithing here, continue caching, move on.
 
                             // Mark loopbody (but not the whole loop) as ended.
@@ -870,6 +875,8 @@ impl CallGraph {
                                                 // Stop caching.
                                                 self.caching_info.clear();
                                             }
+                                        } else { // Bug fix: "Redundant repeat count logged for loop bodies".
+                                            previous_node.borrow_mut().repeat_count.mark_flushed();
                                         }
                                     }
                                     // Otherwise (differs)
