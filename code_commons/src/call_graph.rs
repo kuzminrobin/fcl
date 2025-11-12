@@ -875,7 +875,7 @@ impl CallGraph {
                                                 // Stop caching.
                                                 self.caching_info.clear();
                                             }
-                                        } else { // Bug fix: "Redundant repeat count logged for loop bodies".
+                                        } else {
                                             previous_node.borrow_mut().repeat_count.mark_flushed();
                                         }
                                     }
