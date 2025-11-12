@@ -405,46 +405,90 @@ fn quote_as_expr_closure(
 
     let body = { quote_as_expr(&**body, None, prefix) };
 
+    let logging_is_on = quote! {
+        logger.borrow()
+    };
     #[cfg(feature = "singlethreaded")]
-    let thread_logger_access = quote! {
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            if logger.borrow().borrow().logging_is_on() {
-                optional_callee_logger = Some(fcl::FunctionLogger::new(
-                    #log_closure_name_str, param_val_str))
-            }
-        })
+    let logging_is_on = quote! {
+        #logging_is_on.borrow()
     };
-    #[cfg(not(feature = "singlethreaded"))]
-    let thread_logger_access = quote! {
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            if logger.borrow().logging_is_on() {
-                optional_callee_logger = Some(fcl::FunctionLogger::new(
-                    #log_closure_name_str, param_val_str))
-            }
-        })
+    let logging_is_on = quote! {
+        #logging_is_on.logging_is_on()
     };
+    // #[cfg(feature = "singlethreaded")]
+    // let thread_logger_access = quote! {
+    //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+    //         if logger.borrow().borrow().logging_is_on() {
+    //             optional_callee_logger = Some(fcl::FunctionLogger::new(
+    //                 #log_closure_name_str, param_val_str))
+    //         }
+    //     })
+    // };
+    // #[cfg(not(feature = "singlethreaded"))]
+    // let thread_logger_access = quote! {
+    //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+    //         if logger.borrow().logging_is_on() {
+    //             optional_callee_logger = Some(fcl::FunctionLogger::new(
+    //                 #log_closure_name_str, param_val_str))
+    //         }
+    //     })
+    // };
+
     quote! {
         #(#attrs)*
         #lifetimes #constness #movability #asyncness #capture
         #or1_token #inputs #or2_token #output
         {
             use fcl::{CallLogger, MaybePrint};
-            let param_val_str = #input_vals;
-            let mut optional_callee_logger = None;
 
-            #thread_logger_access;
+            let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                if ! #logging_is_on {
+                // if !logger.borrow().logging_is_on() {
+                    return (move || { #body })();
+                }
 
-            let ret_val = (move || { #body })();
+                // Else (logging is on):
+                let param_val_str = #input_vals;
+                // let param_val_str = Some(format!(
+                //     "value: {}", 
+                //     value.maybe_print(),
+                // ));
+                let mut callee_logger = fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str);
+                // let mut callee_logger = fcl::FunctionLogger::new(
+                //     "f()::closure{1,1:1,0}",
+                //     param_val_str,
+                // );
 
-            // Uncondititonally print what closure returns
-            // since if its return type is not specified explicitely
-            // then the return type is determined with the type inference
-            // which is not available at pre-compile (preprocessing) time.
-            let ret_val_str = format!("{}", ret_val.maybe_print());
-            if let Some(callee_logger) = optional_callee_logger.as_mut() {
+                let ret_val = (move || { #body })();
+
+                // Uncondititonally print what closure returns
+                // since if its return type is not specified explicitly
+                // then the return type is determined with the type inference
+                // which is not available at pre-compile (preprocessing) time.
+                let ret_val_str = format!("{}", ret_val.maybe_print());
                 callee_logger.set_ret_val(ret_val_str);
-            };
+
+                ret_val
+            });
             ret_val
+
+            // let param_val_str = #input_vals;
+            // let mut optional_callee_logger = None;
+
+            // #thread_logger_access;
+
+            // let ret_val = (move || { #body })();
+
+            // // Uncondititonally print what closure returns
+            // // since if its return type is not specified explicitely
+            // // then the return type is determined with the type inference
+            // // which is not available at pre-compile (preprocessing) time.
+            // let ret_val_str = format!("{}", ret_val.maybe_print());
+            // if let Some(callee_logger) = optional_callee_logger.as_mut() {
+            //     callee_logger.set_ret_val(ret_val_str);
+            // };
+            // ret_val
         }
     }
 }

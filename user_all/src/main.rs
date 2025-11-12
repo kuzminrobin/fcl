@@ -55,12 +55,14 @@
 //     ret_val
 // }
 
-// #[fcl_proc_macros::loggable] // The procedural macro that does the instrumetation.
-// fn f() { // The user's function definition.
-//     let _c = Some(5).map(
-//         |value| true    // The user's closure definition.
-//     ); 
-// }
+#[fcl_proc_macros::loggable]
+mod func_and_closure_review {
+    pub fn f() { // The user's function definition.
+        let _c = Some(5).map(
+            |value| true    // The user's closure definition.
+        ); 
+    }
+}
 
 
 #[fcl_proc_macros::loggable]
@@ -215,6 +217,7 @@ pub fn main() {
 
         my_func(); // Invocation of the function.
     }
+    func_and_closure_review::f();
 }
 
 // use fcl_proc_macros::loggable;

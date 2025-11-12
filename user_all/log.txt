@@ -8,7 +8,7 @@ main() {
   S::d(self: &?) {}
   Tr::d(self: &?) {}
   S2::e(self: &?) {
-    S2::e()::closure{288,21:288,30}(val: 1) {} -> -2
+    S2::e()::closure{291,21:291,30}(val: 1) {} -> -2
   } // S2::e().
   S::d(self: &?) {}
   Tr::d(self: &?) {}
@@ -16,8 +16,8 @@ main() {
     root::f() {}
   } // Loop body end.
   // Loop body repeats 2 time(s).
-  main()::r(rp: 0x62bd5bf6cc) {} -> 0x62bd5bf6cc
-Raw pointer: 0x62bd5bf6cc
+  main()::r(rp: 0x66fb57f92c) {} -> 0x66fb57f92c
+Raw pointer: 0x66fb57f92c
   main()::ls(head: Some(Node { _next: Some(Node { _next: None }) })) {} -> Some(Node { _next: Some(Node { _next: None }) })
   main()::pattern_param_fn(MyPoint{x: 2, y: _y: -4}) {}
   main()::ref_pattern_param_fn(&mut MyPoint{x: 2, y: _y: -4}) {}
@@ -38,8 +38,11 @@ Raw pointer: 0x62bd5bf6cc
       // Loop body repeats 99 time(s).
     } // m::g().
     my_func()::MyStruct::my_method(self: &mut MyStruct { _field: 3 }) {
-      my_func()::MyStruct::my_method()::closure{183,38:185,21}(param: 1, &mut MyPoint{x: 2, y: -4}) {} -> -2
+      my_func()::MyStruct::my_method()::closure{185,38:187,21}(param: 1, &mut MyPoint{x: 2, y: -4}) {} -> -2
 This is a sample stderr output.
     } // my_func()::MyStruct::my_method().
   } // my_func().
+  func_and_closure_review::f() {
+    func_and_closure_review::f()::closure{62,13:62,24}(value: 5) {} -> true
+  } // func_and_closure_review::f().
 } // main().
