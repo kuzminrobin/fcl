@@ -140,7 +140,7 @@ struct LoggerCommon {
 ///     ); 
 /// }
 /// ```
-// TODO: Consider FunctionLogger -> FunctionOrClousreLogger or CallableLogger
+// TODO: Consider FunctionLogger -> CalleeLogger, like `callee_logger` in proc macro (or FunctionOrClousreLogger or CallableLogger)
 pub struct FunctionLogger {
     /// The common part.
     common: LoggerCommon,
