@@ -1,5 +1,18 @@
 # TODO:
 
+* Bug
+`cargo r --bin user`
+
+```rs
+        g(i: 6) {}
+      } // f().
+    } // Loop body end.
+    // Loop body repeats 2 time(s).   // MUST BE 1.
+    { // Loop body start.
+      f(i: 8) {
+        g(i: 8) {
+Sample stderr output in main()
+```
 * User practice: For speed, suppress the logging of 
   * parameters and ret val;
   * generic params.
@@ -37,6 +50,8 @@
   * To do:
     * See "To summarize".
     * remove condition form the ctor and dtor
+    * same for LoopbodyLogger
+    * Remove the common part of LoopbodyLogger and FunctionLogger.
 
 Now:
 ```rs

@@ -141,7 +141,7 @@ fn calls() {
         }
         MyStruct.pure_method();
     }
-    #[loggable]
+    // #[loggable] // Traverse stopper of the upper-level `#[loggable]`.
     {
         fn f(i: u8) {
             g(i);

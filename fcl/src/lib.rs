@@ -121,7 +121,7 @@ struct LoggerCommon {
 /// ## Examples
 /// The instrumented user's function and closure:
 /// ```
-/// #[fcl_proc_macros::loggable] // The procedural macro that does the instrumetation.
+/// #[fcl_proc_macros::loggable] // The procedural macro that adds the instrumentation.
 /// fn f() { // The user's function definition.
 ///     let _c = Some(5).map(
 ///         |value| true    // The user's closure definition.
@@ -129,12 +129,22 @@ struct LoggerCommon {
 /// }
 /// ```
 /// The result of the macro expansion:
-/// ```
+/// ```ignore
 /// fn f() {
-///     // TODO: 
+///     . . .
+///     // The instrumentation. 
+///     // The instance whose constructor logs the call `f() {`
+///     // and destructor logs the return `} // f().`.
+///     let mut callee_logger = FunctionLogger::new("f"..);
+///     . . .
 ///     let _c = Some(5).map(
 ///         |value| {
-///             // TODO:
+///             . . .
+///             // The instrumentation. 
+///             // The instance whose constructor logs the call `f()::closure{4,9:4,20} {`
+///             // and destructor logs the return `} // f()::closure{4,9:4,20}.`.
+///             let mut callee_logger = fcl::FunctionLogger::new("f()::closure{1,1:1,0}"..);
+///             . . .
 ///             true    
 ///         }
 ///     ); 
@@ -150,7 +160,7 @@ pub struct FunctionLogger {
 
 impl FunctionLogger {
     /// Creates a new `FunctionLogger` and logs the function/closure's call if logging is enabled.
-    /// # Parameters.
+    /// ### Parameters.
     /// * The optional string representation of the user function's parameters and their values.
     pub fn new(func_name: &str, param_vals: Option<String>) -> Self {
         let mut call_logged = false;

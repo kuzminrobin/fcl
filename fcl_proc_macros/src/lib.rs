@@ -428,14 +428,14 @@ fn quote_as_expr_closure(
             let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 // NOTE: Borrows the params, has to be in front of the `body`
                 // that moves the params to the `body` closure.
-                // 
+                //
                 // At run time get the parameter names and values string:
                 let param_val_str = #input_vals;
 
                 // Get the body as a closure (to be executed later):
                 let mut body = move || { #body };
 
-                // If logging is off then do nothing 
+                // If logging is off then do nothing
                 // except executing the body and returning the value:
                 if ! #logging_is_on {
                     return body();
@@ -1332,7 +1332,9 @@ impl IsTraverseStopper for Attribute {
         };
         if let Some(last_path_segment) = path.segments.last() {
             let last_path_segment_str = last_path_segment.ident.to_string();
-            last_path_segment_str == "loggable" || last_path_segment_str == "non_loggable"
+            last_path_segment_str == "loggable" // Will be handled in a separate pass
+            // of the preprocessor (otherwise was causing a double instrumentation or smth. like that).
+            || last_path_segment_str == "non_loggable"
         } else {
             return false;
         }
@@ -1621,7 +1623,7 @@ fn traversed_block_from_sig(
                     // to handle the `return` in the `block` correctly
                     // (i.e. to catch the return value after the `return` and log that return value).
                     //
-                    // Get the function body as a
+                    // Get the function body as a closure:
                     let mut body = move || #block;
 
                     // If logging is off then do nothing
@@ -2381,12 +2383,47 @@ fn quote_as_loop_block(
         traversed_stmts
     };
 
+    // Get the multithreading-dependent `logging_is_on()` call token stream:
+    let logging_is_on = quote! {
+        logger.borrow()
+    };
+    #[cfg(feature = "singlethreaded")]
+    let logging_is_on = quote! {
+        #logging_is_on.borrow()
+    };
+    let logging_is_on = quote! {
+        #logging_is_on.logging_is_on()
+    };
+
     quote! {
         {
-            // Log the loop body start (if logging is enabled).
-            let _logger = fcl::LoopbodyLogger::new();
+            // For now I intentionally leave this reading in every loop iteration
+            // so that the user can filter out some iterations from the log 
+            // by enabling/disabling the logging during the iterations.
+            // 
+            // To accelerate, this reading can be placed in front of the loop 
+            // (but the check `if logging_is_on` still needs to be in every iteration), 
+            // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`), 
+            // and at the end of that scope the `logging_is_on` dies.
+            let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { #logging_is_on });
 
-            #stmts
+            let _loopbody_logger = if logging_is_on {
+                Some(fcl::LoopbodyLogger::new()) // Log the loop body start.
+            } else {
+                None
+            };
+
+            // NOTE: The `loop` can return a value (with the `break <value>` statement),
+            // the `for` and `while` cannnot.
+
+            // Execute the loop body
+            // (and optionally return a value upon `break <value>` in case of the `loop`):
+            // 
+            // NOTE: The `#stmts` cannot be moved to a closure (as it is done for the body of functions and closures) 
+            // because `break [<value>]` cannot be executed in a closure (compilation error).
+            { // NOTE: This extra scope is to isolate the outer (FCL's) `_loopbody_logger`, `logging_is_on` and possible inner (user's) ones.
+                #stmts 
+            }
 
             // The loop body end is logged in the destructor of `LoopbodyLogger` instance.
         }
