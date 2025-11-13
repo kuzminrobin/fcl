@@ -1,5 +1,20 @@
 # TODO:
 
+* Bug "Tests fail for feature 'singlethreaded':
+  If "user_all\Cargo.toml" uses "singlethreaded"
+  ```toml
+  fcl = { path = "../fcl", features = ["singlethreaded"] }
+  fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
+  ```
+  then tests fail upon 
+  `cargo test -- --test-threads=1`
+  but succeed upon 
+  `cargo test -p fcl --lib -- --test-threads=1`.  
+  Then if "fcl\Cargo.toml" uses 
+  `fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }` then 
+  `cargo test -p fcl --lib -- --test-threads=1` fails to compile, while 
+  `cargo test -- --test-threads=1` still fails to succeed.  
+  During debugging the tests suceed.
 * `debug_assert`: // TODO: Consider postponing the panic until the mutex release.
   Panic message to be complemented with "Location ID: <GUID>".
 * User practice: For speed, suppress the logging of 

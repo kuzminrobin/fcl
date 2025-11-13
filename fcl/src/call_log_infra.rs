@@ -404,7 +404,7 @@ impl CallLoggerArbiter {
             match (*CALL_LOGGER_ARBITER).try_borrow_mut() {
                 Ok(_arbiter) => arbiter = Some(_arbiter),
                 Err(_e) => {
-                    const SYNC_MSG: &str = &"FCL failed to synchronize its cache and buffers with the panic report below";
+                    const SYNC_MSG: &str = &"FCL failed to synchronize its cache and buffers with the panic report";
                     const DEBUGGER_MSG: &str = &"If the panic report is not shown, attach the debugger to see the panic details";
                     match (*THREAD_SHARED_WRITER).try_borrow_mut() {
                         Ok(mut writer) => {

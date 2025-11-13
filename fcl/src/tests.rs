@@ -239,6 +239,9 @@ mod singlethreaded {
         }));
 
         THREAD_LOGGER.with(|logger| {
+            #[cfg(feature = "singlethreaded")]
+            let logger = logger.borrow_mut();
+
             logger.borrow_mut().flush();
         });
 
@@ -288,6 +291,9 @@ mod singlethreaded {
 
         // Flush the log:
         THREAD_LOGGER.with(|logger| {
+            #[cfg(feature = "singlethreaded")]
+            let logger = logger.borrow_mut();
+
             logger.borrow_mut().flush();
         });
 
@@ -350,6 +356,9 @@ mod singlethreaded {
 
         // Flush the log:
         THREAD_LOGGER.with(|logger| {
+            #[cfg(feature = "singlethreaded")]
+            let logger = logger.borrow_mut();
+
             logger.borrow_mut().flush();
         });
 
