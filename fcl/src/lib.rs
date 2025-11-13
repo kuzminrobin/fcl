@@ -158,23 +158,7 @@ impl CalleeLogger {
             #[cfg(feature = "singlethreaded")]
             let logger = logger.borrow_mut();
 
-            // let mut logger = logger.borrow_mut();
-
             logger.borrow_mut().log_call(func_name, param_vals);
-
-            // // TODO: Consider 
-            // // let mut logger_borrow = logger.borrow_mut();
-            // // #[cfg(feature = "singlethreaded")]
-            // // let mut logger_borrow = logger_borrow.borrow_mut();
-            // #[cfg(feature = "singlethreaded")] 
-            // let intermediate_borrow = logger.borrow_mut();
-            // #[cfg(feature = "singlethreaded")]
-            // let mut logger_borrow = intermediate_borrow.borrow_mut();
-
-            // #[cfg(not(feature = "singlethreaded"))]
-            // let mut logger_borrow = logger.borrow_mut();
-
-            // logger_borrow.log_call(func_name, param_vals);
         });
 
         Self {
@@ -194,19 +178,7 @@ impl Drop for CalleeLogger {
             #[cfg(feature = "singlethreaded")]
             let logger = logger.borrow_mut();
 
-            // let mut logger = logger.borrow_mut();
-
             logger.borrow_mut().log_ret(self.ret_val_str.take());
-
-            // #[cfg(feature = "singlethreaded")]
-            // let intermediate_borrow = logger.borrow_mut();
-            // #[cfg(feature = "singlethreaded")]
-            // let mut logger_borrow = intermediate_borrow.borrow_mut();
-
-            // #[cfg(not(feature = "singlethreaded"))]
-            // let mut logger_borrow = logger.borrow_mut();
-
-            // logger_borrow.log_ret(self.ret_val_str.take());
         });
     }
 }
@@ -221,19 +193,7 @@ impl LoopbodyLogger {
             #[cfg(feature = "singlethreaded")]
             let logger = logger.borrow_mut();
 
-            // let mut logger = logger.borrow_mut();
-
             logger.borrow_mut().log_loopbody_start();
-
-            // #[cfg(feature = "singlethreaded")]
-            // let intermediate_borrow = logger.borrow_mut();
-            // #[cfg(feature = "singlethreaded")]
-            // let mut logger_borrow = intermediate_borrow.borrow_mut();
-
-            // #[cfg(not(feature = "singlethreaded"))]
-            // let mut logger_borrow = logger.borrow_mut();
-
-            // logger_borrow.log_loopbody_start();
         });
         Self
     }
@@ -245,19 +205,7 @@ impl Drop for LoopbodyLogger {
             #[cfg(feature = "singlethreaded")]
             let logger = logger.borrow_mut();
 
-            // let mut logger = logger.borrow_mut();
-
             logger.borrow_mut().log_loopbody_end();
-
-            // // TODO: Try to dedup below.
-            // #[cfg(feature = "singlethreaded")]
-            // let intermediate_borrow = logger.borrow_mut();
-            // #[cfg(feature = "singlethreaded")]
-            // let mut logger_borrow = intermediate_borrow.borrow_mut();
-            // #[cfg(not(feature = "singlethreaded"))]
-            // let mut logger_borrow = logger.borrow_mut();
-
-            // logger_borrow.log_loopbody_end();
         });
     }
 }
