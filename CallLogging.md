@@ -1,4 +1,5 @@
 # Unsorted
+* Consider `{ // Loop body start` -> `{ // (line_num, col) Loop body start`
 * Rename `singlethreaded` feature to `single_threaded` (or `single-threaded`). https://en.wikipedia.org/wiki/Thread_(computing)
 * Likely Bug (ivestigate): If the empty loop body (after start) gets interrupted 
   by a thread context switch, then, upon flush, the loop body start is printed, 
@@ -16,8 +17,77 @@
   globally, locally (at specific items, at specific time frames, both).
 
 # TODO:
-
-* `user` and `user_all` cases to the tests.
+* Testing:
+  * Algorithm (fcl/algo_tests*.rs)
+    * All possible combinations (full code coverage)
+      * Call/ret/repeat for fn/closure/loop
+    * fcl/algo_tests_basics.rs
+    * fcl/algo_tests_add_call.rs
+    * fcl/algo_tests_add_ret.rs
+    * fcl/algo_tests_add_loopbody_start.rs
+    * fcl/algo_tests_add_loopbody_end.rs
+    
+  * Macro ({fcl_proc_macros?}/macro_tests*.rs)
+    * Parameters (loggable, non_lggable, prefix)
+    * Recursion (from mod/impl to functions)
+    * `#[loggable]` Different items (mod, trait, impl, fn, closure[, loop])
+  * Enabling/disabling, global/local/temporary
+  * `user` and `user_all` cases to the tests (or separate crate(s) of examples for the users).
+  * feature 'singlethreaded'
+  * Test
+    * Testing
+      * Basics (from user/main.rs).
+        * Log to string/Vector and compare.
+        * Generics
+      * Test coverage
+        * All branches of all the code.
+        * user, user_all
+        * Code coverage
+          * mod
+          * trait / fn with default impl
+          * impl
+            * T
+            * Trait for
+          * fn
+            * local
+          * closure
+      * Test with {vec, file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+      * Features
+        * minimal_writer
+        * singlethreaded
+        * multithreaded
+      * Decorators
+        * CodeLike
+        * TreeLike
+      * Code
+        * Single-threaded
+        * Multithreaded
+      * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
+      * std output and panic sync.
+      * [Temporarily] Enable/disable logging. 
+      * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
+      * ```rs
+        // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
+        // Const(ItemConst)
+        // Enum(ItemEnum)
+        // ExternCrate(ItemExternCrate)
+        // ForeignMod(ItemForeignMod)
+        // Macro(ItemMacro)
+        // Static(ItemStatic)
+        // Struct(ItemStruct)
+        // Trait(ItemTrait)
+        // TraitAlias(ItemTraitAlias)
+        // Type(ItemType)
+        // Union(ItemUnion)
+        // Verbatim(TokenStream)
+        ```
+    * Test with the existing projects.
+      * Update the instructions, how to enable func call logging in your project.
+      * (After testing with real code) Finalize the user's use
+        * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
+          log thread func or not).
+        * Customizing the thread indent.
+  * Consider tests.rs / {`mod singlethreaded` -> `mod single_threaded_tests`}.
 * Consider making the decorators chainable, such that the CodeLikeDecorator or TreeLikeDecorator 
   can be followed by
   * an HtmlDecorator, combined with or followed by HtmlColoringDecorator,
@@ -25,7 +95,7 @@
   * or PowerShellColoringDecorator (if coloring is supported in PowerShell).
 * Consider renaming WriterAdapter to ThreadSharedWriterAdapter, 
   since it is only needed for a thread-shared writer case.
-* Bug "Tests fail for feature 'singlethreaded':
+* (likely not applicable after 2026.01.19) Bug "Tests fail for feature 'singlethreaded':
   If "user_all\Cargo.toml" uses "singlethreaded"
   ```toml
   fcl = { path = "../fcl", features = ["singlethreaded"] }
@@ -79,59 +149,6 @@
   The user should know details about how the thread switch picture gets tistorted.
   How large is the distortion? Depends on the code. If there are lengthy fragments without loops and calls, then the distortion is minimal. But the more often the code execution passes through the loop, function, and closure starts and ends the larger is the distortion (and the slow-down because of logging).
 * (Unsorted. Consider) When the overall repeat count reaches MAX, flush the call and clear both the overall and flushed repeat count.
-* Test
-  * Testing
-    * Basics (from user/main.rs).
-      * Log to string/Vector and compare.
-      * Generics
-    * Test coverage
-      * All branches of all the code.
-      * user, user_all
-      * Code coverage
-        * mod
-        * trait / fn with default impl
-        * impl
-          * T
-          * Trait for
-        * fn
-          * local
-        * closure
-    * Test with {vec, file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
-    * Features
-      * minimal_writer
-      * singlethreaded
-      * multithreaded
-    * Decorators
-      * CodeLike
-      * TreeLike
-    * Code
-      * Single-threaded
-      * Multithreaded
-    * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
-    * std output and panic sync.
-    * [Temporarily] Enable/disable logging. 
-    * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
-    * ```rs
-      // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
-      // Const(ItemConst)
-      // Enum(ItemEnum)
-      // ExternCrate(ItemExternCrate)
-      // ForeignMod(ItemForeignMod)
-      // Macro(ItemMacro)
-      // Static(ItemStatic)
-      // Struct(ItemStruct)
-      // Trait(ItemTrait)
-      // TraitAlias(ItemTraitAlias)
-      // Type(ItemType)
-      // Union(ItemUnion)
-      // Verbatim(TokenStream)
-      ```
-  * Test with the existing projects.
-    * Update the instructions, how to enable func call logging in your project.
-    * (After testing with real code) Finalize the user's use
-      * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
-        log thread func or not).
-      * Customizing the thread indent.
 * Overall clean-up.
   * Rename the traits (from C++-like) according to Rust. E.g. 
     *`Decorator` -> `Decorate`

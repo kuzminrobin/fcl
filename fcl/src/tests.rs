@@ -350,6 +350,117 @@ mod singlethreaded {
     }
 
     #[test]
+    fn empty_calls() {
+        let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+        THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+        // # Empty calls.
+        parent(None); // parent() {} // Empty call (no nested calls).
+
+        // ## Calls with empty loop bodies (empty: has no nested calls) and corresponding returns.
+        // parent() {} // Call with single empty loop body (single: non-repeating).
+        parent(Some(CallOptions::EmptyLoopBodies {
+            one_loop: true,
+            iter_count: (1, 0),
+        }));
+        // parent() {} // Call with 1 loop of repreating empty body.
+        parent(Some(CallOptions::EmptyLoopBodies {
+            one_loop: true,
+            iter_count: (3, 0),
+        }));
+        // parent() {} // Call with 2 loops, each with single empty body.
+        parent(Some(CallOptions::EmptyLoopBodies {
+            one_loop: false,
+            iter_count: (1, 1),
+        }));
+        // parent() {} // Call with 2 loops, repeating and single body correspondingly.
+        parent(Some(CallOptions::EmptyLoopBodies {
+            one_loop: false,
+            iter_count: (3, 1),
+        }));
+        // parent() {} // Call with 2 loops, single and repeating body correspondingly.
+        parent(Some(CallOptions::EmptyLoopBodies {
+            one_loop: false,
+            iter_count: (1, 2),
+        }));
+        // parent() {} // Call with 2 loops with repeating body each.
+        parent(Some(CallOptions::EmptyLoopBodies {
+            one_loop: false,
+            iter_count: (2, 3),
+        }));
+
+        // Flush the log:
+        THREAD_LOGGER.with(|logger| {
+            #[cfg(feature = "singlethreaded")]
+            let logger = logger.borrow_mut();
+
+            // The test output ends with the repeat count that needs to be flushed.
+            logger.borrow_mut().flush();
+        });
+
+        #[rustfmt::skip]
+        unsafe {
+            // Release the borrow for the subsequent panic upon assertion failure
+            // (in case the test fails):
+            let result_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+
+            assert_eq!(
+                result_log,
+                concat!(
+                    "parent(calls: ?) {}\n", 
+                    "// parent() repeats 6 time(s).\n", 
+                )
+            )
+        };
+    }
+
+    #[test]
+    fn single_empty_sibling() {
+        let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+        THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+        // // ## Single empty sibling.
+        // parent() {
+        //     sibling_a() {}  // Single empty sibling.
+        // }
+        // parent() {
+        //     sibling_a() {}  // Single sibling with an empty loop body.
+        // }
+        // parent() {
+        //     sibling_a() {}  // Single sibling with multiple loops with an empty body each.
+        // }
+        parent(Some(CallOptions::SingleEmptySibling { iter_count: (0, 0) }));
+        parent(Some(CallOptions::SingleEmptySibling { iter_count: (1, 0) }));
+        parent(Some(CallOptions::SingleEmptySibling { iter_count: (3, 2) }));
+
+        // Flush the log:
+        THREAD_LOGGER.with(|logger| {
+            #[cfg(feature = "singlethreaded")]
+            let logger = logger.borrow_mut();
+
+            // The test output ends with the repeat count that needs to be flushed.
+            logger.borrow_mut().flush();
+        });
+
+        #[rustfmt::skip]
+        unsafe {
+            // Release the borrow for the subsequent panic upon assertion failure
+            // (in case the test fails):
+            let result_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+
+            assert_eq!(
+                result_log,
+                concat!(
+                    "parent(calls: ?) {\n",
+                    "  parent()::sibling_a(iter_count_a: 0, iter_count_b: 0) {}\n", 
+                    "} // parent().\n",
+                    "// parent() repeats 2 time(s).\n"
+                )
+            )
+        };
+    }
+
+    #[test]
     fn single_nonempty_sibling_with_empty_child() {
         let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
         THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
@@ -421,117 +532,6 @@ mod singlethreaded {
                     "  } // Loop body end.\n",
                     "} // parent().\n",
                     "// parent() repeats 1 time(s).\n", 
-                )
-            )
-        };
-    }
-
-    #[test]
-    fn single_empty_sibling() {
-        let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
-        THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
-
-        // // ## Single empty sibling.
-        // parent() {
-        //     sibling_a() {}  // Single empty sibling.
-        // }
-        // parent() {
-        //     sibling_a() {}  // Single sibling with an empty loop body.
-        // }
-        // parent() {
-        //     sibling_a() {}  // Single sibling with multiple loops with an empty body each.
-        // }
-        parent(Some(CallOptions::SingleEmptySibling { iter_count: (0, 0) }));
-        parent(Some(CallOptions::SingleEmptySibling { iter_count: (1, 0) }));
-        parent(Some(CallOptions::SingleEmptySibling { iter_count: (3, 2) }));
-
-        // Flush the log:
-        THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
-            let logger = logger.borrow_mut();
-
-            // The test output ends with the repeat count that needs to be flushed.
-            logger.borrow_mut().flush();
-        });
-
-        #[rustfmt::skip]
-        unsafe {
-            // Release the borrow for the subsequent panic upon assertion failure
-            // (in case the test fails):
-            let result_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
-
-            assert_eq!(
-                result_log,
-                concat!(
-                    "parent(calls: ?) {\n",
-                    "  parent()::sibling_a(iter_count_a: 0, iter_count_b: 0) {}\n", 
-                    "} // parent().\n",
-                    "// parent() repeats 2 time(s).\n"
-                )
-            )
-        };
-    }
-
-    #[test]
-    fn empty_calls() {
-        let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
-        THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
-
-        // # Empty calls.
-        parent(None); // parent() {} // Empty call (no nested calls).
-
-        // ## Calls with empty loop bodies (empty: has no nested calls) and corresponding returns.
-        // parent() {} // Call with single empty loop body (single: non-repeating).
-        parent(Some(CallOptions::EmptyLoopBodies {
-            one_loop: true,
-            iter_count: (1, 0),
-        }));
-        // parent() {} // Call with 1 loop of repreating empty body.
-        parent(Some(CallOptions::EmptyLoopBodies {
-            one_loop: true,
-            iter_count: (3, 0),
-        }));
-        // parent() {} // Call with 2 loops, each with single empty body.
-        parent(Some(CallOptions::EmptyLoopBodies {
-            one_loop: false,
-            iter_count: (1, 1),
-        }));
-        // parent() {} // Call with 2 loops, repeating and single body correspondingly.
-        parent(Some(CallOptions::EmptyLoopBodies {
-            one_loop: false,
-            iter_count: (3, 1),
-        }));
-        // parent() {} // Call with 2 loops, single and repeating body correspondingly.
-        parent(Some(CallOptions::EmptyLoopBodies {
-            one_loop: false,
-            iter_count: (1, 2),
-        }));
-        // parent() {} // Call with 2 loops with repeating body each.
-        parent(Some(CallOptions::EmptyLoopBodies {
-            one_loop: false,
-            iter_count: (2, 3),
-        }));
-
-        // Flush the log:
-        THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
-            let logger = logger.borrow_mut();
-
-            // The test output ends with the repeat count that needs to be flushed.
-            logger.borrow_mut().flush();
-        });
-
-        #[rustfmt::skip]
-        unsafe {
-            // Release the borrow for the subsequent panic upon assertion failure
-            // (in case the test fails):
-            let result_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
-
-            assert_eq!(
-                result_log,
-                concat!(
-                    "parent(calls: ?) {}\n", 
-                    "// parent() repeats 6 time(s).\n", 
                 )
             )
         };
@@ -918,218 +918,4 @@ mod singlethreaded {
         };
     }
 
-    // {
-    /*
-    // # Empty calls.
-    parent() {} // Empty call (no nested calls).
-
-    // ## Calls with empty loop bodies (empty: has no nested calls) and corresponding returns.
-    parent() {} // Call with single empty loop body (single: non-repeating).
-    parent() {} // Call with 1 loop of repreating empty body.
-    parent() {} // Call with 2 loops, each with single empty body.
-    parent() {} // Call with 2 loops, repeating and single body correspondingly.
-    parent() {} // Call with 2 loops, single and repeating body correspondingly.
-    parent() {} // Call with 2 loops with repeating body each.
-
-    // # Non-empty calls.
-    // ## Single empty sibling.
-    parent() {
-        sibling_a() {}  // Single empty sibling.
-    } // Return after a non-repeating empty sibling.
-    parent() {
-        sibling_a() {}  // Single sibling with an empty loop body.
-    }
-    parent() {
-        sibling_a() {}  // Single sibling with multiple loops with an empty body each.
-    }
-
-    // ## Single non-empty sibling with an empty child.
-    parent() {
-        sibling_a() { // Single non-empty sibling.
-            child_a() {} // Empty child.
-        }
-    }
-    parent() {
-        sibling_a() { // Single non-empty sibling.
-            child_a() {} // Child with empty loop bodies.
-        }
-    }
-    parent() {
-        { // Single non-empty loop body.
-            child_a() {} // Empty child.
-        }
-    }
-    parent() {
-        { // Single non-empty loop body.
-            child_a() {} // Child with empty loop bodies.
-        }
-    }
-
-    // ## Single non-empty sibling with a non-empty child.
-    parent() {
-        sibling_a() { // Single non-empty sibling.
-            child_a() {
-                grandchild_a() {} // Single empty grandchild.
-            }
-        }
-    }
-
-    ## Repeating sibling.
-    parent() {
-        sibling_a() {}  // Repeating empty sibling.
-        // repeats 2 time(s).
-    }
-    parent() {
-        sibling_a() {   // Repeating non-empty sibling.
-            child_a() {}
-        }
-        // repeats 2 time(s).
-    }
-
-    ## Loop body with a single child.
-    parent() {
-        { // Single non-empty loop body.
-            child() {}
-        }
-    }
-    parent() {
-        { // Repeating loop body.
-            child() {}
-        }
-        // Loop body repeats 2 time(s).
-    } // Return after a repeating non-empty loop body.
-
-    ## Loop body with a repeating child.
-    parent() {
-        { // Single non-empty loop body.
-            child_a() {}
-            // Repeats
-        }
-    }
-    parent() {
-        { // Repeating loop body.
-            child_a() {}
-            // Repeats
-        }
-        // Loop body repeats 2 time(s).
-    }
-
-    ## Single loop body with differing siblings or their internals.
-    parent() {
-        {
-            child_a() {
-                grandchild_a() {}
-            }
-            child_a() {
-                grandchild_b() {}
-            }
-        }
-    }
-    parent() {
-        {
-            child_a() {
-                grandchild_a() {}
-            }
-            // Repeats
-            child_a() {
-                grandchild_b() {}
-            }
-            // Repeats
-        }
-    }
-    parent() {
-        {
-            child_a() {}
-            child_b() {}
-        }
-    }
-    parent() {
-        {
-            child_a() {}
-            // Repeats
-            child_b() {}
-            // Repeats
-        }
-    }
-
-    ## Repeating loop body with differing siblings.
-    parent() {
-        {
-            child_a() {
-                grandchild_a() {}
-            }
-            child_a() {
-                grandchild_b() {}
-            }
-        }
-        // Repeats
-    }
-    parent() {
-        {
-            child_a() {
-                grandchild_a() {}
-            }
-            // Repeats
-            child_a() {
-                grandchild_b() {}
-            }
-            // Repeats
-        }
-        // Repeats
-    }
-    parent() {
-        {
-            child_a() {}
-            child_b() {}
-        }
-        // Repeats
-    }
-    parent() {
-        {
-            child_a() {}
-            // Repeats
-            child_b() {}
-            // Repeats
-        }
-        // Repeats
-    }
-
-
-    >
-    >>
-    // Looks already covered above.
-    parent() {
-        { // Single loop body.
-            sibling_a() {}  // Empty sibling repeating in a loop.
-        }
-    } // Return after a single non-empty loop body.
-    parent() {
-        { // Repeating loop body.
-            sibling_a() {}  // Empty sibling repeating in a loop.
-        }
-        // Loop body repeats 2 time(s).
-    } // Return after a repeating non-empty loop body.
-    parent() {
-        { // Loop
-            sibling_a() {   // Repeating non-empty sibling.
-                child_a() {}
-            }
-        }
-        // repeats 2 time(s).
-    } // Return after a repeating non-empty sibling.
-
-    parent_a() {
-        sibling_a() {}
-        [// sibling_a() repeats 1 time(s).   // sibling_a() {}]
-        sibling_b() {}
-    }
-    parent_b() {
-        { // Loop body start.
-            ?
-        } // Loop body end.
-        [// Loop body repeats 1 time(s).]
-        sibling_a() {}
-    }
-    */
-    // }
 }
