@@ -1,5 +1,30 @@
+# Unsorted
+* Rename `singlethreaded` feature to `single_threaded` (or `single-threaded`). https://en.wikipedia.org/wiki/Thread_(computing)
+* Likely Bug (ivestigate): If the empty loop body (after start) gets interrupted 
+  by a thread context switch, then, upon flush, the loop body start is printed, 
+  but the loop body end is not printed after the context return. See below 
+  the "Loop body start" with no "Loop body end":
+  ```
+  thread 'tests::singlethreaded::empty_calls' panicked at fcl\src\tests.rs:375:13:
+  assertion `left == right` failed
+  right: "parent(calls: ?) {}\n// parent() repeats 6 time(s).\n"  
+  left: "                                                  parent(calls: ?) {}\n  
+      parent(calls: ?) {\n                                                    { // Loop body start.\n
+                           } // parent().\n                                                  // parent() repeats 5 time(s).\n"
+  ```
+* Instructions about how to suppress printing the parameters and return values, 
+  globally, locally (at specific items, at specific time frames, both).
+
 # TODO:
 
+* `user` and `user_all` cases to the tests.
+* Consider making the decorators chainable, such that the CodeLikeDecorator or TreeLikeDecorator 
+  can be followed by
+  * an HtmlDecorator, combined with or followed by HtmlColoringDecorator,
+  * or BashShellColoringDecorator
+  * or PowerShellColoringDecorator (if coloring is supported in PowerShell).
+* Consider renaming WriterAdapter to ThreadSharedWriterAdapter, 
+  since it is only needed for a thread-shared writer case.
 * Bug "Tests fail for feature 'singlethreaded':
   If "user_all\Cargo.toml" uses "singlethreaded"
   ```toml
@@ -25,18 +50,21 @@
     then the CallLoggerArbiter is not needed and the THREAD_LOGGER can be directly pointing 
     to the CallLogInfra (after the type adjustment). Reflect on the chart 
     and in the "The Minimal Writer Optimization" chapter of the mdBook.
-  * 
 * In the docs replace all the `std::io::stdio::stdout()` with the `std::io::stdout()`.
 * Writer opening and closing (to open/close HTML).
-* Why does every thread have a separate Decorator and WriterAdapter? Access to them is exclusive any way.
-  Explain that both in the code and in the docs.
-  Answer: for decorating different threads with different colors with an HTML writer (or to different writers). Document that.
+* Why does every thread have a separate Decorator and WriterAdapter? 
+  Access to them is exclusive any way. Explain that both in the code and in the docs.  
+  Answer: To let user 
+  * decorate the threads differently with different decorators,
+  * to log the threads to different writers,
+  * for decorating different threads with different colors, e.g. for an HTML writer (this can 
+    still be done in the single decorator based on the call graph ID).  
+
+  Document that (separate Decorators are redundand but more flexible).
 * Convert every occurrence to either "stdout and/or stderr" or "stdoutput" or "std output".
 * In .md break-up long lines to short ones.
 * Pseudonode (TODO: Consider -> pseudoroot)
 * Implement endless logging (see "mdBook.md").
-* Double-check the case of a thread switch immediately after the repeat count increment,
-  i.e. there is a non-flushed repeat count that needs to be flushed before the next thread's logging.
 * Double-check all the doc comments with ChatGPT.
 * (Unsorted)
   When FCL can be useful. 
@@ -51,28 +79,6 @@
   The user should know details about how the thread switch picture gets tistorted.
   How large is the distortion? Depends on the code. If there are lengthy fragments without loops and calls, then the distortion is minimal. But the more often the code execution passes through the loop, function, and closure starts and ends the larger is the distortion (and the slow-down because of logging).
 * (Unsorted. Consider) When the overall repeat count reaches MAX, flush the call and clear both the overall and flushed repeat count.
-* (Not completed) Consider moving the thread_local use deeper into the call.
-  Such that a {Call|Closure}Logger is created unconditionally.
-  ```rs
-    #[cfg(feature = "singlethreaded")]
-    let thread_logger_access = quote! {
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            if logger.borrow().borrow().logging_is_on() {
-                optional_callee_logger = Some(fcl::FunctionLogger::new(
-                    #log_closure_name_str, param_val_str))
-            }
-        })
-    };
-    #[cfg(not(feature = "singlethreaded"))]
-    let thread_logger_access = quote! {
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            if logger.borrow().logging_is_on() {
-                optional_callee_logger = Some(fcl::FunctionLogger::new(
-                    #log_closure_name_str, param_val_str))
-            }
-        })
-    };
-  ```
 * Test
   * Testing
     * Basics (from user/main.rs).
@@ -1559,3 +1565,27 @@ fn f() {
   then the flushed repeat count should also increment. Otherwise later there will be 1 extra non-flushed repeat logged.  
   In other words, if upon repeated loop body end the caching is not active,
   then both the overall and flushed repeat counts need to be incremented.
+* (Rejected in order to accelerate when logging is off) Consider moving the thread_local use deeper into the call.
+  Such that a {Call|Closure}Logger is created unconditionally.
+  ```rs
+    #[cfg(feature = "singlethreaded")]
+    let thread_logger_access = quote! {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            if logger.borrow().borrow().logging_is_on() {
+                optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str))
+            }
+        })
+    };
+    #[cfg(not(feature = "singlethreaded"))]
+    let thread_logger_access = quote! {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            if logger.borrow().logging_is_on() {
+                optional_callee_logger = Some(fcl::FunctionLogger::new(
+                    #log_closure_name_str, param_val_str))
+            }
+        })
+    };
+  ```
+* (In a single-mutex approach is handled with `flush()`) Double-check the case of a thread switch immediately after the repeat count increment,
+  i.e. there is a non-flushed repeat count that needs to be flushed before the next thread's logging.
