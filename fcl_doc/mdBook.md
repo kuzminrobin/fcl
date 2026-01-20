@@ -966,3 +966,205 @@ and accessed CallLogInfra 0, the flush, accessing the ThreadGatekeeper/CallLogge
 provide to the ThreadGatekeeper/CallLoggerArbiter the cached updates of the CallLogInfra 0
 (n, n + 2, n + 4), such that 
 the ThreadGatekeeper/CallLoggerArbiter asks for the updates (n + 1, n + 3) from all other CallLogInfra instances, but does not access the mutex of CallLogInfra 0 while that mutex is already locked.
+
+## Testing
+
+By default the different tests run in different threads in parallel. This causes at least two issues.
+But before talking about the issues I need to tell a bit about the approach used.
+
+### The Approach
+
+To test the Function Call Logger the typical test has a group of functions
+marked with the `#[loggable]` attribute. The test replaces the default log writer (that writes to `stdout`) with the vector of bytes `Vec<u8>` (that also implements the `Write` trait). Then the test calls the `#[loggable]` functions, 
+the vector gets the function call log, and the test compares 
+the actual output in the vector with the expected one.  
+Example:
+```rs
+#[test]
+fn basics() {
+  // Create the substitution log writer (mock writer):
+  let log: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+
+  // Substitute the default log writer with the created (mock) one:
+  // Note: the writer is replaced at the decorator stage 
+  // rather than at the THREAD_SHARED_WRITER stage 
+  // because with the `singlethreaded` feature there is no THREAD_SHARED_WRITER.
+  THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+  // The function that during the run generates the function call log:
+  #[loggable]
+  fn f() {}
+
+  // The call to that function (the function call log generation):
+  f();
+
+  // Comparison of the actual output with the expected one:
+  unsafe { 
+    assert_eq!(std::str::from_utf8_unchecked(&*log.borrow()), 
+               "f() {}\n") 
+  };
+}
+```
+The different tests have different sets of the `#[loggable]` functions, and test the different parts 
+of the Function Call Logger.
+
+### The Issues
+Since the tests run in parallel threads the following issues are observed. 
+
+The first issue is that **the tests interrupt each other**. As a result, during some of the runs 
+instead of getting `f() {}` the test (I'll call it _test A_) can get
+```
+f() {
+} // f().
+```
+where after the `{` the thread context is switched 
+to a different thread executing a different test - _test B_.
+The test B starts outputing its own function call log. The Call Logger Arbiter notices that the
+log output has started coming from a different thread, and calls `flush()` for the log of test A, 
+which logs `"\n"` after the `{` in the listing above for test A.
+
+Then the new output by the test B (after the thread context switch) goes to the tests B's 
+mock writer. And when the thread context is switched back to the thread of test A, the test A's 
+log writer gets `} // f().`.
+
+In a more complex case instead of getting
+```
+f() {
+  g() {}
+  // g() repeats 3 time(s).
+}
+// f() repeats 5 time(s).
+```
+the test can get
+```
+f() {
+  g() {}
+  // g() repeats 1 time(s).
+  g() {}
+  // g() repeats 1 time(s).
+}
+// f() repeats 2 time(s).
+f() {
+  g() {}
+  // g() repeats 3 time(s).
+}
+// f() repeats 2 time(s).
+```
+And during each run the output can be different, while the call logic is still the same, i.e. 
+still the same functions are called, in the same order, the same number of times, but the call 
+log looks differently after each run.
+
+The comparison of the actual and the expected output becomes somewhat complicated.
+
+The second issue is that **the tests are executed in different threads**.
+
+The Function Call Logger by defualt assigns different thread indents to different threads.
+For example the `main()` thread is logged starting at the left-most position of the console
+("is logged in the left half of the screen"),
+but a spawned thread will be logged shifted to the right by half of the screen
+("is logged in the right half of the screen"). For example,
+```rs
+// The main() thread's log:
+f() {
+  g() {
+                                  // The spawned thread's log:
+                                  h() {
+                                    i() {}
+                                  }
+  } // g().
+}
+```
+As a result, instead of getting 
+```rs
+h() {
+  i() {}
+}
+```
+the test may get the following during some of the runs
+```rs
+                                  h() {
+                                    i() {}
+                                  }
+
+```
+To solve the issues the first thing I tried was the  `#[serial]` attribute of the [`serial_test`](https://crates.io/crates/serial_test) crate (`serial_test = "3.2.0"`, `serial_test = "3.3.1"`).
+But despite the fact that the documentation promises that the `#[serial]` tests are serialized,
+my tests were still interrupted during some of the runs. 
+
+Another issue with `serial_test` was that it didn't provide any guarantees that the `#[serial]` tests 
+run in the same thread. As a result, during some of the runs I was getting an impression that different threads were created for didfferent tests, then the tests were or might be executed one after another
+(serialized). But one of the tests was "logged shifted to the right by half of the screen". 
+In other words, instead of getting the log
+```
+f() {
+  g() {}
+}
+```
+the test was getting
+```
+                                  f() {
+                                    g() {}
+                                  }
+```
+Having ChatGPT as an ally in the fight with `serial_test` didn't help me to resolve the issues in 1 - 2 days, I gave up.
+
+I still don't know why I observed that the tests were interrupted 
+by a thread context switch between the tests. During the analysis suspicious was the observation 
+that _at most one_ test 
+was failing, i.e. either zero or one test was failing of two or four tests running (plus the doc tests running in some cases). 
+
+If the thread context is switched between the tests forth and back, then I would expect 
+more than one test to lose the thread context, get the `flush()` called, which changes the log output,
+and more than one test to fail, at least in a low percentage of the runs. But I never observed 
+more than one test fail (more than one test lose the thread context).
+
+The tool that helped me to resolve the issue was the single-threaded test execution `--test-threads=1`:  
+`cargo test [-p fcl] -- --test-threads=1`.
+
+Of course, it is possible to write a "more sophisticated" log parser that will figure out the "logic" 
+of the log in all possible cases, and make sure it is correct. But that's not really what I would 
+like to focus on.
+
+### Current conclusion
+
+The defalt test execution 
+`cargo test [-p fcl]`
+fails at the moment. In order to succeed, the tests need to be run with the non-default command
+`cargo test [-p fcl] -- --test-threads=1`.
+
+### Notes for the Future. Multithreaded Tests
+TODO: At the moment of writing the thoughts about testing the actual (desired) multithreaded output,
+combined with `--test-threads=1`, will require the explicit thread spawning in a test, 
+and intercepting the log output at the `THREAD_SHARED_WRITER` stage (where more than one thread's output ends up in one place).  
+
+The "more sophisticated" log analizer will have to be developped any way that will understand 
+that the call "logic" of multiple threads is correct even though during different runs 
+the log looks differently,
+i.e., the thread context switches at different stages of the multithreaded log. For example, one run:
+```rs
+// Test A's log:
+f() {
+  g() {
+                                  // Test B's log:
+                                  h() {
+                                    i() {}
+                                  }
+  } // g().
+}
+```
+Another run:
+```rs
+                                  // Test A's log:
+                                  f() {
+// Test B's log:
+h() {
+  i() {
+                                    g() {
+  } // i().
+} // h().
+                                    } // g().
+                                  }
+```
+So, it may be reasonable to write the "more sophisticated" log analizer _now_ and use for both the single-threaded and multithreaded cases with the default test command `cargo test [-p fcl]`.
+
+Unclear is how to run the tests with FCL's features "singlethreaded" and "minimal_writer" _on_ and _off_. TODO - find out.
