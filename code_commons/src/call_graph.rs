@@ -329,22 +329,17 @@ impl CallGraph {
         let siblings_call_depth = self.call_depth();
         let parent = self.current_node.clone();
         let optional_previous_sibling =
-            // TODO: Consider map(): `parent.borrow().children.last().map(|previous_sibling| previous_sibling.clone())`.
-            if let Some(previous_sibling) = parent.borrow().children.last() {
-                Some(previous_sibling.clone())
-            } else {
-                None
-            };
+            parent.borrow().children.last().map(|previous_sibling| previous_sibling.clone());
 
         // Add new_sibling to the call tree by adding
-        // new_sibling node to the parent's list of children:
+        // `new_sibling` node to the parent's list of children:
         parent
             // self.current_node // parent
             .borrow_mut()
             .children
             .push(new_sibling.clone());
 
-        // But not yet make the new_sibling current.
+        // But not yet make the `new_sibling` current.
 
         // Fork depending on whether the caching is active.
         if !self.caching_is_active() {
@@ -415,7 +410,9 @@ impl CallGraph {
             // Caching is active.
             // If the caching has started at the enclosing loopbody
             // (with optional intermediate enclosing loopbodies in between)
-            // and that loopbody is initial then flush (without flushing the notifiable) and stop caching.
+            // and that loopbody is initial then flush 
+            // (without flushing the notifiable/decorator (TODO: why without?)) 
+            // and stop caching.
             if self.caching_info.model_node.is_none() {
                 self.flush(false); // It also stops caching.
             }

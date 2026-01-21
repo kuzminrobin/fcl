@@ -1,7 +1,9 @@
 # Unsorted
 * Consider `{ // Loop body start` -> `{ // (line_num, col) Loop body start`
 * Rename `singlethreaded` feature to `single_threaded` (or `single-threaded`). https://en.wikipedia.org/wiki/Thread_(computing)
-* Likely Bug (ivestigate): If the empty loop body (after start) gets interrupted 
+* Likely Bug (ivestigate): 
+  When resolving, use the TDD (write the failing test first, that catches the bug, then fix the bug).
+  If the empty loop body (after start) gets interrupted 
   by a thread context switch, then, upon flush, the loop body start is printed, 
   but the loop body end is not printed after the context return. See below 
   the "Loop body start" with no "Loop body end":
@@ -26,7 +28,7 @@
     * fcl/algo_tests_add_ret.rs
     * fcl/algo_tests_add_loopbody_start.rs
     * fcl/algo_tests_add_loopbody_end.rs
-    
+  * stdout, stderr[, panic] sync
   * Macro ({fcl_proc_macros?}/macro_tests*.rs)
     * Parameters (loggable, non_lggable, prefix)
     * Recursion (from mod/impl to functions)
