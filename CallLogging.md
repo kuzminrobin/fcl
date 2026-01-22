@@ -1,4 +1,42 @@
 # Unsorted
+* Cancel/disable instrumentation in the attributed (`#[loggable]`) code. 
+  E.g., the user needs to catch a bug, 
+  the user attributes lots of code with the `#[loggable]` attribute,
+  generates the log, catches and fixes the bug, wants to retain the `#[loggable]` attributes 
+  but to disable the (compile-time) instrumentation 
+  such that the user's code is as small and fast as the non-attributed one (like `#[non_loggable]` one).  
+  Feature "idle"?
+  ```toml
+  [features] 
+  idle = []
+  ```
+  * In `fcl_proc_macros` if the feature is active then the macro `#[loggable]` 
+    just transfers the code from the input to the output without instrumenting it.
+    Like `#[non_loggable]`.
+  * In `fcl` 
+    * either no such a feature - all the global and thread-local expenses are still applicable, 
+      but the functionality is not triggered (what about panic hook and stdoutput caching/syncing?
+      They need to be disabled (or not initialized) which requires the feature support);
+    * or if the feature is active then [no code (or no global and thread-local instances),] 
+      no panic hook and no stdoutput caching/syncing.
+* TODO: Add a way to suppress the param printing.
+  * For a particular `fn`: 
+    * All params: `#[loggable(skip_param[, skip_ret_val])]`, 
+    * Specific params: `#[loggable(skip_param: (param_a, param_d)[, skip_ret_val])]`, `#[loggable(skip_param: b)]`.
+    * Logic: If the actual param is found among the params to skip then it is not logged. In all other cases the actual param is logged.
+      In other words, if the specified param to be skipped is not found among the actual params, then nothing happens. 
+      E.g., if a `fn` has params `a` and `b`, and is marked `#[loggable(skip_param: b)]` (param `b` is not logged),
+      and the user removes the actual param `b` but does not remove `(skip_param: b)`, then the code still compiles successfully.
+  * Consider all other cases before starting the implementation.
+    * (Skipping and Non-skipping _all the params_ is recursive, particular params - is not)
+    * For all the functions vs. For particular functions.
+    * UNsuppress the printing. E.g. suppressed for `impl` but unsuppress for particular funcs.
+    * Temporarily in a stack manner (`push_skip_param`, `pop_skip_param`).
+  * After implementing, review the test `fcl::tests_algo_add_call::single_thread::flush_initial_loopbody`,
+    disable logging the param `log: Rc<RefCell<Vec<u8>>>`.
+* Documentation/"logging the parameters and return values".
+  The printed value may be unexpected. For example the parameter `log: Rc<RefCell<Vec<u8>>>` can be printed as 
+  `log: RefCell { value: [] }`.
 * Consider `{ // Loop body start` -> `{ // (line_num, col) Loop body start`
 * Rename `singlethreaded` feature to `single_threaded` (or `single-threaded`). https://en.wikipedia.org/wiki/Thread_(computing)
 * Likely Bug (ivestigate): 

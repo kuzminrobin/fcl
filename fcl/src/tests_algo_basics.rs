@@ -25,7 +25,7 @@ use crate::CallLogger;
 // The default test run command `cargo test [-p fcl]` fails.
 // Use `--test-threads=1` (`cargo test [-p fcl] -- --test-threads=1`)
 // for reliable test run serialization.
-mod singlethreaded {
+mod single_thread {
     use super::*;
 
     #[test]
