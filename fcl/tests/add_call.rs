@@ -69,12 +69,6 @@ use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 //     }
 //     // Test the log: The whole log above.
 
-// TODO: Consider `mod single_thread` -> `mod add_call::single_thread` for the `cargo test` to add `add_call::` to the log:
-// ```
-// running 4 tests
-// test add_call::single_thread::caching_and_flush ... ok
-// test add_call::single_thread::differs_from_prev_sibling ... ok
-// ```
 mod single_thread {
     use super::*;
 

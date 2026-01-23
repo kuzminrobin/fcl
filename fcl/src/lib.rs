@@ -210,14 +210,3 @@ impl Drop for LoopbodyLogger {
     }
 }
 
-// TODO:
-// #[cfg(test)]
-// mod tests {
-//     mod algo_basics;
-//     mod algo_add_call;
-//     mod algo_add_ret;
-// }
-#[cfg(test)]
-mod tests_algo_basics;
-// #[cfg(test)]
-// mod tests_algo_add_call;
