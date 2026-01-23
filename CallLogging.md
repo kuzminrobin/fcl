@@ -1,4 +1,25 @@
 # Unsorted
+* Bug? The tests fail because of an unknown reason 
+  ```
+  running 14 tests
+  test tests_algo_add_call::single_thread::caching_and_flush ... ok
+  test tests_algo_add_call::single_thread::differs_from_prev_sibling ... FAILED
+  test tests_algo_add_call::single_thread::flush_initial_loopbody ... FAILED
+  test tests_algo_add_call::single_thread::flush_loopbodys_repeat_count ... FAILED
+  test tests_algo_basics::single_thread::basics ... FAILED
+  test tests_algo_basics::single_thread::empty_calls ... FAILED  
+  ```
+  if the feature "singlethreaded" is the default
+  ```toml
+  [features]
+  default = ["singlethreaded"]  #
+  singlethreaded = []
+  ```
+  in "fcl_proc_macros\Cargo.toml", "fcl\Cargo.toml".
+  ```
+  cargo clean
+  cargo test [-p fcl [--lib]] -- --test-threads=1
+  ```
 * Cancel/disable instrumentation in the attributed (`#[loggable]`) code. 
   E.g., the user needs to catch a bug, 
   the user attributes lots of code with the `#[loggable]` attribute,

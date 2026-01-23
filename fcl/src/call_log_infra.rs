@@ -199,7 +199,8 @@ struct OutputSync {
 
 /// The arbiter that synchronizes the output to the writer by multiple threads
 /// and user code's `stdout` and `stderr` output.
-pub struct CallLoggerArbiter { // TODO: Consider -> Arbiter or SyncArbiter (Synchronization Arbiter)
+pub struct CallLoggerArbiter {
+    // TODO: Consider -> Arbiter or SyncArbiter (Synchronization Arbiter)
     /// Collection of thread loggers and thread indent IDs used by the corresponding threads.
     thread_loggers: HashMap<thread::ThreadId, (Box<dyn CallLogger>, ThreadIndentId)>, // TODO: thread_loggers -> thread_log_info?
     /// The ID of the last thread that was updating its log.
@@ -404,29 +405,50 @@ impl CallLoggerArbiter {
             match (*CALL_LOGGER_ARBITER).try_borrow_mut() {
                 Ok(_arbiter) => arbiter = Some(_arbiter),
                 Err(_e) => {
-                    const SYNC_MSG: &str = &"FCL failed to synchronize its cache and buffers with the panic report";
+                    const SYNC_MSG: &str =
+                        &"FCL failed to synchronize its cache and buffers with the panic report";
                     const DEBUGGER_MSG: &str = &"If the panic report is not shown, attach the debugger to see the panic details";
+                    const THREAD_PANICKED: &str = &"thread has panicked";
+
+                    fn get_thread_name_and_id() -> String {
+                        format!(
+                            "{} ({:?})",
+                            if let Some(name) = thread::current().name() {
+                                format!("\"{}\"", name)
+                            } else {
+                                String::from("non-named")
+                            },
+                            thread::current().id(),
+                        )
+                    }
+
                     match (*THREAD_SHARED_WRITER).try_borrow_mut() {
                         Ok(mut writer) => {
                             let _ignore_write_error = writeln!(
                                 writer,
-                                "{} '{}'.\n{}. {}.",
-                                "While FCL was busy (arbiter borrowed) one of the threads has panicked:",
+                                "{} {} {}: '{}'.\n{}. {}.",
+                                "While FCL was busy (arbiter borrowed) the",
+                                get_thread_name_and_id(),
+                                THREAD_PANICKED,
                                 panic_hook_info,
                                 SYNC_MSG,
                                 DEBUGGER_MSG
                             );
                         }
                         Err(_e) => {
-                            const DOUBLE_BUSY_MSG: &str = "While FCL was busy (arbiter and writer borrowed) one of the threads has panicked:";
                             let msg = format!(
-                                "{} '{}'.\n{}. {}.",
-                                DOUBLE_BUSY_MSG, panic_hook_info, SYNC_MSG, DEBUGGER_MSG
+                                "{} {} {}: '{}'.\n{}. {}.",
+                                "While FCL was busy (arbiter and writer borrowed) the",
+                                get_thread_name_and_id(),
+                                THREAD_PANICKED,
+                                panic_hook_info,
+                                SYNC_MSG,
+                                DEBUGGER_MSG
                             );
-                            let stdout_msg = format!("(stdout) {}", &msg);
+                            let stdout_msg = format!("(stdout copy) {}", &msg);
                             println!("{}", &stdout_msg);
 
-                            let stderr_msg = format!("(stderr) {}", &msg);
+                            let stderr_msg = format!("(stderr copy) {}", &msg);
                             eprintln!("{}", &stderr_msg);
                         }
                     }
@@ -750,22 +772,23 @@ impl CallLogger for CallLoggerArbiter {
 }
 
 /// Global arbiter instance shared by all the threads.
-pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> = // TODO: Consider -> ARBITER or SYNC_ARBITER or OUTPUT_ARBITER.
+pub static mut CALL_LOGGER_ARBITER: LazyLock<Rc<RefCell<CallLoggerArbiter>>> =
+    // TODO: Consider -> ARBITER or SYNC_ARBITER or OUTPUT_ARBITER.
     LazyLock::new(|| {
-        Rc::new(RefCell::new({
-            #[cfg(not(feature = "minimal_writer"))]
-            let arbiter = {
-                let mut arbiter =
-                    unsafe { CallLoggerArbiter::new(Some((*THREAD_SHARED_WRITER).clone())) };
-                arbiter.set_std_output_sync();
-                arbiter.set_panic_sync();
+            Rc::new(RefCell::new({
+                #[cfg(not(feature = "minimal_writer"))]
+                let arbiter = {
+                    let mut arbiter =
+                        unsafe { CallLoggerArbiter::new(Some((*THREAD_SHARED_WRITER).clone())) };
+                    arbiter.set_std_output_sync();
+                    arbiter.set_panic_sync();
+                    arbiter
+                };
+                #[cfg(feature = "minimal_writer")]
+                let arbiter = CallLoggerArbiter::new();
                 arbiter
-            };
-            #[cfg(feature = "minimal_writer")]
-            let arbiter = CallLoggerArbiter::new();
-            arbiter
-        }))
-    });
+            }))
+        });
 
 /// Global instance for saving the default panic hook.
 ///
@@ -783,10 +806,10 @@ pub mod instances {
     use super::*;
     thread_local! {
         /// Thread-local decorator.
-        /// 
+        ///
         /// Used by the tests to repace the default writer with the one that enables the analysis
         /// against the expected values.
-        /// 
+        ///
         /// To be used by the users to replace the default writer with the custom one.
         // TODO: Update the chart with this info.
         pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {
@@ -825,18 +848,19 @@ pub mod instances {
     use crate::multithreaded::*;
     /// Shared by all the threads global thread synchronization primitive
     /// for accessing the thread-shared `CallLoggerArbiter` instance.
-    static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> = // TODO: Consider -> ARBITER_GATEKEEPER
+    static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> =
+        // TODO: Consider -> ARBITER_GATEKEEPER
         LazyLock::new(|| unsafe {
-            Arc::new(Mutex::new(ThreadGatekeeper::new(
-                (*CALL_LOGGER_ARBITER).clone(),
-            )))
-        });
+                Arc::new(Mutex::new(ThreadGatekeeper::new(
+                    (*CALL_LOGGER_ARBITER).clone(),
+                )))
+            });
     thread_local! {
         /// Thread-local decorator.
-        /// 
+        ///
         /// Used by the tests to repace the default writer with the one that enables the analysis
         /// against the expected values.
-        /// 
+        ///
         /// To be used by the users to replace the default writer with the custom one.
         // TODO: Update the chart with this info.
         pub static THREAD_DECORATOR: Rc<RefCell<dyn LogDecorator>> = unsafe {

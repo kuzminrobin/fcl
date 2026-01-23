@@ -13,5 +13,6 @@ fcl_proc_macros = { path = "../fcl_proc_macros" }
 #serial_test = "3.3.1"
 
 [features]
+# default = ["singlethreaded"]
 singlethreaded = []
 minimal_writer = [ "singlethreaded" ]
