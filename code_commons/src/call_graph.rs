@@ -497,6 +497,7 @@ impl CallGraph {
             self.current_node = self.call_stack.last().unwrap().clone();
         } else {
             // Otherwise (caching is active) {
+            // TODO: Consider `self.call_stack.pop().unwrap()` -> `{self.call_stack.pop(); self.current_node}` (to get rid of the `unwrap()`).
             let returning_sibling = self.call_stack.pop().unwrap();
             returning_sibling.borrow_mut().has_ended = true;
             let parent_or_pseudo = self.call_stack.last().unwrap();
