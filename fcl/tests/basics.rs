@@ -3,10 +3,9 @@ use std::rc::Rc;
 
 use fcl_proc_macros::loggable;
 
-use crate as fcl;
-use crate::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
+use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 #[cfg(feature = "singlethreaded")]
-use crate::CallLogger;
+use fcl::CallLogger;
 
 // By default the tests run in parallel in different threads. That is why they affect each other's log.
 // In particular the log becomes multithreaded, i.e. some tests' log is thread-indented, some function calls
@@ -69,10 +68,6 @@ mod single_thread {
         {
             #[loggable]
             mod t {
-                // NOTE: 
-                // The `use super::fcl` below is added since the tests are inside of `fcl` iteself.
-                // The user does not have to add "use super::fcl" below. TODO (make sure).
-                use super::fcl; // `#[loggable]` adds items referring `fcl`.
                 fn f(p1: usize, p2: bool) -> f32 {
                     -1.01
                 }

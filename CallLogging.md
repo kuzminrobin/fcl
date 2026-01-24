@@ -20,12 +20,12 @@
   cargo clean
   cargo test [-p fcl [--lib]] -- --test-threads=1
   ```
-* Cancel/disable instrumentation in the attributed (`#[loggable]`) code. 
+* Disable instrumentation in the `#[loggable]` code. 
   E.g., the user needs to catch a bug, 
-  the user attributes lots of code with the `#[loggable]` attribute,
-  generates the log, catches and fixes the bug, wants to retain the `#[loggable]` attributes 
-  but to disable the (compile-time) instrumentation 
-  such that the user's code is as small and fast as the non-attributed one (like `#[non_loggable]` one).  
+  the user annotates lots of code with the `#[loggable]` attribute,
+  generates the log, catches and fixes the bug, 
+  then wants to retain the `#[loggable]` attributes  but to disable the (compile-time) instrumentation 
+  such that the user's code is _as small and fast_ as the non-annotated one (like `#[non_loggable]` one).  
   Feature "idle"?
   ```toml
   [features] 
