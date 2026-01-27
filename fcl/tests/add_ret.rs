@@ -1,63 +1,215 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use fcl::call_log_infra::instances::THREAD_DECORATOR;
-// use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 use fcl_proc_macros::loggable;
+#[cfg(feature = "singlethreaded")]
+use fcl::CallLogger;
+use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 
 // By the moment of `code_commons::call_graph::CallGraph::add_ret()` (being tested in this file)
 // the call graph state (and the terminology) is:
-// parent { // The call or the loop body.
+// parent { // The call or the loop body that encloses the call of interest.
 //     [...] // Brackets (`[]`) by default mean "optional".
 //
-//     [previous_sibling() {...} // If caching is active then this is the "caching model node".
-//      [// previous_sibling() repeats 99 time(s). // Not yet flushed (if caching is active).]] // NOTE: The returning function (below)
-//                                                  // can get removed and increment this repreat count (if caching is active).
+//     [previous_sibling() {...} // If caching has started upon the call of interest (returning_sibling()) below then this is the "caching model node".
+//      [// previous_sibling() repeats 99 time(s).  // Not yet flushed if caching is active.]] // NOTE: The returning function 
+//                                                  // (returning_sibling() below)
+//                                                  // can get removed and increment this repreat count, if caching is active.
 //     || (or)
-//     [{ // Loop body start. Caching is not active (since the function call after a loop body cannot trigger caching).
+//     [{ // Loop body start. Caching is either not active (since the function call after a loop body cannot trigger caching) 
+//                                                  // or is active and has started at the parent or earlier level.
 //          child() {...}
 //          [// child() repeats 10 time(s).]
 //      } // Loop body end.
-//      [// Loop body repeats 6 time(s). // Flushed (since caching is not active).]]
+//      [// Loop body repeats 6 time(s). // Flushed (if caching is not active).]]
 //
+//     // The function of interest:
 //     returning_sibling() { // Current node. call_stack: [..., parent (if it's a call), returning_sibling]. // Brackets (`[]`) in this line mean {array|vector|etc.}
 //        [... // Nested calls (children).
 //         [// last_child() repeats 9 time(s). // Not yet flushed. ]]
 //     } // The `return` of interest, that's being handled in `add_ret()` under test.
 
-// High-level logic to test (at the moment of the return of interest):
+// High-level logic to test (at the moment of the `return` of interest):
 // ---------------
 // A: If caching is not active {
-// A:     Log the repeat count, if non-zero, of the last_child, if present.
-// A:     Log the return of the returning_sibling.
+// A:     Log the repeat count, if non-zero, of the last_child(), if present.
+// A:     Log the return of the returning_sibling().
 // A: } else { // (caching is active)
-//      If there exists a previous_sibling, then {
-//          The call subtree of the returning_sibling is compared recursively
-//          to the previous_sibling's call subtree.
-//          If the call subtrees are equal {
-//              the previous sibling's repeat count is incremented,
-//              and the returning_sibling's call subtree is removed from the call graph.
-//              If the previous sibling is the caching model node then
-//                  caching is over, i.e. the caching model becomes `None`.
-//              else (caching started at a parent level or above)
-//                  do nothing.
-//          } else { // The call subtrees are different.
-//              (Caching is active, there is the previous_sibling)
-//              The returning_sibling's and previous_sibling's subtrees differ
-//              (either by name, if caching started at parent or earlier,
-//              or by children, if the previous_sibling is the cahing model node).
-//              If the previous_sibling is the cahing model node then {
-//                  Log the previous_sibling's repeat count, if non-zero,
-//                  Log the subtree of the returning_sibling,
-//                  Stop caching.
-//              }
-//          }
+// D:     If there exists a previous_sibling(), then {
+// D:         The call subtree of the returning_sibling is compared recursively
+// D:         to the previous_sibling's call subtree.
+// D:         If the call subtrees are equal {
+// D:             the previous sibling's repeat count is incremented,
+// D:             and the returning_sibling's call subtree is removed from the call graph.
+// D:             If the previous sibling is the caching model node then
+// D:                 caching is over, i.e. the caching model becomes `None`.
+// C:             else (caching started at a parent level or above)
+// C:                 do nothing.
+// D:         } else { // The call subtrees are different.
+// D:             (Caching is active, there is the previous_sibling)
+// D:             The returning_sibling's and previous_sibling's subtrees differ
+// [TODO:]        (either by name, if caching started at parent or earlier,
+// D:             or by children, if the previous_sibling is the cahing model node).
+// D:             If the previous_sibling is the cahing model node then {
+// D:                 Log the previous_sibling's repeat count, if non-zero,
+// D:                 Log the subtree of the returning_sibling,
+// D:                 Stop caching.
+// D:             }
+// D:         }
 // B:      } // else (no previous_sibling, the returning_sibling is the only child of parent) {
 // B:          continue caching (do nothing). The caching end cannot be detected upon return from the only child.
 // B:      }
 // B: }
 
 // Test cases:
+
+#[test]
+fn ret_from_cached_func() {
+    // The instrumented functions that will generate the call log:
+    #[loggable]
+    fn child() {}
+    #[loggable]
+    fn sibling(third_call: bool) {
+        child();
+        child(); // Generates the repeat count in the call log.
+        if third_call { // Generates the difference between the calls to `sibling()`.
+            child();
+        }
+    }
+    // TODO: Suppress the `log` param logging when the suppression is implemented.
+    #[loggable]
+    fn parent(third_child_call: bool, /*parent_number: usize,*/ log: Rc<RefCell<Vec<u8>>>) {
+        sibling(false); // Original.
+
+        sibling(false); // Repeats.
+        // Assert: The log above, except the sibling's repeat count, is in the call log:
+        #[rustfmt::skip]
+        unsafe {
+            let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+            assert_eq!(
+                log_contents,
+                if third_child_call {
+                    concat!(
+                        "parent(third_child_call: true, log: RefCell { value: [] }) {\n", // Original.
+                        "  sibling(third_call: false) {\n",  // Original.
+                        "    child() {}\n",
+                        "    // child() repeats 1 time(s).\n",
+                        "  } // sibling().\n",
+                        // No repeat count.
+                    ) 
+                } else {
+                    concat!(
+                        "parent(third_child_call: false, log: RefCell { value: [] }) {\n", // Original.
+                        "  sibling(third_call: false) {\n",  // Original.
+                        "    child() {}\n",
+                        "    // child() repeats 1 time(s).\n",
+                        "  } // sibling().\n",
+                        // No repeat count.
+                    ) 
+                }
+            )
+        };
+        
+        sibling(third_child_call); // Of interest. The return under test.
+        if ! third_child_call { // All siblings are equal.
+            // Assert: (If siblings above are equal then) no latest sibling and no previous sibling's repeat count in the call log:
+            #[rustfmt::skip]
+            unsafe {
+                let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+                assert_eq!(
+                    log_contents,
+                    concat!(
+                        "parent(third_child_call: false, log: RefCell { value: [] }) {\n", // Original.
+                        "  sibling(third_call: false) {\n",  // Original.
+                        "    child() {}\n",
+                        "    // child() repeats 1 time(s).\n",
+                        "  } // sibling().\n",
+                        // No repeat count.
+                    ) 
+                )
+            };
+        } else { // The latest sibling is different.
+            // Assert: (the siblings above differ) the whole log above.
+            #[rustfmt::skip]
+            unsafe {
+                let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+                assert_eq!(
+                    log_contents,
+                    concat!(
+                        "parent(third_child_call: true, log: RefCell { value: [] }) {\n",     // Original.
+                        "  sibling(third_call: false) {\n",  // Original.
+                        "    child() {}\n",
+                        "    // child() repeats 1 time(s).\n",
+                        "  } // sibling().\n",
+                        "  // sibling() repeats 1 time(s).\n",                          // Repeats.
+                        "  sibling(third_call: true) {\n",                              // Of interest. The return under test.
+                        "    child() {}\n",
+                        "    // child() repeats 2 time(s).\n", // The difference from the previous siblings.
+                        "  } // sibling().\n",
+                    ) 
+                )
+            };
+        }
+    }
+
+    // Mock log writer creation and substitution of the default one:
+    let log: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+    // The call log generation and some of the checks:
+
+    // All siblings are equal:
+    parent(false, log.clone()); 
+    // Assert: the whole log above:
+    #[rustfmt::skip]
+    unsafe {
+        let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+        assert_eq!(
+            log_contents,
+            concat!(
+                "parent(third_child_call: false, log: RefCell { value: [] }) {\n",
+                "  sibling(third_call: false) {\n",  // Original.
+                "    child() {}\n",
+                "    // child() repeats 1 time(s).\n",
+                "  } // sibling().\n",
+                "  // sibling() repeats 2 time(s).\n", // All siblings are equal.
+                "} // parent().\n",
+            ) 
+        )
+    };
+
+    // Prepare the log for one more test, for that:
+    // Prevent the subsequent `parent()` caching by calling an unrelated function:
+    #[loggable]
+    fn dummy() {}
+    dummy();
+    // Clear the log:
+    log.borrow_mut().clear();
+
+    // The sibling of interest is different:
+    parent(true, log.clone()); 
+    // Assert: the whole log above:
+    #[rustfmt::skip]
+    unsafe {
+        let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+        assert_eq!(
+            log_contents,
+            concat!(
+                "parent(third_child_call: true, log: RefCell { value: [] }) {\n",
+                "  sibling(third_call: false) {\n",  // Original.
+                "    child() {}\n",
+                "    // child() repeats 1 time(s).\n",
+                "  } // sibling().\n",
+                "  // sibling() repeats 1 time(s).\n",
+                "  sibling(third_call: true) {\n",          // The sibling of interest is different.
+                "    child() {}\n",
+                "    // child() repeats 2 time(s).\n",      // The difference from the previous siblings.
+                "  } // sibling().\n",
+                "} // parent().\n",
+            ) 
+        )
+    };
+}
 
 // A: `no_caching_child_repeats`:
 // [previous_sibling() {}] // Doesn't exist or has different name, i.e. caching is not active.
@@ -224,6 +376,143 @@ fn caching_continues_after_the_only_sibling() {
                 "  returning_sibling() {}\n", // Upon this return the caching continues. 
                 "} // repeating_parent().\n", // (Not the subject of this test) Upon this return the second repeating_parent() gets flushed. 
             )
+        )
+    };
+}
+
+// C: `repeated_parent()`
+// D: `ret_from_cached_func()`
+// C:    [parent() { .. } // Optional previous parent(), for the cases when caching starts at the repeated parent() below.
+// C:    [// Repeats n time(s)]]
+// C: D: parent() {
+// C: D:      [sibling() { .. } // Optional sibling for the cases when caching starts upon the call of interest below.
+// C: D:      [// Repeats n time(s)]]
+// C: D:      // assert_eq!(): 
+// C:             If caching started at parent then there is no current (latest) parent in the call log.
+//    D:          otherwise the log above, except the sibling's repeat count, is in the call log.
+// C: D:      sibling() { // The call of interest.
+// C: D:          [..
+// C: D:           [// Repeats]]
+// C: D:      } // The return under test.
+// C: D:      // assert_eq!(): 
+// C:             If caching started at parent then there is no current (latest) parent in the call log.
+//    D:          otherwise
+//    D:              if there is a previous sibling then
+//    D:                  if siblings above are equal then no latest sibling and no previous sibling's repeat count in the call log.
+//    D:                  otherwise (the siblings above differ) the whole log above.
+//    -               otherwise (no previous sibling)
+//    -                   Tested in test B. Do nothing in this test.
+// C: D: }
+// C:    // Flush the log (flush the `parent()` repeat count to the call log).
+// C: D: // assert_eq!(): 
+// C:         If caching started at parent then 
+// [TODO:]        if parents differ then the whole log above,
+// C:             otherwise 
+// C:                 parent() { .. }
+// C:                 // Repeats n+1 time(s).     // The key fragment: `n+1`. 
+//    D:      otherwise (caching didn't start at parent)
+//    D:          the whole log above.
+#[test]
+fn repeated_parent() {
+    // The instrumented functions that will generate the call log:
+    #[loggable]
+    fn child() {}
+    #[loggable]
+    fn sibling() {
+        child();
+        child(); // Repeats (generates the repeat count in the call log). 
+    }
+    // TODO: Suppress the `log` param logging when the suppression is implemented.
+    #[loggable]
+    fn parent(parent_number: usize, log: Rc<RefCell<Vec<u8>>>) {
+        sibling(); // Original.
+
+        sibling(); // Repeats.
+        if parent_number == 2 {
+            // Caching started at parent, there is no current (latest) parent in the call log.
+            #[rustfmt::skip]
+            unsafe {
+                let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+                assert_eq!(
+                    log_contents,
+                    concat!(
+                        "parent(parent_number: 0, log: RefCell { value: [] }) {\n", // Original.
+                        "  sibling() {\n",
+                        "    child() {}\n",
+                        "    // child() repeats 1 time(s).\n",
+                        "  } // sibling().\n",
+                        "  // sibling() repeats 2 time(s).\n",
+                        "} // parent().\n",
+                        // There is no previous parent's repeat count in the call log.
+                        // There is no current (latest) parent in the call log.
+                    ) 
+                )
+            };
+        }
+
+        sibling(); // Of interest. The return under test.
+        if parent_number == 2 {
+            // Caching started at parent, there is no current (latest) parent in the call log.
+            #[rustfmt::skip]
+            unsafe {
+                let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+                assert_eq!(
+                    log_contents,
+                    concat!(
+                        "parent(parent_number: 0, log: RefCell { value: [] }) {\n", // Original.
+                        "  sibling() {\n",
+                        "    child() {}\n",
+                        "    // child() repeats 1 time(s).\n",
+                        "  } // sibling().\n",
+                        "  // sibling() repeats 2 time(s).\n",
+                        "} // parent().\n",
+                        // There is no previous parent's repeat count in the call log.
+                        // There is no current (latest) parent in the call log.
+                    ) 
+                )
+            };    
+        }
+    }
+
+    // Mock log writer creation and substitution of the default one:
+    let log: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+    // The call log generation and some of the checks:
+    //   (The argument `log.clone()` below is only applocable to the third call to `parent()`.
+    //   For the other calls the arg `Rc::new_uninit()` woul be more efficient.
+    //   But to avoid the copy-paste errors, enable the experimenting with the tests and the future extension
+    //   the arg `log.clone()` has been used for all the calls)
+    parent(0, log.clone());   // Original.
+    parent(1, log.clone());   // Repeats.
+    parent(2, log.clone());   // Of interest.
+
+    // Flush the log (flush the `parent()` repeat count to the call log).
+    THREAD_LOGGER.with(|logger| {
+        #[cfg(feature = "singlethreaded")]
+        let logger = logger.borrow_mut();
+
+        logger.borrow_mut().flush();
+    });
+
+    // Assert:
+    //      parent() { .. }
+    //      // Repeats n+1 time(s).     // The key fragment: `n+1`. 
+    #[rustfmt::skip]
+    unsafe {
+        let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+        assert_eq!(
+            log_contents,
+            concat!(
+                "parent(parent_number: 0, log: RefCell { value: [] }) {\n", // Original.
+                "  sibling() {\n",
+                "    child() {}\n",
+                "    // child() repeats 1 time(s).\n",
+                "  } // sibling().\n",
+                "  // sibling() repeats 2 time(s).\n",
+                "} // parent().\n",
+                "// parent() repeats 2 time(s).\n",      // Repeats `n+1` times.
+            ) 
         )
     };
 }
