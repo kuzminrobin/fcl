@@ -23,6 +23,21 @@ macro_rules! NO_LOGGER_ERR_STR {
     };
 }
 
+/// A macro that panics with `debug_assert!(false, ...)` with the message about an unexpected absence of a logger.
+/// 
+/// At the moment of writing certain functions can only be called from the instrumented running user's code,
+/// but not from the panic hook who is the only one who can remove the current thread's logger.
+/// That's why the logger must always exist during such functions and they must never get to this macro invocation.
+/// 
+/// If the logger is removed (or not added, etc.) then some invariant is violated, the program state is unexpected/corrupt, 
+/// such functions can panic ASAP (even though the FCL's mutex is locked, the arbiter is borrowed, etc.)
+/// by invoking this macro.
+macro_rules! LOGGER_LACK_PANIC {
+    () => {
+        debug_assert!(false, NO_LOGGER_ERR_STR!());
+    }
+}
+
 /// Per-thread instance of the call logging infrastructure.
 ///
 /// Contians the call graph, logging enabling/diabling mechanism, and some other thread-specific functionality.
@@ -89,6 +104,9 @@ impl CallLogger for CallLogInfra {
     }
     fn log_loopbody_end(&mut self) {
         self.call_graph.add_loopbody_end()
+    }
+    fn log_loop_end(&mut self) {
+        self.call_graph.add_loop_end()
     }
 }
 
@@ -274,7 +292,10 @@ impl CallLoggerArbiter {
             }
 
             if self.thread_loggers.remove(&current_thread_id).is_none() {
-                debug_assert!(false, "Internal Error: Unregistering failed");
+                // The current function is the exception regarding the invocation of the macro below 
+                // since this function is called by the panic hook. 
+                // But the function still must never end up here. Thus the macro invocation below is applicable.
+                LOGGER_LACK_PANIC!();
             }
             self.thread_indents.check_in(thread_indent_id);
         } // else (no logger) the logger for the current thread is assumed 
@@ -554,7 +575,7 @@ impl CallLoggerArbiter {
                 if let Some((logger, ..)) = self.get_thread_logger(last_fcl_update_thread) {
                     logger.flush();
                 } else {
-                    debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+                    LOGGER_LACK_PANIC!();
                 }
 
                 // Flush the previous (and current) thread's buffered std output, if any:
@@ -600,7 +621,7 @@ impl CallLoggerArbiter {
                     if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
                         logger.flush();
                     } else {
-                        debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+                        LOGGER_LACK_PANIC!();
                     }
                 }
                 // Flush the buffered stderr output (to the original stderr):
@@ -664,28 +685,29 @@ impl CallLogger for CallLoggerArbiter {
         if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
             logger.push_logging_is_on(is_on);
         } else {
-            debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
         }
     }
     fn pop_logging_is_on(&mut self) {
         if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
             logger.pop_logging_is_on();
         } else {
-            debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
         }
     }
     fn logging_is_on(&self) -> bool {
         if let Some((logger, ..)) = self.thread_loggers.get(&thread::current().id()) {
             return logger.logging_is_on();
         } else {
-            panic!(NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
+            false
         }
     }
     fn set_logging_is_on(&mut self, is_on: bool) {
         if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
             logger.set_logging_is_on(is_on);
         } else {
-            debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
         }
     }
 
@@ -693,7 +715,7 @@ impl CallLogger for CallLoggerArbiter {
         if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
             logger.set_thread_indent(thread_indent);
         } else {
-            debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
         }
     }
 
@@ -705,7 +727,7 @@ impl CallLogger for CallLoggerArbiter {
         if let Some((logger, ..)) = self.get_thread_logger(current_thread_id) {
             logger.log_call(name, param_vals);
         } else {
-            debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
         }
         self.last_fcl_update_thread = Some(current_thread_id);
     }
@@ -745,7 +767,7 @@ impl CallLogger for CallLoggerArbiter {
         if let Some((logger, ..)) = self.get_thread_logger(current_thread_id) {
             logger.log_loopbody_start();
         } else {
-            debug_assert!(false, NO_LOGGER_ERR_STR!()); // TODO: Describe in details what happens upon panic (from the point of view of a locked mutex and borrowed arbiter and wrtier).
+            LOGGER_LACK_PANIC!();
         }
         self.last_fcl_update_thread = Some(current_thread_id);
     }
@@ -769,6 +791,16 @@ impl CallLogger for CallLoggerArbiter {
         // of the panicking thread.
         // Do nothing (suppress the fake loopbody end logging).
     }
+    fn log_loop_end(&mut self) {
+        let current_thread_id = thread::current().id();
+        if let Some((logger, ..)) = self.get_thread_logger(current_thread_id) {
+            logger.log_loop_end();
+        } else {
+            LOGGER_LACK_PANIC!();
+        }
+        self.last_fcl_update_thread = Some(current_thread_id);
+    }
+
 }
 
 /// Global arbiter instance shared by all the threads.

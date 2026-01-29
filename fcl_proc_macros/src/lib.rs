@@ -425,7 +425,7 @@ fn quote_as_expr_closure(
         {
             use fcl::{CallLogger, MaybePrint};
 
-            let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { // NOTE: The `logger` is used in `logging_is_on`.
                 // NOTE: Borrows the params, has to be in front of the `body`
                 // that moves the params to the `body` closure.
                 //
@@ -449,10 +449,12 @@ fn quote_as_expr_closure(
                 // Execute the body and catch the return value:
                 let ret_val = body();
 
-                // Uncondititonally print what closure returns
-                // since if its return type is not specified explicitly
+                // Uncondititonally tell the `callee_logger` what closure returns,
+                // since if the closure's return type is not specified explicitly
                 // then the return type is determined with the type inference
                 // which is not available now at pre-compile (preprocessing) time.
+                // In other words, at pre-compile time we don't know for sure
+                // if {the closure return type is the unit type `()` and the return value logging can be skipped}.
                 let ret_val_str = format!("{}", ret_val.maybe_print());
                 callee_logger.set_ret_val(ret_val_str);
 
@@ -521,7 +523,18 @@ fn quote_as_expr_for_loop(
     }
     let expr = quote_as_expr(&**expr, None, prefix);
     let body = quote_as_loop_block(body, prefix);
-    quote! { #(#attrs)* #label #for_token #pat #in_token #expr #body }
+    quote! {
+        {
+            let loop_result = { // At the moment of writing the unit value `()` is the only known possible value returnable by `for` loop.
+                #(#attrs)* #label #for_token #pat #in_token #expr #body
+            };
+
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
+                logger.borrow_mut().log_loop_end());
+
+            loop_result
+        }
+    }
 }
 fn quote_as_expr_group(
     expr_group: &ExprGroup,
@@ -2398,12 +2411,12 @@ fn quote_as_loop_block(
     quote! {
         {
             // For now I intentionally leave this reading in every loop iteration
-            // so that the user can filter out some iterations from the log 
+            // so that the user can filter out some iterations from the log
             // by enabling/disabling the logging during the iterations.
-            // 
-            // To accelerate, this reading can be placed in front of the loop 
-            // (but the check `if logging_is_on` still needs to be in every iteration), 
-            // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`), 
+            //
+            // To accelerate, this reading can be placed in front of the loop
+            // (but the check `if logging_is_on` still needs to be in every iteration),
+            // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`),
             // and at the end of that scope the `logging_is_on` dies.
             let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { #logging_is_on });
 
@@ -2418,11 +2431,11 @@ fn quote_as_loop_block(
 
             // Execute the loop body
             // (and optionally return a value upon `break <value>` in case of the `loop`):
-            // 
-            // NOTE: The `#stmts` cannot be moved to a closure (as it is done for the body of functions and closures) 
+            //
+            // NOTE: The `#stmts` cannot be moved to a closure (as it is done for the body of functions and closures)
             // because `break [<value>]` cannot be executed in a closure (compilation error).
             { // NOTE: This extra scope is to isolate the outer (FCL's) `_loopbody_logger`, `logging_is_on` and possible inner (user's) ones.
-                #stmts 
+                #stmts
             }
 
             // The loop body end is logged in the destructor of `LoopbodyLogger` instance.

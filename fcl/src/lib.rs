@@ -87,6 +87,8 @@ pub trait CallLogger {
     fn log_loopbody_start(&mut self);
     /// Updates the call graph of the calling thread with a loop body end and potentially logs that end.
     fn log_loopbody_end(&mut self);
+    /// Updates the call graph of the calling thread with a loop end, e.g. to avoid treating the adjacent loops as one loop.
+    fn log_loop_end(&mut self);
 }
 
 /// A trait to be used for logging the parameters and return values.

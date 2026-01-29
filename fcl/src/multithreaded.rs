@@ -164,7 +164,9 @@ impl CallLogger for ThreadGatekeeper {
     fn log_loopbody_end(&mut self) {
         self.call_logger_arbiter.borrow_mut().log_loopbody_end()
     }
-    // fn log_loop_end(&mut self);
+    fn log_loop_end(&mut self) {
+        self.call_logger_arbiter.borrow_mut().log_loop_end()
+    }
     // fn set_loop_ret_val(&mut self, ret_val: String);
 }
 
@@ -237,5 +239,8 @@ impl CallLogger for ThreadGateAdapter {
     }
     fn log_loopbody_end(&mut self) {
         self.get_gatekeeper().log_loopbody_end()
+    }
+    fn log_loop_end(&mut self) {
+        self.get_gatekeeper().log_loop_end()
     }
 }

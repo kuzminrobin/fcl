@@ -6,7 +6,7 @@ fn basics() {
     fn f() {}
 
     #[loggable]
-    fn loop_container() {
+    fn loop_instrumenter() {
         let mut result = 0;
         let loop_result = for i in 0..4 {
             result += i;
@@ -21,5 +21,24 @@ fn basics() {
         assert_eq!(loop_result, ());
     }
 
-    loop_container();
+    loop_instrumenter();
+}
+
+#[test]
+fn adjacent_loops() {
+    #[loggable]
+    fn f() {}
+    #[loggable]
+    fn loop_instrumenter() {
+        // Two adjacent identical loops:
+        for _ in 0..2 {
+            f()  
+        }
+        for _ in 0..3 {
+            f()  
+        }
+        // They must not be shown as one loop.
+    }
+
+    loop_instrumenter()
 }
