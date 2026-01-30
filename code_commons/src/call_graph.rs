@@ -283,7 +283,7 @@ pub struct CallGraph {
     current_node: Link,
 
     /// Contains the info necessary for caching the calls before logging.
-    /// The cache is used for repeated call or empty loop body removal.
+    /// The cache is used for repeated call or childless loop body removal.
     /// The cache is flushed upon thread context switch or synchronization with the
     /// instrumented user code's own std output and panic hook output.
     caching_info: CachingInfo,
@@ -933,7 +933,7 @@ impl CallGraph {
         //     }
         //     otherwise (the last loopbody is already marked as `ends_the_loop: true`) {
         //         // The last loopbody belongs to the previous loop that has already ended.
-        //         // The currently ending loop has no survived loop bodies (they are all empty and have been removed).
+        //         // The currently ending loop has no survived loop bodies (they are all childless and have been removed).
         //         Do nothing.
         //     }
         // }
@@ -1033,7 +1033,7 @@ impl CallGraph {
             self.flush_tree(&node_being_cached, self.caching_info.call_depth);
             // TODO: Double-check the scenario when upon thread context switch the initial loopbody gets flushed,
             // subsequently it has no nested calls, but if its beginning is flushed then its end must be flushed too,
-            // after which the empty loopbody must be removed from the call graph.
+            // after which the childless loopbody must be removed from the call graph.
         } else {
             // Caching is inactive.
             // The latest sibling can have a non-zero non-flushed repeat count.

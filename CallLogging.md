@@ -1,7 +1,6 @@
 # Unsorted
 * TODO: instrumented_loopbody_container -> loopbody_instrumenter
 * TODO: `{ // Loop body start.` -> `{ // 'for' loop body start.`
-* TODO: empty -> childless.
 * Bug? The tests fail because of an unknown reason 
   ```
   running 14 tests

@@ -125,16 +125,16 @@ mod single_thread {
     /// Instrumented function that, upon invocation, generates the function call log.
     #[loggable]
     fn parent(calls: Calls) {
-        // // # Empty calls ("empty" means has no nested calls).
+        // // # Empty calls ("childless" means has no nested calls).
         // parent() {} // Empty call.
         let Some(call_options) = calls else { return };
 
         match call_options {
             // // # Empty calls.
-            // // ## Calls with empty loop bodies and corresponding returns.
-            // parent() {} // Call with single empty loop body ("single" means non-repeating).
-            // parent() {} // Call with 1 loop with repeating empty body.
-            // parent() {} // Call with 2 loops, each with single empty body.
+            // // ## Calls with childless loop bodies and corresponding returns.
+            // parent() {} // Call with single childless loop body ("single" means non-repeating).
+            // parent() {} // Call with 1 loop with repeating childless body.
+            // parent() {} // Call with 2 loops, each with single childless body.
             // parent() {} // Call with 2 loops, repeating and single body correspondingly.
             // parent() {} // Call with 2 loops, single and repeating body correspondingly.
             // parent() {} // Call with 2 loops with repeating body each.
@@ -147,16 +147,16 @@ mod single_thread {
                     for _ in 0..iter_count_b {}
                 }
             }
-            // // # Non-empty calls.
-            // // ## Single empty sibling.
+            // // # Non-childless calls.
+            // // ## Single childless sibling.
             // parent() {
-            //     sibling_a() {}  // Single empty sibling.
+            //     sibling_a() {}  // Single childless sibling.
             // }
             // parent() {
-            //     sibling_a() {}  // Single sibling with an empty loop body.
+            //     sibling_a() {}  // Single sibling with an childless loop body.
             // }
             // parent() {
-            //     sibling_a() {}  // Single sibling with multiple loops with an empty body each.
+            //     sibling_a() {}  // Single sibling with multiple loops with an childless body each.
             // }
             CallOptions::SingleEmptySibling {
                 iter_count: (iter_count_a, iter_count_b),
@@ -168,25 +168,25 @@ mod single_thread {
                 sibling_a(iter_count_a, iter_count_b)
             }
 
-            // // ## Single non-empty sibling with an empty child.
+            // // ## Single non-childless sibling with an childless child.
             // parent() {
-            //     sibling_a() { // Single non-empty sibling.
+            //     sibling_a() { // Single non-childless sibling.
             //         child_a() {} // Empty child.
             //     }
             // }
             // parent() {
-            //     sibling_a() { // Single non-empty sibling.
-            //         child_a() {} // Child with empty loop bodies.
+            //     sibling_a() { // Single non-childless sibling.
+            //         child_a() {} // Child with childless loop bodies.
             //     }
             // }
             // parent() {
-            //     { // Single non-empty loop body (sibling is a loop body).
+            //     { // Single non-childless loop body (sibling is a loop body).
             //         child_a() {} // Empty child.
             //     }
             // }
             // parent() {
-            //     { // Single non-empty loop body (sibling is a loop body).
-            //         child_a() {} // Child with empty loop bodies.
+            //     { // Single non-childless loop body (sibling is a loop body).
+            //         child_a() {} // Child with childless loop bodies.
             //     }
             // }
             CallOptions::SingleNonEmptySiblingWithEmptyChild {
@@ -213,11 +213,11 @@ mod single_thread {
                 }
             }
 
-            // // ## Single non-empty sibling with a non-empty child.
+            // // ## Single non-childless sibling with a non-childless child.
             // parent() {
-            //     sibling_a() { // Single non-empty sibling.
+            //     sibling_a() { // Single non-childless sibling.
             //         child_a() {
-            //             grandchild_a() {} // Single empty grandchild.
+            //             grandchild_a() {} // Single childless grandchild.
             //         }
             //     }
             // }
@@ -234,11 +234,11 @@ mod single_thread {
             }
             // ## Repeating sibling.
             // parent() {
-            //     sibling_a() {}  // Repeating empty sibling.
+            //     sibling_a() {}  // Repeating childless sibling.
             //     // repeats 2 time(s).
             // }
             // parent() {
-            //     sibling_a() {   // Repeating non-empty sibling.
+            //     sibling_a() {   // Repeating non-childless sibling.
             //         child_a() {}
             //     }
             //     // repeats 2 time(s).
@@ -258,7 +258,7 @@ mod single_thread {
 
             // ## Loop body with a single child.
             // parent() {
-            //     { // Single non-empty loop body.
+            //     { // Single non-childless loop body.
             //         child() {}
             //     }
             // }
@@ -267,7 +267,7 @@ mod single_thread {
             //         child() {}
             //     }
             //     // Loop body repeats 2 time(s).
-            // } // Return after a repeating non-empty loop body.
+            // } // Return after a repeating non-childless loop body.
             CallOptions::LoopBodyWithSingleChild {
                 invocation_count,
                 child_repeats,
@@ -345,25 +345,25 @@ mod single_thread {
     }
 
     #[test]
-    fn empty_calls() {
+    fn childless_calls() {
         let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
         THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
         // # Empty calls.
         parent(None); // parent() {} // Empty call (no nested calls).
 
-        // ## Calls with empty loop bodies (empty: has no nested calls) and corresponding returns.
-        // parent() {} // Call with single empty loop body (single: non-repeating).
+        // ## Calls with childless loop bodies (childless: has no nested calls) and corresponding returns.
+        // parent() {} // Call with single childless loop body (single: non-repeating).
         parent(Some(CallOptions::EmptyLoopBodies {
             one_loop: true,
             iter_count: (1, 0),
         }));
-        // parent() {} // Call with 1 loop of repreating empty body.
+        // parent() {} // Call with 1 loop of repreating childless body.
         parent(Some(CallOptions::EmptyLoopBodies {
             one_loop: true,
             iter_count: (3, 0),
         }));
-        // parent() {} // Call with 2 loops, each with single empty body.
+        // parent() {} // Call with 2 loops, each with single childless body.
         parent(Some(CallOptions::EmptyLoopBodies {
             one_loop: false,
             iter_count: (1, 1),
@@ -410,19 +410,19 @@ mod single_thread {
     }
 
     #[test]
-    fn single_empty_sibling() {
+    fn single_childless_sibling() {
         let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
         THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
-        // // ## Single empty sibling.
+        // // ## Single childless sibling.
         // parent() {
-        //     sibling_a() {}  // Single empty sibling.
+        //     sibling_a() {}  // Single childless sibling.
         // }
         // parent() {
-        //     sibling_a() {}  // Single sibling with an empty loop body.
+        //     sibling_a() {}  // Single sibling with an childless loop body.
         // }
         // parent() {
-        //     sibling_a() {}  // Single sibling with multiple loops with an empty body each.
+        //     sibling_a() {}  // Single sibling with multiple loops with an childless body each.
         // }
         parent(Some(CallOptions::SingleEmptySibling { iter_count: (0, 0) }));
         parent(Some(CallOptions::SingleEmptySibling { iter_count: (1, 0) }));
@@ -456,29 +456,29 @@ mod single_thread {
     }
 
     #[test]
-    fn single_nonempty_sibling_with_empty_child() {
+    fn single_nonchildless_sibling_with_childless_child() {
         let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
         THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
-        // // ## Single non-empty sibling with an empty child.
+        // // ## Single non-childless sibling with an childless child.
         // parent() {
-        //     sibling_a() { // Single non-empty sibling.
+        //     sibling_a() { // Single non-childless sibling.
         //         child_a() {} // Empty child.
         //     }
         // }
         // parent() {
-        //     sibling_a() { // Single non-empty sibling.
-        //         child_a() {} // Child with empty loop bodies.
+        //     sibling_a() { // Single non-childless sibling.
+        //         child_a() {} // Child with childless loop bodies.
         //     }
         // }
         // parent() {
-        //     { // Single non-empty loop body.
+        //     { // Single non-childless loop body.
         //         child_a() {} // Empty child.
         //     }
         // }
         // parent() {
-        //     { // Single non-empty loop body.
-        //         child_a() {} // Child with empty loop bodies.
+        //     { // Single non-childless loop body.
+        //         child_a() {} // Child with childless loop bodies.
         //     }
         // }
         parent(Some(CallOptions::SingleNonEmptySiblingWithEmptyChild {
@@ -533,16 +533,16 @@ mod single_thread {
     }
 
     #[test]
-    fn single_nonempty_sibling_with_nonempty_child() {
+    fn single_nonchildless_sibling_with_nonchildless_child() {
         let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
         THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
         parent(Some(CallOptions::SingleNonEmptySiblingWithNonEmptyChild));
-        // // ## Single non-empty sibling with a non-empty child.
+        // // ## Single non-childless sibling with a non-childless child.
         // parent() {
-        //     sibling() { // Single non-empty sibling.
+        //     sibling() { // Single non-childless sibling.
         //         child() {
-        //             grandchild() {} // Single empty grandchild.
+        //             grandchild() {} // Single childless grandchild.
         //         }
         //     }
         // }
@@ -577,11 +577,11 @@ mod single_thread {
         parent(Some(CallOptions::RepeatingSibling { call_child: true }));
         // ## Repeating sibling.
         // parent() {
-        //     sibling_a() {}  // Repeating empty sibling.
+        //     sibling_a() {}  // Repeating childless sibling.
         //     // repeats 2 time(s).
         // }
         // parent() {
-        //     sibling_a() {   // Repeating non-empty sibling.
+        //     sibling_a() {   // Repeating non-childless sibling.
         //         child_a() {}
         //     }
         //     // repeats 2 time(s).
@@ -626,7 +626,7 @@ mod single_thread {
         }));
         // ## Loop body with a single child.
         // parent() {
-        //     { // Single non-empty loop body.
+        //     { // Single non-childless loop body.
         //         child() {}
         //     }
         // }
@@ -635,7 +635,7 @@ mod single_thread {
         //         child() {}
         //     }
         //     // Loop body repeats 2 time(s).
-        // } // Return after a repeating non-empty loop body.
+        // } // Return after a repeating non-childless loop body.
 
         #[rustfmt::skip]
         unsafe {
@@ -677,7 +677,7 @@ mod single_thread {
         }));
         // ## Loop body with a repeating child.
         // parent() {
-        //     { // Single non-empty loop body.
+        //     { // Single non-childless loop body.
         //         child() {}
         //         // Repeats
         //     }
