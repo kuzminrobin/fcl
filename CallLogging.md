@@ -183,7 +183,6 @@
   Document that (separate Decorators are redundand but more flexible).
 * Convert every occurrence to either "stdout and/or stderr" or "stdoutput" or "std output".
 * In .md break-up long lines to short ones.
-* Pseudonode (TODO: Consider -> pseudoroot)
 * Implement endless logging (see "mdBook.md").
 * Double-check all the doc comments with ChatGPT.
 * (Unsorted)
@@ -461,18 +460,18 @@ h() {}
 ```
 This infomation is not a tree but is a sequence of subtrees `[f(), h()]`.
 To unify the functionality, the code turns the call graph to a tree
-by initializing the graph with a pseudo-node that will serve as a call tree root,
-and the subsequent calls `f()`, `h()`, and on will be added as nested calls (children) to that pseudo-node.
+by initializing the graph with a pseudoroot that will serve as a call tree root,
+and the subsequent calls `f()`, `h()`, and on will be added as nested calls (children) to that pseudoroot.
 The actual information stored in the call graph will be
 ```c++
-pseudo_node {
+pseudoroot {
     f() {
         g() {}
     }
     h() {}
 }
 ```
-The pseudo-node will stay at the bottom of the call stack until the call graph destruction.
+The pseudoroot will stay at the bottom of the call stack until the call graph destruction.
 
 # Call Stack
 The call stack is intended 
@@ -496,7 +495,7 @@ main() {
 ```
 Moment | The information after that moment, contained
        |---------------------------------------------------------------
-       | in the call graph   | in the call stack (p is the pseudo-node)
+       | in the call graph   | in the call stack (p is the pseudoroot)
 ========================================================================
      0 | f() {               | [p, f]
      1 |     g() {           | [p, f, g]
@@ -701,7 +700,7 @@ f
 ## Consider Using `Box` instead of `Rc`
 Consider Using `Box<RefCell<Node>>` instead of `Rc<RefCell<Node>>` for the 
 * call graph nodes 
-* and the pointer to the pseudo-node (`root`).
+* and the pointer to the pseudoroot (`root`).
 
 Everywhere else consider using refs (`&`). In particular, for the `CallGraph`'s
 * `call_stack` (`Vec<&?>`),
@@ -895,7 +894,7 @@ fn f(x: i32, y: i32, flag: bool) -> usize {
         //     // Called function is a closure.
         //     // Get parent's name if present, otherwise "?":
         //     let parent_name = if self.call_stack.len() <= 1 {
-        //         // pseudo (or nothing, which must never happen :)
+        //         // pseudoroot (or nothing, which must never happen :)
         //         NameEither::Function(&"?")
         //     } else {
         //         self.call_stack.last().unwrap().borrow().name.clone()

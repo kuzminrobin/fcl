@@ -256,10 +256,10 @@ impl core::cmp::PartialEq for RepeatCount {
 /// The `f()` followed by `g()`, including their nested calls, will be a sequence of two call trees
 /// added to the call graph.
 ///
-/// To unify and simplify handling, a _pseudonode_ is always added to the call graph as a root,
-/// which turns any call graph to a tree. Both `f()` and `g()` get added as children of the pseudonode.  
+/// To unify and simplify handling, a _pseudoroot_ is always added to the call graph as a root,
+/// which turns any call graph to a tree. Both `f()` and `g()` get added as children of the pseudoroot.  
 ///
-/// But if logging gets enabled before `main()` then `main()` gets added as a child to the pseudonode.
+/// But if logging gets enabled before `main()` then `main()` gets added as a child to the pseudoroot.
 pub struct CallGraph {
     /// The call stack.
     ///
@@ -268,8 +268,8 @@ pub struct CallGraph {
     /// from the root to the currently active call node in the call graph.
     /// Is used for returning to the parent at any moment in a singly linked call tree.
     ///
-    /// The link to a pseudonode always exists at the bottom of the call stack.
-    /// The pseudonode is not to be logged. Its children have the call depth of 0.
+    /// The link to a pseudoroot always exists at the bottom of the call stack.
+    /// The pseudoroot is not to be logged. Its children have the call depth of 0.
     /// In other words the call depth of a call is `call_stack.len() - 1` when
     /// the call is not yet on the call stack.
     call_stack: Vec<Link>,
@@ -299,13 +299,13 @@ pub struct CallGraph {
 impl CallGraph {
     /// Creates a new `CallGraph` instance.
     pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
-        let pseudo_node = Rc::new(RefCell::new(CallNode::new(ItemKind::Call {
+        let pseudoroot = Rc::new(RefCell::new(CallNode::new(ItemKind::Call {
             name: String::from(""),
             param_vals: None,
         })));
         Self {
-            current_node: pseudo_node.clone(),
-            call_stack: vec![pseudo_node],
+            current_node: pseudoroot.clone(),
+            call_stack: vec![pseudoroot],
             caching_info: CachingInfo::new(/*CacheKind::Call*/),
             coderun_notifiable,
         }
@@ -512,16 +512,16 @@ impl CallGraph {
             // TODO: Consider `self.call_stack.pop().unwrap()` -> `{self.call_stack.pop(); self.current_node}` (to get rid of the `unwrap()`).
             let returning_sibling = self.call_stack.pop().unwrap();
             returning_sibling.borrow_mut().has_ended = true;
-            let parent_or_pseudo = self.call_stack.last().unwrap();
+            let parent_or_pseudoroot = self.call_stack.last().unwrap();
             let returning_sibling_call_depth = self.call_depth(); // The returning sibling is not on the call stack already.
-            self.current_node = parent_or_pseudo.clone();
+            self.current_node = parent_or_pseudoroot.clone();
             // If there exists a previous_sibling, then {
-            if parent_or_pseudo.borrow().children.len() > 1 {
+            if parent_or_pseudoroot.borrow().children.len() > 1 {
                 // The call subtree of the returning_sibling is compared recursively
                 // to the previous_sibling's call subtree.
-                let previous_sibling_index = parent_or_pseudo.borrow().children.len() - 2;
+                let previous_sibling_index = parent_or_pseudoroot.borrow().children.len() - 2;
                 let previous_sibling =
-                    parent_or_pseudo.borrow().children[previous_sibling_index].clone();
+                    parent_or_pseudoroot.borrow().children[previous_sibling_index].clone();
                 // If the call subtrees are equal
                 if Self::trees_are_equal(
                     &previous_sibling,
@@ -534,7 +534,7 @@ impl CallGraph {
                     // the previous sibling's repeat count is incremented,
                     previous_sibling.borrow_mut().repeat_count.inc();
                     // and the returning_sibling's call subtree is removed from the call graph.
-                    parent_or_pseudo.borrow_mut().children.pop();
+                    parent_or_pseudoroot.borrow_mut().children.pop();
                     // If the previous sibling is the caching model node then caching is over,
                     // i.e. the caching model becomes `None`.
                     if let Some(model_node) = self.caching_info.model_node.as_ref()
@@ -813,14 +813,14 @@ impl CallGraph {
         let children_call_depth = self.call_depth();
 
         // Go back to parent:
-        self.call_stack.pop(); // [.., parent_or_pseudo, ending_loopbody] -> [.., parent_or_pseudo].
-        let parent_or_pseudo = match self.call_stack.last() {
+        self.call_stack.pop(); // [.., parent_or_pseudoroot, ending_loopbody] -> [.., parent_or_pseudoroot].
+        let parent_or_pseudoroot = match self.call_stack.last() {
             None => panic!("FCL Internal Error: Unexpected bottom of the call stack"), // Must never get here. The program state
             // is unexpected, panicking ASAP. TODO: Consider logging the error and returning (to continue)
             // instead of panicking the thread.
-            Some(parent_or_pseudo) => parent_or_pseudo.clone(),
+            Some(parent_or_pseudoroot) => parent_or_pseudoroot.clone(),
         };
-        self.current_node = parent_or_pseudo.clone();
+        self.current_node = parent_or_pseudoroot.clone();
 
         let returning_loopbody_call_depth = self.call_depth();
 
@@ -841,7 +841,7 @@ impl CallGraph {
                 self.caching_info.clear();
             }
             // Remove the ending childless loop body from the call graph (from the parent's list of children,
-            parent_or_pseudo.borrow_mut().children.pop();
+            parent_or_pseudoroot.borrow_mut().children.pop();
 
             // pop from the call stack, redirect `current` to parent;
             // Is already done in the beginning of the function.
@@ -880,9 +880,9 @@ impl CallGraph {
 
         // // If there is a (current loop's) previous iteration's loop body (with optionally non-zero repeat count)
         // If the previous sibling exists...
-        let sibling_count = parent_or_pseudo.borrow().children.len();
+        let sibling_count = parent_or_pseudoroot.borrow().children.len();
         if sibling_count >= 2 {
-            let previous_sibling = parent_or_pseudo.borrow().children[sibling_count - 2].clone();
+            let previous_sibling = parent_or_pseudoroot.borrow().children[sibling_count - 2].clone();
 
             // && is a loop body && doesn't end the loop {
             let previous_sibling_kind = previous_sibling.borrow().kind.clone(); // NOTE: Cloning to enable 
@@ -894,7 +894,7 @@ impl CallGraph {
                 // If equal {
                 if Self::trees_are_equal(&ending_loopbody, &previous_sibling, false) {
                     // Remove the ending loop body from the call graph (from the parent's list of children,
-                    parent_or_pseudo.borrow_mut().children.pop();
+                    parent_or_pseudoroot.borrow_mut().children.pop();
                     // and from {the call stack, current} - already done in the beginning of the function;
                     // and it is already not in the cache (since the caching either stopped upon child
                     // or started at parent or earlier)).
@@ -1057,7 +1057,7 @@ impl CallGraph {
         self.caching_info.clear();
     }
 
-    /// Returns one less than the length of the call stack, `0` when the mandatory pseudonode is the only one on the call stack.
+    /// Returns one less than the length of the call stack, `0` when the mandatory pseudoroot is the only one on the call stack.
     ///
     /// E.g. before adding `main()` returns `0`. After adding `main()` returns `1`.
     //

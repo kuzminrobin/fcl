@@ -292,7 +292,7 @@ f() {
   } // Loop body ends.
 ```
 
-### The Pseudonode (TODO: Consider -> pseudoroot)
+### The Pseudoroot
 Let's imagine that the FCL is used for logging a program having the following picture of the function calls
 ```
         main()
@@ -317,14 +317,14 @@ The subsequent call after `init()` will be added as a root again.
 
 If the subsequent call is `init()` again (a repeated call), in order to make a decision about whether to start caching, the algorithm will have no the first `init()`'s node in the call tree. The algorithm will have to fully log every repeated `init()`.
 
-To retain the repeat counting of the top-level calls, and to keep the algorithm simple and unified, the pseudonode is always added as the first node to the call graph.
+To retain the repeat counting of the top-level calls, and to keep the algorithm simple and unified, the pseudoroot is always added as the first node to the call graph.
 ```
 The Call Tree             The Call Stack       
-  pseudonode <--------------[ ]  Bottom
+  pseudoroot <--------------[ ]  Bottom
 ```
-All the subsequent nodes, including `main()`, are added as children, grandchildren, and other successors of the pseudonode. 
+All the subsequent nodes, including `main()`, are added as children, grandchildren, and other successors of the pseudoroot. 
 
-Thus the topology of calls is _always a tree_, even if the logging gets enabled after the call to `main()`, in which case the first call to `init()` is added as a child of pseudonode, upon return it is retained in the call tree, and the subsequent repeated calls to `init()` are cached and can end up in incrementing the first `init()`'s repeat count. 
+Thus the topology of calls is _always a tree_, even if the logging gets enabled after the call to `main()`, in which case the first call to `init()` is added as a child of pseudoroot, upon return it is retained in the call tree, and the subsequent repeated calls to `init()` are cached and can end up in incrementing the first `init()`'s repeat count. 
 
 In my experience there were embedded systems where `main()` was returning and was called again. In such systems if the logging gets enabled before the call to `main()` then the repeated calls to `main()` will be cached and may end up in incrementing the repeat count of the preceding call to `main()`. 
 
@@ -332,7 +332,7 @@ In my experience there were embedded systems where `main()` was returning and wa
 
 The algorithm uses the length of the call stack (or call depth) to determine the _indent_ used for logging the function calls and returns. For an example, let's consider the following call tree.
 ```
-  pseudonode
+  pseudoroot
       |
      a()
    /  |  \
@@ -340,7 +340,7 @@ b()  c()  d()
     /  \
   e()  f()
 ```
-When logging the call and return for function `a()`, the length of the call stack is 2 (the call stack contains the pseudonode and `a()`). For logging the funcitons `b()`, `c()`, and `d()`, the length is 3, and so on. 
+When logging the call and return for function `a()`, the length of the call stack is 2 (the call stack contains the pseudoroot and `a()`). For logging the funcitons `b()`, `c()`, and `d()`, the length is 3, and so on. 
 
 The actual indent level is a value 2 less than the length of the call stack, i.e. the indent level is
 * 0 for logging `a()`, 
@@ -372,7 +372,7 @@ As for the log storage, the FCL, _customized by the user_, can log the function 
 
 But what does happen to the dynamic memory occupied by the call tree? Based on the logic so far the call tree grows endlessly. This will exhaust the memory. How can FCL log endlessly but still retain all the functionality?
 
-Let's consider a simple `main()` function that calls `init()`, after which it calls `work()` in a loop. During logging the `main()` gets added as a child to the pseudonode. Then `init()` is added as a child of `main()`, then the `work()` (with its children) is added after `init()`, the repeated `work()` increments the repeat count of the first `work()` and gets removed from the call graph. The `work()` with the subtree different from the one of the first `work()`, stays in the call tree, and so on.
+Let's consider a simple `main()` function that calls `init()`, after which it calls `work()` in a loop. During logging the `main()` gets added as a child to the pseudoroot. Then `init()` is added as a child of `main()`, then the `work()` (with its children) is added after `init()`, the repeated `work()` increments the repeat count of the first `work()` and gets removed from the call graph. The `work()` with the subtree different from the one of the first `work()`, stays in the call tree, and so on.
 
 During the loop the FCL algorithm analyses the two latest calls to `work()` in order to make a decision whether to leave the latest `work()` in the call tree and log it, or to remove it and increment the repeat count of the preceding `work()`.
 
@@ -384,7 +384,7 @@ But if the FCL's algorithm removes the `main()`'s child `init()`, then the compa
 
 To summarize, for the common case we cannot remove `init()` from the call graph (when we proceed to handling the calls to `work()`), because the `init()` particiaptes in comparing the adjacent subtrees of `main()`.
 
-But what if `main()` is not added to the call graph? What if logging starts after the call to `main()` but before the call to `init()`? In that case the `init()` will be added to the call graph as the first child of the pseudonode and logged. Then upon the first call to `work()` the algorighm will see that the `work()` has a name different from `init()`, thus the caching will not be triggered, the `work()` will be added to the call graph, logged without caching, and the `init()` will not be needed in the call graph starting with the call to `work()`. That is why, upon the first call to `work()`, the `init()` can be removed from the list of pseudonode's children , and the `work()` can be added as the first child instead.  
+But what if `main()` is not added to the call graph? What if logging starts after the call to `main()` but before the call to `init()`? In that case the `init()` will be added to the call graph as the first child of the pseudoroot and logged. Then upon the first call to `work()` the algorighm will see that the `work()` has a name different from `init()`, thus the caching will not be triggered, the `work()` will be added to the call graph, logged without caching, and the `init()` will not be needed in the call graph starting with the call to `work()`. That is why, upon the first call to `work()`, the `init()` can be removed from the list of pseudoroot's children , and the `work()` can be added as the first child instead.  
 (TODO: Not yet implemented. Reader Practice?)
 
 The repeated calls to `work()` will increment the repeat count of the first `work()`.
@@ -392,12 +392,12 @@ The repeated calls to `work()` will increment the repeat count of the first `wor
 Any different call to `work()`, the one having subtree different from that of the first `work()`, will cause
 * caching stop, 
 * the first `work()`'s repeat count flush, 
-* removal of the first `work()` from the list of pseudonode's children, 
-* and adding the latest `work()` as the fist child of the pseudonode.
+* removal of the first `work()` from the list of pseudoroot's children, 
+* and adding the latest `work()` as the fist child of the pseudoroot.
 
 (TODO: Not yet implemented. Reader Practice?)
 
-This can continue endlessly. At any moment the pseudonode will have at most 2 latest children: 
+This can continue endlessly. At any moment the pseudoroot will have at most 2 latest children: 
 * either 1 that is being added to the call tree and logged without caching, 
 * or 1 that is fully added and logged, plus 1 that is being added and cached. 
 
@@ -422,7 +422,7 @@ To summarize,
 
 then the thread logging can last endlessly.
 
-TODO: Unneeded node removal from the pseudonode children is not yet implemented.
+TODO: Unneeded node removal from the pseudoroot children is not yet implemented.
 
 ### Disadvantages Found
 
