@@ -242,18 +242,15 @@ mod single_thread {
         // { // Loop body
         //     some_calls() {}
         // }
-        // // Test the log: Only the log above.
         // [Repeats]
-        // // Test the log: No repeat count in the log.
-        // // ! caching_is_active
-        // call() {}
-        // // Test the log: The whole log, including the loop_body's repeat count.
+        // Test the log: No repeat count in the log.
+        // Loop end.
+        // Test the log: The whole log, including the loop_body's repeat count.
 
         // The instrumented functions that will generate the call log.
         #[loggable]
         fn some_call() {}
-        #[loggable]
-        fn call() {}
+
         // The loop body cannot be attributed with `#[loggable]` directly 
         // (Rust: the proc macros cannot be applied to expressions). 
         // The loop body is placed into a `#[loggable]` function
@@ -262,35 +259,35 @@ mod single_thread {
         fn instrumented_loopbody_container(log: Rc<RefCell<Vec<u8>>>) {
             // Generate some call log and make sure it is correct:
 
-            for _ in 0..3 {
+            for i in 0..4 {
                 // The instrumented loop body.
                 some_call();
+                if i == 2 {
+                    // Test the log: Make sure that there's no repeat count in the log.
+                    #[rustfmt::skip]
+                    unsafe {
+                        // (Inside of the instrumented function?) the `log` contents have to be copied outside of `assert_eq!()`.
+                        // Otherwise in case of a test failure the panic occurs "while processing panic" and the 
+                        // test executor aborts reporting the exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN.
+                        // Likely because upon the comparison failure during `assert_eq!()`, the `assert_eq!()` panics
+                        // while `log.borrow()` is still active, being borrowed for reading. 
+                        // And the FCL's panic hook tries to borrow the log again,
+                        // but for writing, fails, and likely eventually panics again.
+                        let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
+                        assert_eq!(
+                            log_contents,
+                            concat!(
+                                "instrumented_loopbody_container(log: RefCell { value: [] }) {\n",
+                                "  { // Loop body start.\n",
+                                "    some_call() {}\n",
+                                "  } // Loop body end.\n",
+                                // Make sure that there's no repeat count in the log.
+                            ) 
+                        )
+                    };
+                }
             }
 
-            // Test the log: Make sure that there's no repeat count in the log.
-            #[rustfmt::skip]
-            unsafe {
-                // (Inside of the instrumented function?) the `log` contents have to be copied outside of `assert_eq!()`.
-                // Otherwise in case of a test failure the panic occurs "while processing panic" and the 
-                // test executor aborts reporting the exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN.
-                // Likely because upon the comparison failure during `assert_eq!()`, the `assert_eq!()` panics
-                // while `log.borrow()` is still active, being borrowed for reading. 
-                // And the FCL's panic hook tries to borrow the log again,
-                // but for writing, fails, and likely eventually panics again.
-                let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
-                assert_eq!(
-                    log_contents,
-                    concat!(
-                        "instrumented_loopbody_container(log: RefCell { value: [] }) {\n",
-                        "  { // Loop body start.\n",
-                        "    some_call() {}\n",
-                        "  } // Loop body end.\n",
-                        // Make sure that there's no repeat count in the log.
-                    ) 
-                )
-            };
-
-            call();
             #[rustfmt::skip]
             unsafe {
                 let log_contents  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
@@ -301,8 +298,7 @@ mod single_thread {
                         "  { // Loop body start.\n",
                         "    some_call() {}\n",
                         "  } // Loop body end.\n",
-                        "  // Loop body repeats 2 time(s).\n", // The repeat count is flushed (since `! caching_is_active`).
-                        "  call() {}\n"
+                        "  // Loop body repeats 3 time(s).\n", // The repeat count is flushed upon loop end.
                     ) 
                 )
             };
@@ -320,21 +316,31 @@ mod single_thread {
     fn flush_initial_loopbody() {
         // D: `flush_initial_loopbody`:
         // { // Enclosing loop body. Caching is active upon initial loop body.
-        //     // Test the log: Nothing's in the log.
+        //     Test the log: Nothing's in the log.
         //     { // Intermediate enclosing loop body. Caching is still active.
-        //         // Test the log: Nothing's in the log.
+        //         Test the log: Nothing's in the log.
         //         call() {
-        //             // Test the log: The log above, flushed.
+        //             Test the log: The log above, flushed.
         //         }
         //     }
         // }
-        // // Test the log: The whole log above.
+        // Test the log: The whole log above.
 
         // The loop body cannot be instrumented directly (see details in the other test). 
-        // It is placed into an instrumented function
-        // that recursively instruments the loop body.
+        // It is placed into an instrumented function that recursively instruments the loop body.
         #[loggable]
         fn instrumented_loopbody_container(log: Rc<RefCell<Vec<u8>>>) {
+            // Major Call Logic:
+            // instrumented_loopbody_container() {
+            //  { // Loop body start.
+            //    { // Loop body start.
+            //      call() {}
+            //    } // Loop body end.
+            //    // Loop body repeats 2 time(s).
+            //  } // Loop body end.
+            //  // Loop body repeats 1 time(s).
+            // }
+
             for index0 in 0..2 { // Enclosing loop body. Caching starts upon initial loop body.
                 // Test the log: Nothing's in the log:
                 if index0 == 0 {
@@ -368,7 +374,7 @@ mod single_thread {
                         };
                     }
 
-                    // Make a call that stops caching:
+                    // Make a call that stops caching for the initial loop body:
                     call(log.clone(), (index0, index1));
                 }
             }
@@ -387,7 +393,7 @@ mod single_thread {
                             "instrumented_loopbody_container(log: RefCell { value: [] }) {\n",
                             "  { // Loop body start.\n",    // Caching has stopped. Flushed.
                             "    { // Loop body start.\n",  // Caching has stopped. Flushed.
-                            // The call that has put an end to caching (disregard the `call()` params below):
+                            // The call that has put an end to caching (the `call()` params below are not the test subject):
                             // TODO: After implementing the param logging suppression
                             // suppress the params logging in `fn call()` above
                             // and remove the params from the string literals below.

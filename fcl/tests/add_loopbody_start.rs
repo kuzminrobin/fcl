@@ -11,7 +11,7 @@ fn basics() {
         let loop_result = for i in 0..4 {
             result += i;
 
-            // In some iterations
+            // In odd iterations
             if i & 1 != 0 {
                 f(); // generate some call log.
             }

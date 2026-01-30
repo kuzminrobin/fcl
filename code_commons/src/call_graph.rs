@@ -423,7 +423,7 @@ impl CallGraph {
             // If the caching has started at the enclosing loopbody
             // (with optional intermediate enclosing loopbodies in between)
             // and that loopbody is initial then flush
-            // (without flushing the notifiable/decorator (TODO: why without?))
+            // (without flushing the notifiable/decorator, so that it doesn't add `\n` after `f() {`)
             // and stop caching.
             if self.caching_info.model_node.is_none() {
                 self.flush(false); // It also stops caching.
@@ -924,11 +924,12 @@ impl CallGraph {
 
     pub fn add_loop_end(&mut self) {
         // When the loop ends
-        // If the current node (parent) has children and the last child is a loop body { // Previous sibling is a loop body.
+        // If the current node (parent) has children and the last child is a loop body {
         //     If the last loop body is not marked as `ends_the_loop: true` (it is the last survived loop body of the ending loop) {
-        //         Flush its repeat count, if non-zero.
-        //         Mark it as `ends_the_loop: true`. // Based on this the subsequent loop body, if any,
-        //                                           // will be interpreted as the first loop body of the next loop.
+        //          If cahing is not active
+        //              Flush the last loop body's repeat count, if non-zero.
+        //          Mark it as `ends_the_loop: true`.   // Based on this the subsequent loop body, if any,
+        //                                              // will be interpreted as the first loop body of the next loop.
         //     }
         //     otherwise (the last loopbody is already marked as `ends_the_loop: true`) {
         //         // The last loopbody belongs to the previous loop that has already ended.
@@ -969,17 +970,19 @@ impl CallGraph {
             *ends_the_loop = true; // NOTE: Is placed first to release this `&mut` ASAP, 
             // such that the `last_child_kind` stays the only `&mut`.
 
-            let last_child_kind = last_child_kind.clone();
+            if !self.caching_is_active() {
+                let last_child_kind = last_child_kind.clone();
 
-            // Flush its repeat count, if non-zero.
-            if !last_child_borrow_mut.repeat_count.non_flushed_is_empty() {
+                // Flush its repeat count, if non-zero.
+                if !last_child_borrow_mut.repeat_count.non_flushed_is_empty() {
 
-                self.coderun_notifiable.borrow_mut().notify_repeat_count(
-                    self.call_depth(), // The parent's children call depth.
-                    &last_child_kind,
-                    last_child_borrow_mut.repeat_count.non_flushed(),
-                );
-                last_child_borrow_mut.repeat_count.mark_flushed();
+                    self.coderun_notifiable.borrow_mut().notify_repeat_count(
+                        self.call_depth(), // The parent's children call depth.
+                        &last_child_kind,
+                        last_child_borrow_mut.repeat_count.non_flushed(),
+                    );
+                    last_child_borrow_mut.repeat_count.mark_flushed();
+                }
             }
         }
         // else (the last loop body ends the loop)

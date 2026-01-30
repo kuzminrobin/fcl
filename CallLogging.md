@@ -1,4 +1,6 @@
 # Unsorted
+* TODO: instrumented_loopbody_container -> loopbody_instrumenter
+* TODO: `{ // Loop body start.` -> `{ // 'for' loop body start.`
 * TODO: empty -> childless.
 * Bug? The tests fail because of an unknown reason 
   ```
@@ -61,20 +63,6 @@
   `log: RefCell { value: [] }`.
 * Consider `{ // Loop body start` -> `{ // (line_num, col) Loop body start`
 * Rename `singlethreaded` feature to `single_threaded` (or `single-threaded`). https://en.wikipedia.org/wiki/Thread_(computing)
-* Likely Bug (ivestigate): 
-  When resolving, use the TDD (write the failing test first, that catches the bug, then fix the bug).
-  If the empty loop body (after start) gets interrupted 
-  by a thread context switch, then, upon flush, the loop body start is printed, 
-  but the loop body end is not printed after the context return. See below 
-  the "Loop body start" with no "Loop body end":
-  ```
-  thread 'tests::singlethreaded::empty_calls' panicked at fcl\src\tests.rs:375:13:
-  assertion `left == right` failed
-  right: "parent(calls: ?) {}\n// parent() repeats 6 time(s).\n"  
-  left: "                                                  parent(calls: ?) {}\n  
-      parent(calls: ?) {\n                                                    { // Loop body start.\n
-                           } // parent().\n                                                  // parent() repeats 5 time(s).\n"
-  ```
 * Instructions about how to suppress printing the parameters and return values, 
   globally, locally (at specific items, at specific time frames, both).
 
