@@ -525,7 +525,8 @@ fn quote_as_expr_for_loop(
     let body = quote_as_loop_block(body, prefix);
     quote! {
         {
-            let loop_result = { // At the moment of writing the unit value `()` is the only known possible value returnable by `for` loop.
+            let loop_result = { // At the moment of writing the unit value `()`
+                // is the only known possible value returnable by `for` loop.
                 #(#attrs)* #label #for_token #pat #in_token #expr #body
             };
 

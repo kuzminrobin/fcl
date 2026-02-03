@@ -1,4 +1,88 @@
+# Need ASAP
+* Working on test `basics()`.  
+  Prevent caching after flush.
+  * add_call
+    * if !previous_sibling.borrow().followed_by_flush {
+          Start caching
+  * add_ret
+    * previous_sibling.followed_by_flush = false.
+  * flush
+    * if previous_sibling.ended { 
+          previous_sibling.followed_by_flush = true.
+  >
+  * back to the test `fcl\tests\add_loopbody_start::basics()`.
+  * followed_by_flush for loop body
+  * test
+* Parameter loggin suppression
+  * Update the tests.
+
 # Unsorted
+* TODO: stdoutput -> standard output.
+* TODO: Double-check the scenario when upon thread context switch the initial loopbody gets flushed,
+  subsequently it has no nested calls, but if its beginning is flushed then its end must be flushed too,
+  after which the childless loopbody must be removed from the call graph.
+  * Add failing test that catches that.
+  * Add a fix.
+* To docs: If the standard output is done in _non-instrumented_ user's code, then the stdout and stderr output 
+  are not synchronized between themselves (but are synchronized with the call log).
+  The standard output is buffered, with the separate buffer for stdout and stderr. When the call logging happens, 
+  the synchronization algorithm flushes those buffers in a hard-coded order (.. first, then ..) which may differ from the actual output order.
+  E.g. the non-instrumented user's code might output:
+  "1. stderr output A". // Is buffered in                 stderr buffer.
+  "2. stdout output 1". // Is buffered in stdout buffer.
+  "3. stderr output B". // Is added to                    stderr buffer.
+  "4. stdout output 2". // Is added to    stdout buffer.
+  The algorithm may flush the stdout? buffer first, then stderr?:
+  "2. stdout output 1".
+  "4. stdout output 2".
+  "1. stderr output A".
+  "3. stderr output B".
+* To Docs: During the test debugging 
+  the debugger, upon slow stepping or long standing, can periodically 
+  * write to stdout that the "test `<name>` has been running for over 60 seconds"
+  * or do something else with the std{out|err?}. 
+  
+  This output gets redirected and affects the call log (how exactly? Break in the middle of childless and after 60 seconds continue).  
+  E.g. I observed the chidless function logged 
+  as if the flush happened in the middle of it (Questionable. Maybe related to stdout as my `Box<dyn Write>` instead of `Vec<u8>`. Double-check).
+* To docs: If the instrumented loop body only calls the _non-instrumented_ functions and closures (e.g. calls the standard functions)
+  then from the FCL's point of view such a loop body is childless and 
+  * will be removed from the call graph 
+  * will not be logged (unless the flush happens in the middle of it)
+  * will not increment the repeat count of the previous survived loop body of the current loop  
+
+  (the flush happens upon either the thread context switch or standard output sunchronization).
+* To docs: If there is f() that has a loop with 2 interations, and each iteration can call g() upon condition, 
+  then during adjacent calls to f() the following can be observed.  
+  During the first call to f() the iteration 0 of the loop calls g(), whereas the iteration 1 gets removed for being childless.  
+  During the second call to f() vice versa, the iteration 1 of the loop calls g() but iteration 0 gets removed.  
+  For each call to f() the call graph will get the following info
+  ```rs
+  f() {
+    { // Loop body start.
+      g() {}
+    } // Loop body end.
+  }
+  ```
+  The adjacent calls to f() will be considered identical. The first call will be logged as is, 
+  the second one will be removed from the call graph, and the repeat count of the first one will be incremented.
+  This will end up in the following log.
+  ```rs
+  f() {
+    { // Loop body start.
+      g() {}
+    } // Loop body end.
+  }
+  // f() repeats 1 time(s).
+  ```
+  The log makes an impression that the two calls to f() are 100% identical, but they can differ with the loop iterations.
+* TODO: Consider logging the loop body iteration number
+  * `{ // Loop body [i: 3] start.`, where i is the `for` loop varaible,  
+  * `{ // Loop body [(index: 3, val: ?)] start.`,
+  * `{ // Loop body [2] start.`, where 2 is the iteration number of any loop (`for`, `while`, `loop`).  
+
+  FCL's feature. Disabled (globally) by default. Enables globally. 
+  Attribute param (#[loggable(param)]) to disable/enable locally.
 * TODO: instrumented_loopbody_container -> loopbody_instrumenter
 * TODO: `{ // Loop body start.` -> `{ // 'for' loop body start.`
 * Bug? The tests fail because of an unknown reason 
@@ -28,20 +112,24 @@
   generates the log, catches and fixes the bug, 
   then wants to retain the `#[loggable]` attributes  but to disable the (compile-time) instrumentation 
   such that the user's code is _as small and fast_ as the non-annotated one (like `#[non_loggable]` one).  
-  Feature "idle"?
-  ```toml
-  [features] 
-  idle = []
-  ```
-  * In `fcl_proc_macros` if the feature is active then the macro `#[loggable]` 
-    just transfers the code from the input to the output without instrumenting it.
+
+  **Feature "idle"**?
+    ```toml
+    [features] 
+    idle = []
+    ```
+  **FCL Feature "non_idle?"** enabled by default. To disable instrumentation the user disables the feature.  
+  In all the cases
+  * In `fcl_proc_macros` if the feature ("idle") is active then the macro `#[loggable]` 
+    just transfers the code from the input to the output without instrumenting it.  
     Like `#[non_loggable]`.
   * In `fcl` 
     * either no such a feature - all the global and thread-local expenses are still applicable, 
       but the functionality is not triggered (what about panic hook and stdoutput caching/syncing?
       They need to be disabled (or not initialized) which requires the feature support);
-    * or if the feature is active then [no code (or no global and thread-local instances),] 
-      no panic hook and no stdoutput caching/syncing.
+    * or if the feature ("idle") is active then [no code (and/or no global and thread-local instances),] 
+      no panic hook [initialization] and no stdoutput caching/syncing [initialization].
+
 * TODO: Add a way to suppress the param printing.
   * For a particular `fn`: 
     * All params: `#[loggable(skip_param[, skip_ret_val])]`, 
