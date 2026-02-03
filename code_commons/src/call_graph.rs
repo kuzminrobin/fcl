@@ -469,32 +469,32 @@ impl CallGraph {
     //         [// last_child() repeats 9 time(s). // Not yet flushed. ]]
     //     } // The return being handled.
     pub fn add_ret(&mut self, ret_val: Option<String>) {
-        //  If caching is not active {
-        //      Log the repeat count, if non-zero, of the last_child, if present.
-        //      Log the return of the returning_sibling.
-        //  }
-        //  If there exists a previous_sibling, then {
-        //      If the call subtree of the returning and previous sibling are equal {
-        //          The previous sibling's repeat count is incremented,
-        //          and the returning_sibling's call subtree is removed from the call graph.
-        //          If caching is active && the previous sibling is the caching model node then
-        //              Stop caching.
-        //          //else (caching is inactive or has started at a parent level or above) do nothing.
-        //          previous_sibling.followed_by_flush = false.
-        //      }
-        //      else { // Not equal.
-        //          If caching is active && the previous_sibling is the cahing model node then {
-        //              Log the previous_sibling's repeat count, if non-zero,
-        //              Log the subtree of the returning_sibling,
-        //              Stop caching.
-        //          }
-        //          // else (caching is inactive or has started at a parent level or above) do nothing, continue caching.
-        //      }
-        //  }
-        //  // else (no previous_sibling, the returning_sibling is the only child)
-        //  //  do nothing. Continue caching, if active. The caching end cannot be detected upon return from the only child.
+        // returning_sibling.has_ended = true
         //
-        //  returning_sibling.has_ended = true
+        // If caching is not active {
+        //     Log the repeat count, if non-zero, of the last_child, if present.
+        //     Log the return of the returning_sibling.
+        // }
+        // If there exists a previous_sibling, then {
+        //     If the call subtree of the returning and previous sibling are equal {
+        //         The previous sibling's repeat count is incremented,
+        //         and the returning_sibling's call subtree is removed from the call graph.
+        //         If caching is active && the previous sibling is the caching model node then
+        //             Stop caching.
+        //         //else (caching is inactive or has started at a parent level or above) do nothing.
+        //         previous_sibling.followed_by_flush = false.
+        //     }
+        //     else { // Not equal.
+        //         If caching is active && the previous_sibling is the cahing model node then {
+        //             Log the previous_sibling's repeat count, if non-zero,
+        //             Log the subtree of the returning_sibling,
+        //             Stop caching.
+        //         }
+        //         // else (caching is inactive or has started at a parent level or above) do nothing, continue caching.
+        //     }
+        // }
+        // // else (no previous_sibling, the returning_sibling is the only child)
+        // //  do nothing. Continue caching, if active. The caching end cannot be detected upon return from the only child.
         //
         // Handle the return in the call graph.
 
@@ -503,6 +503,9 @@ impl CallGraph {
         returning_sibling.borrow_mut().set_ret_val(ret_val);
 
         let children_call_depth = self.call_depth();
+
+        // returning_sibling.has_ended = true
+        returning_sibling.borrow_mut().has_ended = true;
 
         // If caching is not active {
         if !self.caching_is_active() {
@@ -605,9 +608,6 @@ impl CallGraph {
         }
         // else (no previous_sibling, the returning_sibling is the only child)
         //      do nothing. Continue caching, if active. The caching end cannot be detected upon return from the only child.
-
-        // returning_sibling.has_ended = true
-        self.current_node.borrow_mut().has_ended = true;
 
         // Handle the return in the call graph:
         self.call_stack.pop(); // [..., parent, returning_sibling] -> [..., parent].
