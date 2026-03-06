@@ -1,23 +1,11 @@
 # Need ASAP
-* Working on test `basics()`.  
-  Prevent caching after flush.
-  * add_call
-    * if !previous_sibling.borrow().followed_by_flush {
-          Start caching
-  * add_ret
-    * previous_sibling.followed_by_flush = false.
-  * flush
-    * if previous_sibling.ended { 
-          previous_sibling.followed_by_flush = true.
-  * back to the test `fcl\tests\add_loopbody_start::basics()`.
-  * The tests\add_ret.rs got broken.
-  >
-  * followed_by_flush for loop body
-  * test
-* Parameter loggin suppression
+* Parameter logging suppression
   * Update the tests.
 
 # Unsorted
+* TODO: Non-zero repeat count -> Non-flushed repeat count.
+* To docs: FCL can be used for testing, to make sure that a function calls at least certain functions in a certain order 
+  required number of times with certain arguments and gets certain return value. The mandatory functions are annotated, the optional ones are not.
 * TODO: stdoutput -> standard output.
 * TODO: Double-check the scenario when upon thread context switch the initial loopbody gets flushed,
   subsequently it has no nested calls, but if its beginning is flushed then its end must be flushed too,
@@ -43,9 +31,9 @@
   * write to stdout that the "test `<name>` has been running for over 60 seconds"
   * or do something else with the std{out|err?}. 
   
-  This output gets redirected and affects the call log (how exactly? Break in the middle of childless and after 60 seconds continue).  
+  This output gets redirected/flushed and affects the call log (how exactly? (Update: At least triggers `flush()`) Break in the middle of childless and after 60 seconds continue).  
   E.g. I observed the chidless function logged 
-  as if the flush happened in the middle of it (Questionable. Maybe related to stdout as my `Box<dyn Write>` instead of `Vec<u8>`. Double-check).
+  as if the flush happened in the middle of it (Questionable (no, see the update above). Maybe related to stdout as my `Box<dyn Write>` instead of `Vec<u8>`. Double-check).
 * To docs: If the instrumented loop body only calls the _non-instrumented_ functions and closures (e.g. calls the standard functions)
   then from the FCL's point of view such a loop body is childless and 
   * will be removed from the call graph 
@@ -54,7 +42,7 @@
 
   (the flush happens upon either the thread context switch or standard output sunchronization).
 * To docs: If there is f() that has a loop with 2 interations, and each iteration can call g() upon condition, 
-  then during adjacent calls to f() the following can be observed.  
+  then during adjacent calls to f() (from the same function but not in a loop) the following can be observed.  
   During the first call to f() the iteration 0 of the loop calls g(), whereas the iteration 1 gets removed for being childless.  
   During the second call to f() vice versa, the iteration 1 of the loop calls g() but iteration 0 gets removed.  
   For each call to f() the call graph will get the following info
@@ -80,10 +68,12 @@
 * TODO: Consider logging the loop body iteration number
   * `{ // Loop body [i: 3] start.`, where i is the `for` loop varaible,  
   * `{ // Loop body [(index: 3, val: ?)] start.`,
-  * `{ // Loop body [2] start.`, where 2 is the iteration number of any loop (`for`, `while`, `loop`).  
-
+  * `{ // Loop body [2] start.`, where 2 is the iteration number of any loop (`for`, `while`, `loop`). 
+    For that define a var outside the loop, log and increment that var inside of the loop. Nest both in an extra scope: 
+    `{ let mut iter_count = 0; loop { let loop_logger = new LoopBodyLogger(iter_count); { <body> }; iter_count += 1; } }`
   FCL's feature. Disabled (globally) by default. Enables globally. 
-  Attribute param (#[loggable(param)]) to disable/enable locally.
+  Attribute param (#[loggable(param)]) to disable/enable locally. `param`: {<none>, }
+* TODO: Consider `#[loggable]`, `#[non_loggable]` for loops (and what if the enclosing func is non-loggable).
 * TODO: instrumented_loopbody_container -> loopbody_instrumenter
 * TODO: `{ // Loop body start.` -> `{ // 'for' loop body start.`
 * Bug? The tests fail because of an unknown reason 
@@ -1743,3 +1733,53 @@ fn f() {
   ```
 * (In a single-mutex approach is handled with `flush()`) Double-check the case of a thread switch immediately after the repeat count increment,
   i.e. there is a non-flushed repeat count that needs to be flushed before the next thread's logging.
+
+* Working on test `basics()`.  
+  Prevent caching after flush.
+  * add_call
+    * if !previous_sibling.borrow().followed_by_flush {
+          Start caching
+  * add_ret
+    * previous_sibling.followed_by_flush = false.
+  * flush
+    * if previous_sibling.ended { 
+          previous_sibling.followed_by_flush = true.
+  * back to the test `fcl\tests\add_loopbody_start::basics()`.
+  * The tests\add_ret.rs got broken.
+  >
+  * followed_by_flush for loop body.
+    While trying to create a situation when a loop iteration is flushed in order to prevent the subsequent iteration caching,
+    I'm observing a bug. 
+    A loop has 5 iterations, the iterations [1] and [4] are identical (they call `f()`), the others are childless.
+    Stopping in the debugger for more than 1 minite in the beginning of iteration [4] causes the debugger to `stdout` the following:
+    "test basics has been running for over 60 seconds". This causes FCL flush upon subsequent debugger run. 
+    In other words the interation [4] before logging `f() {` 
+    flushes the itreation [1]'s potentially non-zero repeat count, then flushes the `stdout`, then flushes 
+    its own `{ // Loop body start.\n`, then proceeds to normal logging `f() {`, etc.
+    To summarize, the iterations [1] and [4] are logged each, but the `log_loop_end()` still logs `// Loop body repeats 1 time(s).\n`
+    but should not, and the test fails:
+
+    thread 'basics' panicked at fcl\tests\add_loopbody_start.rs:128:13:
+    assertion `left == right` failed
+      left: "\n  { // Loop body start.\n    f() {}\n  } // Loop body end.\n  { // Loop body start.\n    f() {}\n  } // Loop body end.\n  // Loop body repeats 1 time(s).\n"
+      right: "\n  { // Loop body start.\n    f() {}\n  } // Loop body end.\n  // Loop body repeats 1 time(s).\n"  
+    
+    THis means that after removing the loop iteration that repeats the previous one, and incrementing the repeat count,
+    if caching is inactive, i.e. the removed iteration has been logged/flushed, the repeat count must be marked as flushed.
+    And the subsequent `log_loop_end()` must only log the _non-flushed_ repeat count.
+  * test
+
+* Working on test `basics()`.  
+  Prevent caching after flush.
+  * add_call
+    * if !previous_sibling.borrow().followed_by_flush {
+          Start caching
+  * add_ret
+    * previous_sibling.followed_by_flush = false.
+  * flush
+    * if previous_sibling.ended { 
+          previous_sibling.followed_by_flush = true.
+  * back to the test `fcl\tests\add_loopbody_start::basics()`.
+  * The tests\add_ret.rs got broken.
+  * followed_by_flush for loop body.
+  * test

@@ -18,12 +18,22 @@ macro_rules! test_assert {
     };
 }
 
+fn flush_log() {
+    // Flush the log:
+    THREAD_LOGGER.with(|logger| {
+        #[cfg(feature = "singlethreaded")]
+        let logger = logger.borrow_mut();
+
+        logger.borrow_mut().flush();
+    });
+}
+
 //   High-level logic to test:
 //     [parent // Previous parent to activate caching.]
-//     parent {  // The call or enclosing loop body. Caching is {inactive, active}.
-//       Either previous loop [with [non-]identical children];
-//       or call: {function, closure};
-// A:    or previous iteration of the current loop [A: with [non-]identical children]
+//     parent {  // It's a call or an enclosing loop body. Caching is {inactive, active}.
+//       Either a previous loop [with [non-]identical children];
+//       or a call: {function, closure};
+// A:    or a previous iteration of the current loop [A: with [non-]identical children]
 //
 // A:    { // Loop body start that's being tested.
 //
@@ -69,12 +79,12 @@ fn basics() {
         let mut iter_count_sum = 0;
         let loop_result = // At the moment of writing the unit value `()`
         // is the only known possible value returnable by the `for` loop.
-        for i in 0..6 {
-            iter_count_sum += i; // Generate some testable state.
+        for iter_count in 0..6 {
+            iter_count_sum += iter_count; // Generate some testable state.
 
-            if i == 1 {
+            if iter_count == 1 {
                 f(); // Generate some call log.
-            } else if i == 2 {
+            } else if iter_count == 2 {
                 // Assert:
                 // Iteration [0] is removed.
                 // Iteration [1] is logged as is.
@@ -88,7 +98,7 @@ fn basics() {
                         "  } // Loop body end.\n", // Iteration [1] is logged as is.
                     )
                 )
-            } else if i == 4 {
+            } else if iter_count == 4 {
                 // Assert: Iterations [2] and [3] did not affect the log.
                 test_assert!(
                     log,
@@ -119,7 +129,7 @@ fn basics() {
                     "  } // Loop body end.\n",
                     "  { // Loop body start.\n", // Iteration [4] is logged as is.
                     "    f() {}\n",
-                    "    f() {}\n", // The difference from [1].
+                    "    // f() repeats 1 time(s).\n", // The difference from [1].
                     "  } // Loop body end.\n",
                 ),
             );
@@ -149,20 +159,16 @@ fn basics() {
     // Generate the log and check it step by step:
     loop_instrumenter(log.clone(), false); // Identical iterations.
 
-    // Flush the log:
-    THREAD_LOGGER.with(|logger| {
-        #[cfg(feature = "singlethreaded")]
-        let logger = logger.borrow_mut();
-
-        logger.borrow_mut().flush();
-    });
+    flush_log();
     log.borrow_mut().clear();
     
-    loop_instrumenter(log.clone(), false); // Different iterations.
+    loop_instrumenter(log.clone(), true); // Different iterations.
+    flush_log();
 }
 
 #[test]
-fn adjacent_loops() {
+fn adjacent_identical_loops() {
+    // Instrumented functions:
     #[loggable]
     fn f() {}
     #[loggable]
@@ -177,7 +183,29 @@ fn adjacent_loops() {
         // They must not be shown as one loop.
     }
 
-    loop_instrumenter()
+    // Mock log writer creation and substitution of the default one:
+    let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+    // Generate the log:
+    loop_instrumenter();
+
+    test_assert!(
+        log,
+        concat!(
+            "loop_instrumenter() {\n",
+            "  { // Loop body start.\n",
+            "    f() {}\n",
+            "  } // Loop body end.\n",
+            "  // Loop body repeats 1 time(s).\n",
+            "  { // Loop body start.\n",
+            "    f() {}\n",
+            "  } // Loop body end.\n",
+            "  // Loop body repeats 2 time(s).\n",
+            "} // loop_instrumenter().\n",
+        ),
+    );
+
 }
 
 // #[test]
