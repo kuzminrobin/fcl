@@ -8,7 +8,7 @@ use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, 
 /// For example, if a struct implementation is marked as `#[loggable]` then
 /// the associated funtions defined in that struct implementation will automatically be
 /// instrumented as `#[loggable]`. The `#[non_loggable]` attribute added to an
-/// associated funtion suppresses that instrumentation.
+/// associated funtion suppresses the instrumentation for that function.
 ///
 /// # Examples
 /// ```compile_fail, E0432, E0433, E0599
@@ -75,26 +75,15 @@ pub fn loggable(
     attr_args: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args_ = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately.
-    let mut prefix = quote! {};
-    if let AttrArgs {
-        prefix: QSelfOrPath(Some(q_self_or_path)),
-        ..
-    } = attr_args_
-    {
-        match q_self_or_path {
-            LogPrefix::QSelf(qself) => prefix = quote! { #qself },
-            LogPrefix::Path(path) => prefix = quote! { #path },
-        }
-    }
+    let attr_args_parsed = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately (TODO: Check).
     let output = {
         if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
-            quote_as_item(&item, &prefix)
+            quote_as_item(&item, &attr_args_parsed.prefix)   // TODO: `&attr_args_parsed.prefix_ts` -> `&attr_args_parsed`
         } else if let Ok(expr) = syn::parse::<Expr>(attributed_item.clone()) {
-            quote_as_expr(&expr, None, &prefix)
+            quote_as_expr(&expr, None, &attr_args_parsed.prefix)
         } else {
             let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
-            quote_as_expr_closure(&closure_w_opt_comma.closure, &prefix)
+            quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args_parsed.prefix)
         }
     };
     let ret_val = quote! { #output };
@@ -2541,28 +2530,28 @@ impl Parse for QSelfOrPath {
 }
 
 struct AttrArgs {
-    prefix: QSelfOrPath,
+    prefix: proc_macro2::TokenStream,
 }
 impl Parse for AttrArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut attr_args = AttrArgs {
-            prefix: QSelfOrPath(None),
+            prefix: quote! {},
         };
         if input.is_empty() {
             return Ok(attr_args);
         }
         let lookahead = input.lookahead1();
-        // if lookahead.peek(kw::name) {
-        //     Ok(AttrArgs::Name {
-        //         _name_token: input.parse::<kw::name>()?,
-        //         _eq_token: input.parse()?,
-        //         path: input.parse()?,
-        //     })
-        // } else if lookahead.peek(kw::prefix) {
         if lookahead.peek(kw::prefix) {
             input.parse::<kw::prefix>()?;
             input.parse::<Token![=]>()?;
-            attr_args.prefix = input.parse()?;
+            let optional_refix = input.parse()?;
+
+            if let QSelfOrPath(Some(q_self_or_path)) = optional_refix {
+                match q_self_or_path {
+                    LogPrefix::QSelf(qself) => attr_args.prefix = quote! { #qself },
+                    LogPrefix::Path(path) => attr_args.prefix = quote! { #path },
+                }
+            };
         } else {
             return Err(lookahead.error());
         }
