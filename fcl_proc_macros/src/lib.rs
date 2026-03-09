@@ -72,18 +72,20 @@ pub fn non_loggable(
 /// ```
 #[proc_macro_attribute]
 pub fn loggable(
-    attr_args: proc_macro::TokenStream,
+    attr_args_ts: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args_parsed = parse_macro_input!(attr_args as AttrArgs); // Handles the compilation errors appropriately (TODO: Check).
+    let attr_args = parse_macro_input!(attr_args_ts as AttrArgs); // Handles the compilation errors appropriately (TODO: Check).
     let output = {
         if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
-            quote_as_item(&item, &attr_args_parsed.prefix)   // TODO: `&attr_args_parsed.prefix_ts` -> `&attr_args_parsed`
+            quote_as_item(&item, &attr_args)
         } else if let Ok(expr) = syn::parse::<Expr>(attributed_item.clone()) {
-            quote_as_expr(&expr, None, &attr_args_parsed.prefix)
+            quote_as_expr(&expr, None, &attr_args)
+            // quote_as_expr(&expr, None, &attr_args_parsed.prefix)
         } else {
             let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
-            quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args_parsed.prefix)
+            quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
+            // quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args_parsed.prefix)
         }
     };
     let ret_val = quote! { #output };
@@ -116,7 +118,7 @@ fn remove_spaces(s: &str) -> String {
 
 fn quote_as_expr_array(
     expr_array: &ExprArray,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprArray { // [a, b, c, d]
         attrs, //: Vec<Attribute>,
@@ -132,7 +134,7 @@ fn quote_as_expr_array(
     let elems = {
         let mut traversed_elems = quote! {};
         for elem in elems {
-            let traversed_elem = quote_as_expr(elem, None, prefix);
+            let traversed_elem = quote_as_expr(elem, None, attr_args);
             traversed_elems = quote! { #traversed_elems #traversed_elem , };
         }
         traversed_elems
@@ -143,7 +145,7 @@ fn quote_as_expr_array(
 
 fn quote_as_expr_assign(
     expr_assign: &ExprAssign,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs
 ) -> proc_macro2::TokenStream {
     // a = compute()
     let ExprAssign {
@@ -158,13 +160,13 @@ fn quote_as_expr_assign(
             return quote! { #expr_assign };
         }
     }
-    let left = quote_as_expr(left, None, prefix);
-    let right = quote_as_expr(right, None, prefix);
+    let left = quote_as_expr(left, None, attr_args);
+    let right = quote_as_expr(right, None, attr_args);
     quote! { #(#attrs)* #left #eq_token #right }
 }
 fn quote_as_expr_async(
     expr_async: &ExprAsync,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprAsync {
         // async { ... }
@@ -179,12 +181,12 @@ fn quote_as_expr_async(
             return quote! { #expr_async };
         }
     }
-    let block = quote_as_block(block, prefix);
+    let block = quote_as_block(block, attr_args);
     quote! { #(#attrs)* #async_token #capture #block }
 }
 fn quote_as_expr_await(
     expr_await: &ExprAwait,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprAwait {
         // fut.await
@@ -199,12 +201,12 @@ fn quote_as_expr_await(
             return quote! { #expr_await };
         }
     }
-    let base = quote_as_expr(base, None, prefix);
+    let base = quote_as_expr(base, None, attr_args);
     quote! { #(#attrs)* #base #dot_token #await_token }
 }
 fn quote_as_expr_binary(
     expr_binary: &ExprBinary,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprBinary {
         // `a + b`, `a += b`
@@ -219,13 +221,13 @@ fn quote_as_expr_binary(
             return quote! { #expr_binary };
         }
     }
-    let left = quote_as_expr(left, None, prefix);
-    let right = quote_as_expr(right, None, prefix);
+    let left = quote_as_expr(left, None, attr_args);
+    let right = quote_as_expr(right, None, attr_args);
     quote! { #(#attrs)* #left #op #right }
 }
 fn quote_as_expr_block(
     expr_block: &ExprBlock,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprBlock {
         attrs, //: Vec<Attribute>,
@@ -238,12 +240,12 @@ fn quote_as_expr_block(
             return quote! { #expr_block };
         }
     }
-    let block = quote_as_block(block, prefix);
+    let block = quote_as_block(block, attr_args);
     quote! { #(#attrs)* #label #block }
 }
 fn quote_as_expr_break(
     expr_break: &ExprBreak,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprBreak {
         attrs,       //: Vec<Attribute>,
@@ -257,12 +259,12 @@ fn quote_as_expr_break(
             return quote! { #expr_break };
         }
     }
-    let expr = expr.as_ref().map(|expr| quote_as_expr(expr, None, prefix));
+    let expr = expr.as_ref().map(|expr| quote_as_expr(expr, None, attr_args));
     quote! { #(#attrs)* #break_token #label #expr }
 }
 fn quote_as_expr_call(
     expr_call: &ExprCall,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprCall {
         attrs, //: Vec<Attribute>,
@@ -278,11 +280,11 @@ fn quote_as_expr_call(
         }
     }
     let mut is_print_func_name = false;
-    let func = quote_as_expr(func, Some(&mut is_print_func_name), prefix);
+    let func = quote_as_expr(func, Some(&mut is_print_func_name), attr_args);
     let args = {
         let mut traversed_args = quote! {};
         for arg in args {
-            let traversed_arg = quote_as_expr(arg, None, prefix);
+            let traversed_arg = quote_as_expr(arg, None, attr_args);
             traversed_args = quote! { #traversed_args #traversed_arg, }
         }
         traversed_args
@@ -311,7 +313,7 @@ fn quote_as_expr_call(
 }
 fn quote_as_expr_cast(
     expr_cast: &ExprCast,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     // foo as f64
     let ExprCast {
@@ -326,12 +328,13 @@ fn quote_as_expr_cast(
             return quote! { #expr_cast };
         }
     }
-    let expr = quote_as_expr(expr, None, prefix);
+    let expr = quote_as_expr(expr, None, attr_args);
     quote! { #(#attrs)* #expr #as_token #ty }
 }
 fn quote_as_expr_closure(
     expr_closure: &ExprClosure,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
+    //prefix: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let ExprClosure {
         attrs,      //: Vec<Attribute>,
@@ -387,13 +390,18 @@ fn quote_as_expr_closure(
         }
     };
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
+    let prefix = &attr_args.prefix;
     if !prefix.is_empty() {
         log_closure_name_ts = quote! { #prefix::#log_closure_name_ts }
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
-    let prefix = &log_closure_name_ts;
+    let attr_args = AttrArgs { 
+        prefix: log_closure_name_ts 
+    };
+    // let prefix = &log_closure_name_ts;
 
-    let body = { quote_as_expr(&**body, None, prefix) };
+    let body = { quote_as_expr(&**body, None, &attr_args) };
+    // let body = { quote_as_expr(&**body, None, prefix) };
 
     let logging_is_on = quote! {
         logger.borrow()
@@ -457,24 +465,24 @@ fn quote_as_expr_closure(
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_const(expr_const: &ExprConst, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_expr_const(expr_const: &ExprConst, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_const }
 //     // let ExprConst {
 //     //     attrs, //: Vec<Attribute>,
 //     //     const_token, //: Const,
 //     //     block, //: Block,
 //     // } = expr_const;
-//     // let block = quote_as_expr_block(block, prefix);
+//     // let block = quote_as_expr_block(block, attr_args);
 //     // quote!{ #(#attrs)* #const_token #block }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_continue(expr_continue: &ExprContinue, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_expr_continue(expr_continue: &ExprContinue, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_continue }   // A `continue`, with an optional label.
 // }
 fn quote_as_expr_field(
     expr_field: &ExprField,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprField {
         attrs,     //: Vec<Attribute>,
@@ -488,12 +496,12 @@ fn quote_as_expr_field(
             return quote! { #expr_field };
         }
     }
-    let base = quote_as_expr(&**base, None, prefix);
+    let base = quote_as_expr(&**base, None, attr_args);
     quote! { #(#attrs)* #base #dot_token #member }
 }
 fn quote_as_expr_for_loop(
     expr_for_loop: &ExprForLoop,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprForLoop {
         attrs,     //: Vec<Attribute>,
@@ -510,8 +518,8 @@ fn quote_as_expr_for_loop(
             return quote! { #expr_for_loop };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
-    let body = quote_as_loop_block(body, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
+    let body = quote_as_loop_block(body, attr_args);
     quote! {
         {
             let loop_result = { // At the moment of writing the unit value `()`
@@ -528,7 +536,7 @@ fn quote_as_expr_for_loop(
 }
 fn quote_as_expr_group(
     expr_group: &ExprGroup,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprGroup {
         attrs, //: Vec<Attribute>,
@@ -542,13 +550,13 @@ fn quote_as_expr_group(
             return quote! { #expr_group };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     // the trait bound `syn::token::Group: quote::ToTokens` is not satisfied
     quote! { { #(#attrs)* #expr } }
 }
 fn quote_as_expr_if(
     expr_if: &ExprIf,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprIf {
         attrs,       //: Vec<Attribute>,
@@ -563,17 +571,17 @@ fn quote_as_expr_if(
             return quote! { #expr_if };
         }
     }
-    let cond = quote_as_expr(&**cond, None, prefix);
-    let then_branch = quote_as_block(then_branch, prefix);
+    let cond = quote_as_expr(&**cond, None, attr_args);
+    let then_branch = quote_as_block(then_branch, attr_args);
     let else_branch = else_branch.as_ref().map(|(else_token, expr)| {
-        let expr = quote_as_expr(&**expr, None, prefix);
+        let expr = quote_as_expr(&**expr, None, attr_args);
         quote! { #else_token #expr }
     });
     quote! { #(#attrs)* #if_token #cond #then_branch #else_branch }
 }
 fn quote_as_expr_index(
     expr_index: &ExprIndex,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprIndex {
         attrs, //: Vec<Attribute>,
@@ -588,18 +596,18 @@ fn quote_as_expr_index(
             return quote! { #expr_index };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
-    let index = quote_as_expr(&**index, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
+    let index = quote_as_expr(&**index, None, attr_args);
     quote! { #(#attrs)* #expr [ #index ] }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_infer(expr_infer: &ExprInfer, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_expr_infer(expr_infer: &ExprInfer, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_infer }
 // }
 fn quote_as_expr_let(
     expr_let: &ExprLet,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprLet {
         attrs,     //: Vec<Attribute>,
@@ -617,17 +625,17 @@ fn quote_as_expr_let(
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let pat = quote_as_pat(&**pat, prefix);
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* #let_token #pat #eq_token #expr }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_lit(expr_lit: &ExprLit, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_expr_lit(expr_lit: &ExprLit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_lit }
 // }
 fn quote_as_expr_loop(
     expr_loop: &ExprLoop,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprLoop {
         attrs,      //: Vec<Attribute>,
@@ -641,7 +649,7 @@ fn quote_as_expr_loop(
             return quote! { #expr_loop };
         }
     }
-    let body = quote_as_loop_block(body, prefix);
+    let body = quote_as_loop_block(body, attr_args);
     quote! {
         // // Ret val for `loop` has been deprioritized since it requires extra
         // // refactoring for the case of a (removed) loopbody with no nested calls.
@@ -658,7 +666,7 @@ fn quote_as_expr_loop(
         // }
     }
 }
-fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_arm(arm: &Arm, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let Arm {
         attrs,           //: Vec<Attribute>,
         pat,             //: Pat,
@@ -674,19 +682,19 @@ fn quote_as_arm(arm: &Arm, prefix: &proc_macro2::TokenStream) -> proc_macro2::To
         }
     }
     let guard = guard.as_ref().map(|(if_token, expr)| {
-        let expr = quote_as_expr(expr, None, prefix);
+        let expr = quote_as_expr(expr, None, attr_args);
         quote! { #if_token #expr }
     });
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // guard
-    let body = quote_as_expr(&**body, None, prefix);
+    let body = quote_as_expr(&**body, None, attr_args);
     quote! { #(#attrs)* #pat #guard #fat_arrow_token #body #comma }
 }
 fn quote_as_macro(
     macro_: &Macro,
     maybe_flush_invocation: &mut proc_macro2::TokenStream,
-    _prefix: &proc_macro2::TokenStream,
+    _attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let Macro {
         path, //: Path,
@@ -723,14 +731,14 @@ fn quote_as_macro(
 }
 fn quote_as_expr_macro(
     expr_macro: &ExprMacro,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprMacro {
         attrs, //: Vec<Attribute>,
         mac,   //: Macro,
     } = expr_macro;
     let mut maybe_flush_invocation = quote! {};
-    let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, prefix);
+    let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, attr_args);
     quote! {
         {
             #maybe_flush_invocation;
@@ -740,7 +748,7 @@ fn quote_as_expr_macro(
 }
 fn quote_as_expr_match(
     expr_match: &ExprMatch,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprMatch {
         attrs, //: Vec<Attribute>,
@@ -756,17 +764,17 @@ fn quote_as_expr_match(
             return quote! { #expr_match };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     let mut traveresed_arms = quote! {};
     for arm in arms {
-        let traversed_arm = quote_as_arm(arm, prefix);
+        let traversed_arm = quote_as_arm(arm, attr_args);
         traveresed_arms = quote! { #traveresed_arms #traversed_arm }
     }
     quote! { #(#attrs)* #match_token #expr { #traveresed_arms } }
 }
 fn quote_as_expr_method_call(
     expr_method_call: &ExprMethodCall,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprMethodCall { // x.foo::<T>(a, b)
         attrs, //: Vec<Attribute>,
@@ -784,7 +792,7 @@ fn quote_as_expr_method_call(
             return quote! { #expr_method_call };
         }
     }
-    let receiver = quote_as_expr(&**receiver, None, prefix);
+    let receiver = quote_as_expr(&**receiver, None, attr_args);
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let turbofish = match turbofish {
@@ -794,14 +802,14 @@ fn quote_as_expr_method_call(
     // };
     let mut traversed_args = quote! {};
     for arg in args {
-        let traversed_arg = quote_as_expr(arg, None, prefix);
+        let traversed_arg = quote_as_expr(arg, None, attr_args);
         traversed_args = quote! { #traversed_args #traversed_arg, }
     }
     quote! { #(#attrs)* #receiver #dot_token #method #turbofish ( #traversed_args ) }
 }
 fn quote_as_expr_paren(
     expr_paren: &ExprParen,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprParen { // A parenthesized expression: `(a + b)`.
         attrs, //: Vec<Attribute>,
@@ -815,13 +823,13 @@ fn quote_as_expr_paren(
             return quote! { #expr_paren };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* ( #expr ) }
 }
 fn quote_as_expr_path(
     expr_path: &ExprPath,
     is_print_func_name: Option<&mut bool>,
-    _prefix: &proc_macro2::TokenStream,
+    _attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprPath {
         // attrs, //: Vec<Attribute>,
@@ -842,7 +850,7 @@ fn quote_as_expr_path(
 }
 fn quote_as_expr_range(
     expr_range: &ExprRange,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprRange {
         attrs,  //: Vec<Attribute>,
@@ -858,13 +866,13 @@ fn quote_as_expr_range(
     }
     let start = start
         .as_ref()
-        .map(|start| quote_as_expr(&**start, None, prefix));
-    let end = end.as_ref().map(|end| quote_as_expr(&**end, None, prefix));
+        .map(|start| quote_as_expr(&**start, None, attr_args));
+    let end = end.as_ref().map(|end| quote_as_expr(&**end, None, attr_args));
     quote! { #(#attrs)* #start #limits #end }
 }
 fn quote_as_expr_raw_addr(
     expr_raw_addr: &ExprRawAddr,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprRawAddr {
         attrs,      //: Vec<Attribute>,
@@ -879,12 +887,12 @@ fn quote_as_expr_raw_addr(
             return quote! { #expr_raw_addr };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* #and_token #raw #mutability #expr }
 }
 fn quote_as_expr_reference(
     expr_reference: &ExprReference,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprReference {
         attrs,      //: Vec<Attribute>,
@@ -898,12 +906,12 @@ fn quote_as_expr_reference(
             return quote! { #expr_reference };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* #and_token #mutability #expr }
 }
 fn quote_as_expr_repeat(
     expr_repeat: &ExprRepeat,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprRepeat { // [0u8; N]
         attrs, //: Vec<Attribute>,
@@ -919,13 +927,13 @@ fn quote_as_expr_repeat(
             return quote! { #expr_repeat };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
-    let len = quote_as_expr(&**len, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
+    let len = quote_as_expr(&**len, None, attr_args);
     quote! { #(#attrs)* [ #expr #semi_token #len ] }
 }
 fn quote_as_expr_return(
     expr_return: &ExprReturn,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprReturn {
         attrs,        //: Vec<Attribute>,
@@ -940,12 +948,12 @@ fn quote_as_expr_return(
     }
     let expr = expr
         .as_ref()
-        .map(|expr| quote_as_expr(&**expr, None, prefix));
+        .map(|expr| quote_as_expr(&**expr, None, attr_args));
     quote! { #(#attrs)* #return_token #expr }
 }
 fn quote_as_field_value(
     field: &FieldValue,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let FieldValue {
         attrs,       //: Vec<Attribute>,
@@ -959,12 +967,12 @@ fn quote_as_field_value(
             return quote! { #field };
         }
     }
-    let expr = quote_as_expr(expr, None, prefix);
+    let expr = quote_as_expr(expr, None, attr_args);
     quote! { #(#attrs)* #member #colon_token #expr }
 }
 fn quote_as_expr_struct(
     expr_struct: &ExprStruct,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprStruct { // S { a: 1, b: 1, ..rest }
         attrs, //: Vec<Attribute>,
@@ -1014,20 +1022,20 @@ fn quote_as_expr_struct(
     let fields = {
         let mut traversed_fileds = quote! {};
         for field in fields {
-            let traversed_field = quote_as_field_value(field, prefix);
+            let traversed_field = quote_as_field_value(field, attr_args);
             traversed_fileds = quote! { #traversed_fileds #traversed_field, };
         }
         traversed_fileds
     };
     let rest = rest
         .as_ref()
-        .map(|expr| quote_as_expr(&**expr, None, prefix));
+        .map(|expr| quote_as_expr(&**expr, None, attr_args));
 
     quote! { #(#attrs)* #qself_and_apth { #fields #dot2_token #rest } }
 }
 fn quote_as_expr_try(
     expr_try: &ExprTry,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprTry {
         // expr?
@@ -1041,12 +1049,12 @@ fn quote_as_expr_try(
             return quote! { #expr_try };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* #expr #question_token }
 }
 fn quote_as_expr_try_block(
     expr_try_block: &ExprTryBlock,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprTryBlock {
         // try { ... }
@@ -1060,12 +1068,12 @@ fn quote_as_expr_try_block(
             return quote! { #expr_try_block };
         }
     }
-    let block = quote_as_block(block, prefix);
+    let block = quote_as_block(block, attr_args);
     quote! { #(#attrs)* #try_token #block }
 }
 fn quote_as_expr_tuple(
     expr_tuple: &ExprTuple,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprTuple {
         attrs, //: Vec<Attribute>,
@@ -1082,7 +1090,7 @@ fn quote_as_expr_tuple(
     let elems = {
         let mut traversed_elems = quote! {};
         for elem in elems {
-            let traversed_elem = quote_as_expr(elem, None, prefix);
+            let traversed_elem = quote_as_expr(elem, None, attr_args);
             traversed_elems = quote! { #traversed_elems #traversed_elem, }
         }
         traversed_elems
@@ -1091,7 +1099,7 @@ fn quote_as_expr_tuple(
 }
 fn quote_as_expr_unary(
     expr_unary: &ExprUnary,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprUnary {
         // `!x`, `*x`
@@ -1105,12 +1113,12 @@ fn quote_as_expr_unary(
             return quote! { #expr_unary };
         }
     }
-    let expr = quote_as_expr(&**expr, None, prefix);
+    let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* #op #expr }
 }
 fn quote_as_expr_unsafe(
     expr_unsafe: &ExprUnsafe,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprUnsafe {
         // unsafe { ... }
@@ -1124,12 +1132,12 @@ fn quote_as_expr_unsafe(
             return quote! { #expr_unsafe };
         }
     }
-    let block = quote_as_block(block, prefix);
+    let block = quote_as_block(block, attr_args);
     quote! { #(#attrs)* #unsafe_token #block }
 }
 fn quote_as_expr_while(
     expr_while: &ExprWhile,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprWhile {
         attrs,       //: Vec<Attribute>,
@@ -1144,13 +1152,13 @@ fn quote_as_expr_while(
             return quote! { #expr_while };
         }
     }
-    let cond = quote_as_expr(&**cond, None, prefix);
-    let body = quote_as_loop_block(body, prefix);
+    let cond = quote_as_expr(&**cond, None, attr_args);
+    let body = quote_as_loop_block(body, attr_args);
     quote! { #(#attrs)* #label #while_token #cond #body }
 }
 fn quote_as_expr_yield(
     expr_yield: &ExprYield,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ExprYield {
         attrs,       //: Vec<Attribute>,
@@ -1165,65 +1173,66 @@ fn quote_as_expr_yield(
     }
     let expr = expr
         .as_ref()
-        .map(|ref_boxed_expr| quote_as_expr(&**ref_boxed_expr, None, prefix));
+        .map(|ref_boxed_expr| quote_as_expr(&**ref_boxed_expr, None, attr_args));
     quote! { #(#attrs)* #yield_token #expr }
 }
 
 #[rustfmt::skip]
-fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, attr_args: &AttrArgs/*prefix: &proc_macro2::TokenStream*/) -> proc_macro2::TokenStream {
+// fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     match expr {
-        Expr::Array     (expr_array) => { quote_as_expr_array(expr_array, prefix) },
-        Expr::Assign    (expr_assign) => { quote_as_expr_assign(expr_assign, prefix) },
-        Expr::Async     (expr_async) => { quote_as_expr_async(expr_async, prefix) },
-        Expr::Await     (expr_await) => { quote_as_expr_await(expr_await, prefix) },
-        Expr::Binary    (expr_binary) => { quote_as_expr_binary(expr_binary, prefix) },
-        Expr::Block     (expr_block) => { quote_as_expr_block(expr_block, prefix) },
-        Expr::Break     (expr_break) => { quote_as_expr_break(expr_break, prefix) },
-        Expr::Call      (expr_call) => { quote_as_expr_call(expr_call, prefix) },
-        Expr::Cast      (expr_cast) => { quote_as_expr_cast(expr_cast, prefix) },
-        Expr::Closure   (expr_closure) => { quote_as_expr_closure(expr_closure, prefix) },
+        Expr::Array     (expr_array) => { quote_as_expr_array(expr_array, attr_args) },
+        Expr::Assign    (expr_assign) => { quote_as_expr_assign(expr_assign, attr_args) },
+        Expr::Async     (expr_async) => { quote_as_expr_async(expr_async, attr_args) },
+        Expr::Await     (expr_await) => { quote_as_expr_await(expr_await, attr_args) },
+        Expr::Binary    (expr_binary) => { quote_as_expr_binary(expr_binary, attr_args) },
+        Expr::Block     (expr_block) => { quote_as_expr_block(expr_block, attr_args) },
+        Expr::Break     (expr_break) => { quote_as_expr_break(expr_break, attr_args) },
+        Expr::Call      (expr_call) => { quote_as_expr_call(expr_call, attr_args) },
+        Expr::Cast      (expr_cast) => { quote_as_expr_cast(expr_cast, attr_args) },
+        Expr::Closure   (expr_closure) => { quote_as_expr_closure(expr_closure, attr_args) },
 
         // // Likely not applicable for instrumenting the run time functions and 
         // // closures (as opposed to compile time const functions and closures).
-        // Expr::Const     (expr_const) => { quote_as_expr_const(expr_const, prefix) },
-        // Expr::Continue  (expr_continue) => { quote_as_expr_continue(expr_continue, prefix) },
+        // Expr::Const     (expr_const) => { quote_as_expr_const(expr_const, attr_args) },
+        // Expr::Continue  (expr_continue) => { quote_as_expr_continue(expr_continue, attr_args) },
 
-        Expr::Field     (expr_field) => { quote_as_expr_field(expr_field, prefix) },
-        Expr::ForLoop   (expr_for_loop) => { quote_as_expr_for_loop(expr_for_loop, prefix) },
-        Expr::Group     (expr_group) => { quote_as_expr_group(expr_group, prefix) },
-        Expr::If        (expr_if) => { quote_as_expr_if(expr_if, prefix) },
-        Expr::Index     (expr_index) => { quote_as_expr_index(expr_index, prefix) },
+        Expr::Field     (expr_field) => { quote_as_expr_field(expr_field, attr_args) },
+        Expr::ForLoop   (expr_for_loop) => { quote_as_expr_for_loop(expr_for_loop, attr_args) },
+        Expr::Group     (expr_group) => { quote_as_expr_group(expr_group, attr_args) },
+        Expr::If        (expr_if) => { quote_as_expr_if(expr_if, attr_args) },
+        Expr::Index     (expr_index) => { quote_as_expr_index(expr_index, attr_args) },
         // // Likely not applicable for instrumenting the run time functions and 
         // // closures (as opposed to compile time const functions and closures).
-        // Expr::Infer     (expr_infer) => { quote_as_expr_infer(expr_infer, prefix) },
-        Expr::Let       (expr_let) => { quote_as_expr_let(expr_let, prefix) },
-        // Expr::Lit       (expr_lit) => { quote_as_expr_lit(expr_lit, prefix) },
-        Expr::Loop      (expr_loop) => { quote_as_expr_loop(expr_loop, prefix) },
-        Expr::Macro     (expr_macro) => { quote_as_expr_macro(expr_macro, prefix) },
-        Expr::Match     (expr_match) => { quote_as_expr_match(expr_match, prefix) },
-        Expr::MethodCall(expr_method_call) => { quote_as_expr_method_call(expr_method_call, prefix) },
-        Expr::Paren     (expr_paren) => { quote_as_expr_paren(expr_paren, prefix) },
-        Expr::Path      (expr_path) => { quote_as_expr_path(expr_path, is_print_func_name, prefix) },
-        Expr::Range     (expr_range) => { quote_as_expr_range(expr_range, prefix) },
-        Expr::RawAddr   (expr_raw_addr) => { quote_as_expr_raw_addr(expr_raw_addr, prefix) },
-        Expr::Reference (expr_reference) => { quote_as_expr_reference(expr_reference, prefix) },
-        Expr::Repeat    (expr_repeat) => { quote_as_expr_repeat(expr_repeat, prefix) },
-        Expr::Return    (expr_return) => { quote_as_expr_return(expr_return, prefix) },
-        Expr::Struct    (expr_struct) => { quote_as_expr_struct(expr_struct, prefix) },
-        Expr::Try       (expr_try) => { quote_as_expr_try(expr_try, prefix) },
-        Expr::TryBlock  (expr_try_block) => { quote_as_expr_try_block(expr_try_block, prefix) },
-        Expr::Tuple     (expr_tuple) => { quote_as_expr_tuple(expr_tuple, prefix) },
-        Expr::Unary     (expr_unary) => { quote_as_expr_unary(expr_unary, prefix) },
-        Expr::Unsafe    (expr_unsafe) => { quote_as_expr_unsafe(expr_unsafe, prefix) },
-        Expr::While     (expr_while) => { quote_as_expr_while(expr_while, prefix) },
-        Expr::Yield     (expr_yield) => { quote_as_expr_yield(expr_yield, prefix) },        
+        // Expr::Infer     (expr_infer) => { quote_as_expr_infer(expr_infer, attr_args) },
+        Expr::Let       (expr_let) => { quote_as_expr_let(expr_let, attr_args) },
+        // Expr::Lit       (expr_lit) => { quote_as_expr_lit(expr_lit, attr_args) },
+        Expr::Loop      (expr_loop) => { quote_as_expr_loop(expr_loop, attr_args) },
+        Expr::Macro     (expr_macro) => { quote_as_expr_macro(expr_macro, attr_args) },
+        Expr::Match     (expr_match) => { quote_as_expr_match(expr_match, attr_args) },
+        Expr::MethodCall(expr_method_call) => { quote_as_expr_method_call(expr_method_call, attr_args) },
+        Expr::Paren     (expr_paren) => { quote_as_expr_paren(expr_paren, attr_args) },
+        Expr::Path      (expr_path) => { quote_as_expr_path(expr_path, is_print_func_name, attr_args) },
+        Expr::Range     (expr_range) => { quote_as_expr_range(expr_range, attr_args) },
+        Expr::RawAddr   (expr_raw_addr) => { quote_as_expr_raw_addr(expr_raw_addr, attr_args) },
+        Expr::Reference (expr_reference) => { quote_as_expr_reference(expr_reference, attr_args) },
+        Expr::Repeat    (expr_repeat) => { quote_as_expr_repeat(expr_repeat, attr_args) },
+        Expr::Return    (expr_return) => { quote_as_expr_return(expr_return, attr_args) },
+        Expr::Struct    (expr_struct) => { quote_as_expr_struct(expr_struct, attr_args) },
+        Expr::Try       (expr_try) => { quote_as_expr_try(expr_try, attr_args) },
+        Expr::TryBlock  (expr_try_block) => { quote_as_expr_try_block(expr_try_block, attr_args) },
+        Expr::Tuple     (expr_tuple) => { quote_as_expr_tuple(expr_tuple, attr_args) },
+        Expr::Unary     (expr_unary) => { quote_as_expr_unary(expr_unary, attr_args) },
+        Expr::Unsafe    (expr_unsafe) => { quote_as_expr_unsafe(expr_unsafe, attr_args) },
+        Expr::While     (expr_while) => { quote_as_expr_while(expr_while, attr_args) },
+        Expr::Yield     (expr_yield) => { quote_as_expr_yield(expr_yield, attr_args) },        
 
         // Expr::Verbatim  (token_stream) => { quote_as_token_stream(token_stream, prefix) },
         _other => quote!{ #_other } // Expr::{Macro,Path}
     }
 }
 
-fn quote_as_init(init: &LocalInit, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_init(init: &LocalInit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     // `LocalInit` represents `= s.parse()?` in `let x: u64 = s.parse()?` and
     // `= r else { return }` in `let Ok(x) = r else { return }`.
     let LocalInit {
@@ -1231,15 +1240,15 @@ fn quote_as_init(init: &LocalInit, prefix: &proc_macro2::TokenStream) -> proc_ma
         expr,     //: Box<Expr>,
         diverge,  //: Option<(Else, Box<Expr>)>,
     } = init;
-    let expr = quote_as_expr(expr, None, prefix);
+    let expr = quote_as_expr(expr, None, attr_args);
     let diverge = diverge.as_ref().map(|(else_token, expr)| {
-        let expr = quote_as_expr(expr, None, prefix);
+        let expr = quote_as_expr(expr, None, attr_args);
         quote! { #else_token #expr }
     });
     quote! { #eq_token #expr #diverge }
 }
 
-fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let Local {
         attrs,      //: Vec<Attribute>,
         let_token,  //: Let,
@@ -1254,7 +1263,7 @@ fn quote_as_local(local: &Local, prefix: &proc_macro2::TokenStream) -> proc_macr
         }
     }
 
-    let init = init.as_ref().map(|init| quote_as_init(init, prefix));
+    let init = init.as_ref().map(|init| quote_as_init(init, attr_args));
 
     quote! { #(#attrs)* #let_token #pat #init #semi_token }
 }
@@ -1560,7 +1569,7 @@ fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
 fn traversed_block_from_sig(
     block: &Block,
     sig: &Signature,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let Signature {
         ident,    //: Ident,
@@ -1578,16 +1587,18 @@ fn traversed_block_from_sig(
 
     let block = {
         let func_log_name = {
-            if prefix.is_empty() {
+            if attr_args.prefix.is_empty() {
                 quote! { #ident }
             } else {
+                let prefix = &attr_args.prefix;
                 quote! { #prefix::#ident }
             }
         };
 
         // Instrument the local functions and closures inside of the function body:
-        let prefix = quote! { #func_log_name #generics() };
-        let block = quote_as_block(block, &prefix);
+        let attr_args = AttrArgs { prefix: quote! { #func_log_name #generics() } };
+        // let prefix = quote! { #func_log_name #generics() };
+        let block = quote_as_block(block, &attr_args);
 
         // The proc_macros (the pre-compile) part of the infrastructure for
         // generic parameters substitution with actual generic arguments,
@@ -1680,7 +1691,7 @@ fn traversed_block_from_sig(
 }
 fn quote_as_item_fn(
     item_fn: &ItemFn,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ItemFn {
         attrs, //: Vec<Attribute>,
@@ -1695,7 +1706,7 @@ fn quote_as_item_fn(
         }
     }
 
-    let block = traversed_block_from_sig(block, sig, prefix);
+    let block = traversed_block_from_sig(block, sig, attr_args);
     quote! { #(#attrs)* #vis #sig #block }
 }
 // // Likely not applicable for instrumenting the run time functions and
@@ -1706,7 +1717,7 @@ fn quote_as_item_fn(
 // }
 fn quote_as_impl_item_fn(
     impl_item_fn: &ImplItemFn,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ImplItemFn {
         attrs,       //: Vec<Attribute>,
@@ -1721,15 +1732,15 @@ fn quote_as_impl_item_fn(
             return quote! { #impl_item_fn };
         }
     }
-    let block = traversed_block_from_sig(block, sig, prefix);
+    let block = traversed_block_from_sig(block, sig, attr_args);
     quote! { #(#attrs)* #vis #defaultness #sig #block }
 }
 fn quote_as_impl_item(
     impl_item: &ImplItem,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     match impl_item {
-        ImplItem::Fn(impl_item_fn) => quote_as_impl_item_fn(impl_item_fn, prefix),
+        ImplItem::Fn(impl_item_fn) => quote_as_impl_item_fn(impl_item_fn, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
         // ImplItem::Const(impl_item_const) => quote_as_impl_item_const(impl_item_const, prefix),
@@ -1741,7 +1752,7 @@ fn quote_as_impl_item(
 }
 fn quote_as_item_impl(
     item_impl: &ItemImpl,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ItemImpl {
         attrs, //: Vec<Attribute>,
@@ -1782,10 +1793,12 @@ fn quote_as_item_impl(
     let items = {
         // Add the impl type to the prefix
         // (to pass such an updated prefix to the nested items):
-        let prefix = {
-            if prefix.is_empty() {
+        let attr_args = AttrArgs { prefix:  
+        // let prefix = {
+            if attr_args.prefix.is_empty() {
                 quote! { #self_ty }
             } else {
+                let prefix = &attr_args.prefix;
                 quote! { #prefix::#self_ty }
             }
         };
@@ -1793,7 +1806,7 @@ fn quote_as_item_impl(
 
         let mut traversed_impl_items = quote! {};
         for impl_item in items {
-            let traversed_impl_item = quote_as_impl_item(impl_item, &prefix);
+            let traversed_impl_item = quote_as_impl_item(impl_item, &attr_args);
             traversed_impl_items = quote! { #traversed_impl_items #traversed_impl_item };
         }
         traversed_impl_items
@@ -1808,7 +1821,7 @@ fn quote_as_item_impl(
 // }
 fn quote_as_item_mod(
     item_mod: &ItemMod,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ItemMod {
         attrs,     //: Vec<Attribute>,
@@ -1826,10 +1839,12 @@ fn quote_as_item_mod(
         }
     }
 
-    let prefix = {
-        if prefix.is_empty() {
+    let attr_args = AttrArgs { prefix:  
+    // let prefix = {
+        if attr_args.prefix.is_empty() {
             quote! { #ident }
         } else {
+            let prefix = &attr_args.prefix;
             quote! { #prefix::#ident }
         }
     };
@@ -1837,7 +1852,7 @@ fn quote_as_item_mod(
     let content = content.as_ref().map(|(_brace, items)| {
         let mut traversed_items = quote! {};
         for item in items {
-            let item = quote_as_item(item, &prefix);
+            let item = quote_as_item(item, &attr_args);
             traversed_items = quote! { #traversed_items #item };
         }
         quote! { { #traversed_items } }
@@ -1846,7 +1861,7 @@ fn quote_as_item_mod(
 }
 fn quote_as_item_static(
     item_static: &ItemStatic,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ItemStatic {
         attrs,        //: Vec<Attribute>,
@@ -1873,7 +1888,7 @@ fn quote_as_item_static(
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let ty = quote_as_ty(ty, prefix);
-    let expr = quote_as_expr(expr, None, prefix);
+    let expr = quote_as_expr(expr, None, attr_args);
     quote! { #(#attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
 }
 // // Likely not applicable for instrumenting the run time functions and
@@ -1908,7 +1923,7 @@ fn quote_as_item_static(
 // }
 fn quote_as_trait_item_const(
     trait_item_const: &TraitItemConst,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let TraitItemConst {
         attrs,       //: Vec<Attribute>,
@@ -1927,14 +1942,14 @@ fn quote_as_trait_item_const(
         }
     }
     let default = default.as_ref().map(|(eq_token, expr)| {
-        let expr = quote_as_expr(expr, None, prefix);
+        let expr = quote_as_expr(expr, None, attr_args);
         quote! { #eq_token #expr }
     });
     quote! {  #(#attrs)* #const_token #ident #generics #colon_token #ty #default #semi_token }
 }
 fn quote_as_trait_item_fn(
     trait_item_fn: &TraitItemFn,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let TraitItemFn {
         attrs,      //: Vec<Attribute>,
@@ -1950,16 +1965,16 @@ fn quote_as_trait_item_fn(
     }
     let default = default
         .as_ref()
-        .map(|block| traversed_block_from_sig(block, sig, prefix));
+        .map(|block| traversed_block_from_sig(block, sig, attr_args));
     quote! { #(#attrs)* #sig #default #semi_token }
 }
 fn quote_as_trait_item(
     item: &TraitItem,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     match item {
-        TraitItem::Const(trait_item_const) => quote_as_trait_item_const(trait_item_const, prefix),
-        TraitItem::Fn(trait_item_fn) => quote_as_trait_item_fn(trait_item_fn, prefix),
+        TraitItem::Const(trait_item_const) => quote_as_trait_item_const(trait_item_const, attr_args),
+        TraitItem::Fn(trait_item_fn) => quote_as_trait_item_fn(trait_item_fn, attr_args),
 
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
@@ -1972,7 +1987,7 @@ fn quote_as_trait_item(
 }
 fn quote_as_item_trait(
     item_trait: &ItemTrait,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ItemTrait {
         attrs, //: Vec<Attribute>,
@@ -2014,16 +2029,24 @@ fn quote_as_item_trait(
     //     traversed_supertraits
     // };
     let items = {
-        let prefix = {
-            if prefix.is_empty() {
+        let attr_args = AttrArgs { prefix:  if attr_args.prefix.is_empty() {
                 quote! { #ident #generics }
             } else {
+                let prefix = &attr_args.prefix;
                 quote! { #prefix::#ident #generics }
             }
         };
+        // let prefix = {
+        //     if attr_args.prefix.is_empty() {
+        //         quote! { #ident #generics }
+        //     } else {
+        //         let prefix = &attr_args.prefix;
+        //         quote! { #prefix::#ident #generics }
+        //     }
+        // };
         let mut traversed_items = quote! {};
         for item in items {
-            let traversed_item = quote_as_trait_item(item, &prefix);
+            let traversed_item = quote_as_trait_item(item, &attr_args);
             traversed_items = quote! { #traversed_items #traversed_item };
         }
         traversed_items
@@ -2300,40 +2323,40 @@ fn quote_as_item_trait(
 //     quote!{ #token_stream }
 // }
 
-fn quote_as_item(item: &Item, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_item(item: &Item, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match item {
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // Item::Const(item_const) => quote_as_item_const(item_const, prefix),
-        // Item::Enum(item_enum) => quote_as_item_enum(item_enum, prefix),
-        // Item::ExternCrate(item_extern_crate) => quote_as_item_extern_crate(item_extern_crate, prefix),
-        Item::Fn(item_fn) => quote_as_item_fn(item_fn, prefix),
-        // Item::ForeignMod(item_foreign_mod) => quote_as_item_foreign_mod(item_foreign_mod, prefix),
-        Item::Impl(item_impl) => quote_as_item_impl(item_impl, prefix),
-        // Item::Macro(item_macro) => quote_as_item_macro(item_macro, prefix),
-        Item::Mod(item_mod) => quote_as_item_mod(item_mod, prefix),
-        Item::Static(item_static) => quote_as_item_static(item_static, prefix),
+        // Item::Const(item_const) => quote_as_item_const(item_const, attr_args),
+        // Item::Enum(item_enum) => quote_as_item_enum(item_enum, attr_args),
+        // Item::ExternCrate(item_extern_crate) => quote_as_item_extern_crate(item_extern_crate, attr_args),
+        Item::Fn(item_fn) => quote_as_item_fn(item_fn, attr_args),
+        // Item::ForeignMod(item_foreign_mod) => quote_as_item_foreign_mod(item_foreign_mod, attr_args),
+        Item::Impl(item_impl) => quote_as_item_impl(item_impl, attr_args),
+        // Item::Macro(item_macro) => quote_as_item_macro(item_macro, attr_args),
+        Item::Mod(item_mod) => quote_as_item_mod(item_mod, attr_args),
+        Item::Static(item_static) => quote_as_item_static(item_static, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // Item::Struct(item_struct) => quote_as_item_struct(item_struct, prefix),
-        Item::Trait(item_trait) => quote_as_item_trait(item_trait, prefix),
+        // Item::Struct(item_struct) => quote_as_item_struct(item_struct, attr_args),
+        Item::Trait(item_trait) => quote_as_item_trait(item_trait, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // Item::TraitAlias(item_trait_alias) => quote_as_item_trait_alias(item_trait_alias, prefix),
+        // Item::TraitAlias(item_trait_alias) => quote_as_item_trait_alias(item_trait_alias, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // Item::Type(item_type) => quote_as_item_type(item_type, prefix),
+        // Item::Type(item_type) => quote_as_item_type(item_type, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // Item::Union(item_union) => quote_as_item_union(item_union, prefix),
-        // Item::Use(item_use) => quote_as_item_use(item_use, prefix),
-        // Item::Verbatim(token_stream) => quote_as_token_stream(token_stream, prefix)
+        // Item::Union(item_union) => quote_as_item_union(item_union, attr_args),
+        // Item::Use(item_use) => quote_as_item_use(item_use, attr_args),
+        // Item::Verbatim(token_stream) => quote_as_token_stream(token_stream, attr_args)
         other => quote! { #other }, // Item::{Const,Enum,Union,Verbatim}
     }
 }
 fn quote_as_stmt_macro(
     stmt_macro: &StmtMacro,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let StmtMacro {
         attrs,      //: Vec<Attribute>,
@@ -2342,7 +2365,7 @@ fn quote_as_stmt_macro(
     } = stmt_macro;
 
     let mut maybe_flush_invocation = quote! {};
-    let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, prefix);
+    let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, attr_args);
 
     let mut ret_val = quote! { #(#attrs)* #mac #semi_token };
 
@@ -2356,20 +2379,20 @@ fn quote_as_stmt_macro(
     }
     ret_val
 }
-fn quote_as_stmt(stmt: &Stmt, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_stmt(stmt: &Stmt, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match stmt {
-        Stmt::Local(local) => quote_as_local(local, prefix),
-        Stmt::Item(item) => quote_as_item(item, prefix),
+        Stmt::Local(local) => quote_as_local(local, attr_args),
+        Stmt::Item(item) => quote_as_item(item, attr_args),
         Stmt::Expr(expr, opt_semi) => {
-            let expr = quote_as_expr(expr, None, prefix);
+            let expr = quote_as_expr(expr, None, attr_args);
             quote! { #expr #opt_semi }
         }
-        Stmt::Macro(stmt_macro) => quote_as_stmt_macro(stmt_macro, prefix),
+        Stmt::Macro(stmt_macro) => quote_as_stmt_macro(stmt_macro, attr_args),
     }
 }
 fn quote_as_loop_block(
     block: &Block,
-    prefix: &proc_macro2::TokenStream,
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let Block {
         // brace_token, //: Brace,
@@ -2380,7 +2403,7 @@ fn quote_as_loop_block(
     let stmts = {
         let mut traversed_stmts = quote! {};
         for stmt in stmts {
-            let traversed_stmt = quote_as_stmt(stmt, prefix);
+            let traversed_stmt = quote_as_stmt(stmt, attr_args);
             traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
         }
         traversed_stmts
@@ -2433,7 +2456,7 @@ fn quote_as_loop_block(
     }
 }
 
-fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_block(block: &Block, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let Block {
         // brace_token, //: Brace,
         stmts, // Vec<Stmt>
@@ -2443,7 +2466,7 @@ fn quote_as_block(block: &Block, prefix: &proc_macro2::TokenStream) -> proc_macr
     let stmts = {
         let mut traversed_stmts = quote! {};
         for stmt in stmts {
-            let traversed_stmt = quote_as_stmt(stmt, prefix);
+            let traversed_stmt = quote_as_stmt(stmt, attr_args);
             traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
         }
         traversed_stmts
