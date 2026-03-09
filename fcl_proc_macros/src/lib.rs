@@ -81,11 +81,9 @@ pub fn loggable(
             quote_as_item(&item, &attr_args)
         } else if let Ok(expr) = syn::parse::<Expr>(attributed_item.clone()) {
             quote_as_expr(&expr, None, &attr_args)
-            // quote_as_expr(&expr, None, &attr_args_parsed.prefix)
         } else {
             let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
             quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
-            // quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args_parsed.prefix)
         }
     };
     let ret_val = quote! { #output };
@@ -334,7 +332,6 @@ fn quote_as_expr_cast(
 fn quote_as_expr_closure(
     expr_closure: &ExprClosure,
     attr_args: &AttrArgs,
-    //prefix: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let ExprClosure {
         attrs,      //: Vec<Attribute>,
@@ -390,18 +387,16 @@ fn quote_as_expr_closure(
         }
     };
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
-    let prefix = &attr_args.prefix;
-    if !prefix.is_empty() {
+    if !attr_args.prefix.is_empty() {
+        let prefix = &attr_args.prefix;
         log_closure_name_ts = quote! { #prefix::#log_closure_name_ts }
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
     let attr_args = AttrArgs { 
         prefix: log_closure_name_ts 
     };
-    // let prefix = &log_closure_name_ts;
 
     let body = { quote_as_expr(&**body, None, &attr_args) };
-    // let body = { quote_as_expr(&**body, None, prefix) };
 
     let logging_is_on = quote! {
         logger.borrow()
@@ -465,19 +460,19 @@ fn quote_as_expr_closure(
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_const(expr_const: &ExprConst, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+// fn quote_as_expr_const(expr_const: &ExprConst, _attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_const }
 //     // let ExprConst {
 //     //     attrs, //: Vec<Attribute>,
 //     //     const_token, //: Const,
 //     //     block, //: Block,
 //     // } = expr_const;
-//     // let block = quote_as_expr_block(block, attr_args);
+//     // let block = quote_as_expr_block(block, _attr_args);
 //     // quote!{ #(#attrs)* #const_token #block }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_expr_continue(expr_continue: &ExprContinue, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+// fn quote_as_expr_continue(expr_continue: &ExprContinue, _attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_continue }   // A `continue`, with an optional label.
 // }
 fn quote_as_expr_field(
@@ -624,7 +619,7 @@ fn quote_as_expr_let(
     }
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
-    // let pat = quote_as_pat(&**pat, prefix);
+    // let pat = quote_as_pat(&**pat, attr_args);
     let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* #let_token #pat #eq_token #expr }
 }
@@ -797,7 +792,7 @@ fn quote_as_expr_method_call(
     // // closures (as opposed to compile time const functions and closures).
     // let turbofish = match turbofish {
     //     Some(angle_bracketed_generic_arguments) =>
-    //         Some(quote_as_angle_bracketed_generic_arguments(angle_bracketed_generic_arguments, prefix)),
+    //         Some(quote_as_angle_bracketed_generic_arguments(angle_bracketed_generic_arguments, attr_args)),
     //     _ => turbofish
     // };
     let mut traversed_args = quote! {};
@@ -1012,12 +1007,12 @@ fn quote_as_expr_struct(
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let qself = match qself {
-    //     Some(qself) => Some(quote_as_qself(qself, prefix)),
+    //     Some(qself) => Some(quote_as_qself(qself, attr_args)),
     //     _ => qself, // None
     // };
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
-    // let path = quote_as_path(path, prefix);
+    // let path = quote_as_path(path, attr_args);
 
     let fields = {
         let mut traversed_fileds = quote! {};
@@ -1178,8 +1173,7 @@ fn quote_as_expr_yield(
 }
 
 #[rustfmt::skip]
-fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, attr_args: &AttrArgs/*prefix: &proc_macro2::TokenStream*/) -> proc_macro2::TokenStream {
-// fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match expr {
         Expr::Array     (expr_array) => { quote_as_expr_array(expr_array, attr_args) },
         Expr::Assign    (expr_assign) => { quote_as_expr_assign(expr_assign, attr_args) },
@@ -1227,7 +1221,7 @@ fn quote_as_expr(expr: &Expr, is_print_func_name: Option<&mut bool>, attr_args: 
         Expr::While     (expr_while) => { quote_as_expr_while(expr_while, attr_args) },
         Expr::Yield     (expr_yield) => { quote_as_expr_yield(expr_yield, attr_args) },        
 
-        // Expr::Verbatim  (token_stream) => { quote_as_token_stream(token_stream, prefix) },
+        // Expr::Verbatim  (token_stream) => { quote_as_token_stream(token_stream, attr_args) },
         _other => quote!{ #_other } // Expr::{Macro,Path}
     }
 }
@@ -1270,7 +1264,7 @@ fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStre
 
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_const(item_const: &ItemConst, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_const(item_const: &ItemConst, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemConst { // const MAX: u16 = 65535
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -1285,15 +1279,15 @@ fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStre
 //     } = item_const;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
-//     let generics = quote_as_generics(generics, prefix);
-//     // let ty = quote_as_type(ty, prefix);
-//     let expr = quote_as_expr(expr, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
+//     let generics = quote_as_generics(generics, attr_args);
+//     // let ty = quote_as_type(ty, attr_args);
+//     let expr = quote_as_expr(expr, attr_args);
 //     quote!{ #(#attrs)* #vis #const_token #ident #generics #colon_token #ty #eq_token #expr #semi_token }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_enum(item_enum: &ItemEnum, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_enum(item_enum: &ItemEnum, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemEnum {  // enum Foo<A, B> { A(A), B(B) }
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -1306,18 +1300,18 @@ fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStre
 //     } = item_enum;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
-//     let generics = quote_as_generics(generics, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
+//     let generics = quote_as_generics(generics, attr_args);
 //     let mut traversed_variants = quote!{};
 //     for variant in variants {
-//         let traveresed_variant = quote_as_variant(variant, prefix);
+//         let traveresed_variant = quote_as_variant(variant, attr_args);
 //         traversed_variants = quote!{ #traversed_variants #traveresed_variant }
 //     }
 //     quote!{ #(#attrs)* #vis #enum_token #ident #generics { #traversed_variants } }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_extern_crate(item_extern_crate: &ItemExternCrate, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_extern_crate(item_extern_crate: &ItemExternCrate, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemExternCrate {
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -1329,7 +1323,7 @@ fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStre
 //     } = item_extern_crate;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
 //     quote!{ #(#attrs)* #vis #extern_token #crate_token #ident #rename #semi_token }
 // }
 trait IsTraverseStopper {
@@ -1597,7 +1591,6 @@ fn traversed_block_from_sig(
 
         // Instrument the local functions and closures inside of the function body:
         let attr_args = AttrArgs { prefix: quote! { #func_log_name #generics() } };
-        // let prefix = quote! { #func_log_name #generics() };
         let block = quote_as_block(block, &attr_args);
 
         // The proc_macros (the pre-compile) part of the infrastructure for
@@ -1711,7 +1704,7 @@ fn quote_as_item_fn(
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_foreign_mod(item_foreign_mod: &ItemForeignMod, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_foreign_mod(item_foreign_mod: &ItemForeignMod, _attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     // let ItemForeignMod {} = item_foreign_mod;
 //     quote!{ #item_foreign_mod }
 // }
@@ -1743,10 +1736,10 @@ fn quote_as_impl_item(
         ImplItem::Fn(impl_item_fn) => quote_as_impl_item_fn(impl_item_fn, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // ImplItem::Const(impl_item_const) => quote_as_impl_item_const(impl_item_const, prefix),
-        // ImplItem::Type(impl_item_type) => quote_as_impl_item_type(impl_item_type, prefix),
-        // ImplItem::Macro(impl_item_macro) => quote_as_impl_item_macro(impl_item_macro, prefix),
-        // ImplItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, prefix),
+        // ImplItem::Const(impl_item_const) => quote_as_impl_item_const(impl_item_const, attr_args),
+        // ImplItem::Type(impl_item_type) => quote_as_impl_item_type(impl_item_type, attr_args),
+        // ImplItem::Macro(impl_item_macro) => quote_as_impl_item_macro(impl_item_macro, attr_args),
+        // ImplItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, attr_args),
         other => quote! { #other },
     }
 }
@@ -1788,13 +1781,12 @@ fn quote_as_item_impl(
     //     let path = quote_as_path(path);
     //     quote!{ #opt_not #path #for_token };
     // });
-    // let self_ty = quote_as_type(&**self_ty, prefix);
+    // let self_ty = quote_as_type(&**self_ty, attr_args);
 
     let items = {
         // Add the impl type to the prefix
         // (to pass such an updated prefix to the nested items):
         let attr_args = AttrArgs { prefix:  
-        // let prefix = {
             if attr_args.prefix.is_empty() {
                 quote! { #self_ty }
             } else {
@@ -1802,7 +1794,6 @@ fn quote_as_item_impl(
                 quote! { #prefix::#self_ty }
             }
         };
-        // let prefix = quote!{ #prefix::#self_ty };
 
         let mut traversed_impl_items = quote! {};
         for impl_item in items {
@@ -1815,7 +1806,7 @@ fn quote_as_item_impl(
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_macro(item_macro: &ItemMacro, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_macro(item_macro: &ItemMacro, _attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     // let ItemMacro {} = item_macro;
 //     quote!{ #item_macro }
 // }
@@ -1840,7 +1831,6 @@ fn quote_as_item_mod(
     }
 
     let attr_args = AttrArgs { prefix:  
-    // let prefix = {
         if attr_args.prefix.is_empty() {
             quote! { #ident }
         } else {
@@ -1884,16 +1874,16 @@ fn quote_as_item_static(
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
-    // let vis = quote_as_vis(vis, prefix);
+    // let vis = quote_as_vis(vis, attr_args);
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
-    // let ty = quote_as_ty(ty, prefix);
+    // let ty = quote_as_ty(ty, attr_args);
     let expr = quote_as_expr(expr, None, attr_args);
     quote! { #(#attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_struct(item_struct: &ItemStruct, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_struct(item_struct: &ItemStruct, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemStruct {
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -1905,17 +1895,21 @@ fn quote_as_item_static(
 //     } = item_struct;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let generics = quote_as_generics(generics, prefix);
+//     // let generics = quote_as_generics(generics, attr_args);
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
 //     // let fields = {
-//     //     let prefix = quote!{ #prefix::#ident };
+//     //     let attr_args = AttrArgs { prefix: {
+//     //             let prefix = &attr_args.prefix;
+//     //             quote!{ #prefix::#ident }
+//     //         } 
+//     //     };
 //     //     let mut traversed_fields = quote!{};
 //     //     for field in fields {
-//     //         let traversed_field = quote_as_field(field, prefix);
+//     //         let traversed_field = quote_as_field(field, &attr_args);
 //     //         traversed_fields = quote!{ #traversed_fields #traversed_field };
 //     //     }
 //     // };
@@ -1978,10 +1972,10 @@ fn quote_as_trait_item(
 
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
-        // TraitItem::Type(trait_item_type) => quote_as_trait_item_type(trait_item_type, prefix),
-        // TraitItem::Macro(trait_item_macro) => quote_as_trait_item_macro(trait_item_macro, prefix),
+        // TraitItem::Type(trait_item_type) => quote_as_trait_item_type(trait_item_type, attr_args),
+        // TraitItem::Macro(trait_item_macro) => quote_as_trait_item_macro(trait_item_macro, attr_args),
 
-        // TraitItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, prefix),
+        // TraitItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, attr_args),
         other => quote! { #other },
     }
 }
@@ -2013,37 +2007,30 @@ fn quote_as_item_trait(
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
-    // let vis = quote_as_vis(vis, prefix);
+    // let vis = quote_as_vis(vis, attr_args);
 
     // NOTE: Future: restriction. Unused, but reserved for RFC 3323 restrictions.
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
-    // let generics = quote_as_generics(generics, prefix);
+    // let generics = quote_as_generics(generics, attr_args);
     // let supertraits = {
     //     let mut traversed_supertraits = quote!{};
     //     for supertrait in supertraits {
-    //         let type_param_bound = quote_as_type_param_bound(supertrait, prefix);
+    //         let type_param_bound = quote_as_type_param_bound(supertrait, attr_args);
     //         traversed_supertraits = quote!{ #traversed_supertraits #type_param_bound + }
     //     }
     //     traversed_supertraits
     // };
     let items = {
-        let attr_args = AttrArgs { prefix:  if attr_args.prefix.is_empty() {
+        let attr_args = AttrArgs { prefix:  
+            if attr_args.prefix.is_empty() {
                 quote! { #ident #generics }
             } else {
                 let prefix = &attr_args.prefix;
                 quote! { #prefix::#ident #generics }
             }
         };
-        // let prefix = {
-        //     if attr_args.prefix.is_empty() {
-        //         quote! { #ident #generics }
-        //     } else {
-        //         let prefix = &attr_args.prefix;
-        //         quote! { #prefix::#ident #generics }
-        //     }
-        // };
         let mut traversed_items = quote! {};
         for item in items {
             let traversed_item = quote_as_trait_item(item, &attr_args);
@@ -2056,7 +2043,7 @@ fn quote_as_item_trait(
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_trait_alias(item_trait_alias: &ItemTraitAlias, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_trait_alias(item_trait_alias: &ItemTraitAlias, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemTraitAlias {    // pub trait SharableIterator = Iterator + Sync
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -2069,14 +2056,14 @@ fn quote_as_item_trait(
 //     } = item_trait_alias;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let generics = quote_as_generics(generics, prefix);
+//     // let generics = quote_as_generics(generics, attr_args);
 //     // let bounds = {
 //     //     let mut traversed_bounds = quote!{};
 //     //     for bound in bounds {
-//     //         let type_param_bound = quote_as_type_param_bound(bound, prefix);
+//     //         let type_param_bound = quote_as_type_param_bound(bound, attr_args);
 //     //         traversed_bounds = quote!{ #traversed_bounds #type_param_bound + }
 //     //     }
 //     //     traversed_bounds
@@ -2088,7 +2075,7 @@ fn quote_as_item_trait(
 // // closures (as opposed to compile time const functions and closures)
 // // since types are a compile time concepts and require const functions
 // // executed at compile time.
-// fn quote_as_type_array(type_array: &TypeArray, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_array(type_array: &TypeArray, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeArray { // [T; n]
 //         // bracket_token, //: Bracket,
 //         elem, //: Box<Type>,
@@ -2096,76 +2083,76 @@ fn quote_as_item_trait(
 //         len, //: Expr,
 //         .. // bracket_token
 //     } = type_array;
-//     let elem = quote_as_type(&**elem, prefix);
-//     let len = quote_as_expr(len, prefix);
+//     let elem = quote_as_type(&**elem, attr_args);
+//     let len = quote_as_expr(len, attr_args);
 //     quote!{ [ #elem #semi_token #len ] }
 // }
-// fn quote_as_type_bare_fn(type_bare_fn: &TypeBareFn, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_bare_fn(type_bare_fn: &TypeBareFn, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeBareFn {
 //     } = type_bare_fn;
 //     quote!{}
 // }
-// fn quote_as_type_group(type_group: &TypeGroup, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_group(type_group: &TypeGroup, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeGroup {
 //     } = type_group;
 //     quote!{}
 // }
-// fn quote_as_type_impl_trait(type_impl_trait: &TypeImplTrait, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_impl_trait(type_impl_trait: &TypeImplTrait, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeImplTrait {
 //     } = type_impl_trait;
 //     quote!{}
 // }
-// fn quote_as_type_infer(type_infer: &TypeInfer, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_infer(type_infer: &TypeInfer, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeInfer {
 //     } = type_infer;
 //     quote!{}
 // }
-// fn quote_as_type_macro(type_macro: &TypeMacro, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_macro(type_macro: &TypeMacro, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeMacro {
 //     } = type_macro;
 //     quote!{}
 // }
-// fn quote_as_type_never(type_never: &TypeNever, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_never(type_never: &TypeNever, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeNever {
 //     } = type_never;
 //     quote!{}
 // }
-// fn quote_as_type_paren(type_paren: &TypeParen, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_paren(type_paren: &TypeParen, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeParen {
 //     } = type_paren;
 //     quote!{}
 // }
-// fn quote_as_type_path(type_path: &TypePath, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_path(type_path: &TypePath, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypePath {
 //     } = type_path;
 //     quote!{}
 // }
-// fn quote_as_type_ptr(type_ptr: &TypePtr, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_ptr(type_ptr: &TypePtr, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypePtr {
 //     } = type_ptr;
 //     quote!{}
 // }
-// fn quote_as_type_reference(type_reference: &TypeReference, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_reference(type_reference: &TypeReference, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeReference {
 //     } = type_reference;
 //     quote!{}
 // }
-// fn quote_as_type_slice(type_slice: &TypeSlice, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_slice(type_slice: &TypeSlice, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeSlice {
 //     } = type_slice;
 //     quote!{}
 // }
-// fn quote_as_type_trait_object(type_trait_object: &TypeTraitObject, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_trait_object(type_trait_object: &TypeTraitObject, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeTraitObject {
 //     } = type_trait_object;
 //     quote!{}
 // }
-// fn quote_as_type_tuple(type_tuple: &TypeTuple, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_type_tuple(type_tuple: &TypeTuple, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TypeTuple {
 //     } = type_tuple;
 //     quote!{}
 // }
-// fn quote_as_token_stream(token_stream: &TokenStream, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_token_stream(token_stream: &TokenStream, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let TokenStream {
 //     } = token_stream;
 //     quote!{}
@@ -2173,29 +2160,29 @@ fn quote_as_item_trait(
 
 // // Likely not applicable since types are a compile time concepts and require
 // // the const functions (executed at compile time) rather than the run time functions.
-// fn quote_as_type(ty: &Type, prefix: &proc_macro2::TokenStream) -> TokenStream {
+// fn quote_as_type(ty: &Type, attr_args: &AttrArgs) -> TokenStream {
 //     quote!{ #ty }
 //     // match ty {
-//     //     Type::Array(type_array) => quote_as_type_array(type_array, prefix),
-//     //     Type::BareFn(type_bare_fn) => quote_as_type_bare_fn(type_bare_fn, prefix),
-//     //     Type::Group(type_group) => quote_as_type_group(type_group, prefix),
-//     //     Type::ImplTrait(type_impl_trait) => quote_as_type_impl_trait(type_impl_trait, prefix),
-//     //     Type::Infer(type_infer) => quote_as_type_infer(type_infer, prefix),
-//     //     Type::Macro(type_macro) => quote_as_type_macro(type_macro, prefix),
-//     //     Type::Never(type_never) => quote_as_type_never(type_never, prefix),
-//     //     Type::Paren(type_paren) => quote_as_type_paren(type_paren, prefix),
-//     //     Type::Path(type_path) => quote_as_type_path(type_path, prefix),
-//     //     Type::Ptr(type_ptr) => quote_as_type_ptr(type_ptr, prefix),
-//     //     Type::Reference(type_reference) => quote_as_type_reference(type_reference, prefix),
-//     //     Type::Slice(type_slice) => quote_as_type_slice(type_slice, prefix),
-//     //     Type::TraitObject(type_trait_object) => quote_as_type_trait_object(type_trait_object, prefix),
-//     //     Type::Tuple(type_tuple) => quote_as_type_tuple(type_tuple, prefix),
+//     //     Type::Array(type_array) => quote_as_type_array(type_array, attr_args),
+//     //     Type::BareFn(type_bare_fn) => quote_as_type_bare_fn(type_bare_fn, attr_args),
+//     //     Type::Group(type_group) => quote_as_type_group(type_group, attr_args),
+//     //     Type::ImplTrait(type_impl_trait) => quote_as_type_impl_trait(type_impl_trait, attr_args),
+//     //     Type::Infer(type_infer) => quote_as_type_infer(type_infer, attr_args),
+//     //     Type::Macro(type_macro) => quote_as_type_macro(type_macro, attr_args),
+//     //     Type::Never(type_never) => quote_as_type_never(type_never, attr_args),
+//     //     Type::Paren(type_paren) => quote_as_type_paren(type_paren, attr_args),
+//     //     Type::Path(type_path) => quote_as_type_path(type_path, attr_args),
+//     //     Type::Ptr(type_ptr) => quote_as_type_ptr(type_ptr, attr_args),
+//     //     Type::Reference(type_reference) => quote_as_type_reference(type_reference, attr_args),
+//     //     Type::Slice(type_slice) => quote_as_type_slice(type_slice, attr_args),
+//     //     Type::TraitObject(type_trait_object) => quote_as_type_trait_object(type_trait_object, attr_args),
+//     //     Type::Tuple(type_tuple) => quote_as_type_tuple(type_tuple, attr_args),
 //     //     _other => quote!{ #_other } // Type::Verbatim(token_stream)
 //     // }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_type(item_type: &ItemType, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_type(item_type: &ItemType, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemType {  // type Result<T> = std::result::Result<T, MyError>;
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -2208,16 +2195,16 @@ fn quote_as_item_trait(
 //     } = item_type;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let generics = quote_as_generics(generics, prefix);
-//     // let ty = quote_as_type(&**ty, prefix);
+//     // let generics = quote_as_generics(generics, attr_args);
+//     // let ty = quote_as_type(&**ty, attr_args);
 //     quote!{ #(#attrs)* #vis #type_token #ident #generics #eq_token #ty #semi_token }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_path(path: &Path, prefix: &proc_macro2::TokenStream) -> TokenStream {
+// fn quote_as_path(path: &Path, attr_args: &AttrArgs) -> TokenStream {
 //     let Path {
 //         leading_colon, //: Option<PathSep>,
 //         segments, //: Punctuated<PathSegment, PathSep>,
@@ -2227,7 +2214,7 @@ fn quote_as_item_trait(
 //     // let segments = {
 //     //     let mut traversed_segments = quote!{};
 //     //     for segment in segments {
-//     //         let segment = quote_as_path_segment(segment, prefix);
+//     //         let segment = quote_as_path_segment(segment, attr_args);
 //     //         traversed_segments = quote!{ #traversed_segments #segment:: };
 //     //     }
 //     // };
@@ -2235,7 +2222,7 @@ fn quote_as_item_trait(
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_vis_restricted(vis_restricted: &VisRestricted, prefix: &proc_macro2::TokenStream) -> TokenStream {
+// fn quote_as_vis_restricted(vis_restricted: &VisRestricted, attr_args: &AttrArgs) -> TokenStream {
 //     let VisRestricted { // pub(self) or pub(super) or pub(crate) or pub(in some::module).
 //         pub_token, //: Pub,
 //         // paren_token, //: Paren,
@@ -2245,32 +2232,32 @@ fn quote_as_item_trait(
 //     } = vis_restricted;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let path = quote_as_path(&**path, prefix);
+//     // let path = quote_as_path(&**path, attr_args);
 //     quote!{ #pub_token ( #in_token #path ) }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_vis(vis: &Visibility, prefix: &proc_macro2::TokenStream) -> TokenStream {
+// fn quote_as_vis(vis: &Visibility, attr_args: &AttrArgs) -> TokenStream {
 //     match vis {
 //         Visibility::Restricted(vis_restricted) =>
-//             quote_as_vis_restricted(vis_restricted, prefix),
+//             quote_as_vis_restricted(vis_restricted, attr_args),
 //         vis_inherited => quote!{ #vis_inherited }, // Public, Inherited
 //     }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_generic_param(param: &GenericParam, prefix: &proc_macro2::TokenStream) -> TokenStream {
+// fn quote_as_generic_param(param: &GenericParam, attr_args: &AttrArgs) -> TokenStream {
 //     match param { // `T: Into<String>`, `'a: 'b`, `const LEN: usize`
-//         // GenericParam::Type(type_param) => quote_as_type_param(type_param, prefix),
+//         // GenericParam::Type(type_param) => quote_as_type_param(type_param, attr_args),
 //         // // Likely not applicable for instrumenting the run time functions and
 //         // // closures (as opposed to compile time const functions and closures).
-//         // GenericParam::Const(const_param) => quote_as_const_param(const_param, prefix),
+//         // GenericParam::Const(const_param) => quote_as_const_param(const_param, attr_args),
 //         _other => quote!{ #_other },    // GenericParam::{Lifetime,Type}
 //     }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_generics(generics: &Generics, prefix: &proc_macro2::TokenStream) -> TokenStream {
+// fn quote_as_generics(generics: &Generics, attr_args: &AttrArgs) -> TokenStream {
 //     let Generics {
 //         lt_token, //: Option<Lt>,
 //         params, //: Punctuated<GenericParam, Comma>,
@@ -2282,19 +2269,19 @@ fn quote_as_item_trait(
 //     // let params = {
 //     //     let mut traversed_params = quote!{};
 //     //     for param in params {
-//     //         let generic_param = quote_as_generic_param(param, prefix);
+//     //         let generic_param = quote_as_generic_param(param, attr_args);
 //     //         traversed_params = quote!{ #traversed_params #generic_param }
 //     //     }
 //     //     traversed_params
 //     // };
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let where_clause = quote_as_where_clause(where_clause, prefix);
+//     // let where_clause = quote_as_where_clause(where_clause, attr_args);
 //     quote!{ #lt_token #params #gt_token #where_clause }
 // }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
-// fn quote_as_item_union(item_union: &ItemUnion, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_item_union(item_union: &ItemUnion, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     let ItemUnion { // union Foo<A, B> { x: A, y: B }
 //         attrs, //: Vec<Attribute>,
 //         vis, //: Visibility,
@@ -2305,21 +2292,24 @@ fn quote_as_item_trait(
 //     } = item_union;
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let vis = quote_as_vis(vis, prefix);
+//     // let vis = quote_as_vis(vis, attr_args);
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let generics = quote_as_generics(generics, prefix);
-//     let prefix = quote!{ #prefix::#ident };
+//     // let generics = quote_as_generics(generics, attr_args);
+//     let attr_args = AttrArgs { prefix: {
+//          let prefix = &attr_args.prefix;
+//          quote!{ #prefix::#ident }
+//     }};
 //     // // Likely not applicable for instrumenting the run time functions and
 //     // // closures (as opposed to compile time const functions and closures).
-//     // let fields = quote_as_fields_named(fields, prefix);
+//     // let fields = quote_as_fields_named(fields, attr_args);
 //     quote!{ #(#attrs)* #vis #union_token #ident #generics #fields }
 // }
 
 // fn quote_as_item_use(item_use: &ItemUse, _prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 //     quote!{ #item_use }
 // }
-// fn quote_as_token_stream(token_stream: &TokenStream, prefix: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+// fn quote_as_token_stream(token_stream: &TokenStream, attr_args: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 //     quote!{ #token_stream }
 // }
 

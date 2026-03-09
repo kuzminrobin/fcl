@@ -3,7 +3,15 @@
   * Update the tests.
 
 # Unsorted
-* TODO: Break-up "fcl_proc_macros\src\lib.rs" into multiple files.
+* TODO: To tests: Prefixes (see user[_all]: "calls()::closure{74,14:82,9}::closure{79,21:79,26}(v: true) {} -> false" (OK), but  
+  "f_with_f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>(fun: ?, _b: true) {
+                                                      closure{468,13:468,17}() {" (no prefix in closure))
+  * prefix of an enclosing function in
+    * closures
+    * local function 
+  * `impl` prefix in the nested items
+  * `mod` prefix in the nested items
+* TODO: Break-up "fcl_proc_macros\src\lib.rs" into multiple files (exprs, items, publics).
 * TODO: Non-zero repeat count -> Non-flushed repeat count.
 * To docs: FCL can be used for testing, to make sure that a function calls at least certain functions in a certain order 
   required number of times with certain arguments and gets certain return value. The mandatory functions are annotated, the optional ones are not.
