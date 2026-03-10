@@ -313,13 +313,14 @@ fn no_caching_child_repeats() {
 //     assert_eq!(): No second repeating_parent() (and returning_sibling()) in the log. Caching continues.
 // } // Caching stops since the same-name calls differ with internals. The second repeating_parent() gets flushed.
 // assert_eq!(): The whole log above.
+// TODO: `assert_eq!():` -> `Assert:`.
 #[test]
 fn caching_continues_after_the_only_sibling() {
 
     // The functions that will generate the call log.
     #[loggable]
     fn returning_sibling() {}
-    #[loggable]
+    #[loggable(skip_params)]
     fn repeating_parent(calls_child: bool, log: Rc<RefCell<Vec<u8>>>) {
         if calls_child {
             // assert_eq!(): No second repeating_parent() in the log. Caching is active.
@@ -327,7 +328,7 @@ fn caching_continues_after_the_only_sibling() {
                 let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
                 assert_eq!(
                     call_log,
-                    concat!("repeating_parent(calls_child: false, log: RefCell { value: [] }) {}\n")
+                    "repeating_parent(..) {}\n"
                 )
             };
 
@@ -337,7 +338,7 @@ fn caching_continues_after_the_only_sibling() {
                 let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
                 assert_eq!(
                     call_log,
-                    concat!("repeating_parent(calls_child: false, log: RefCell { value: [] }) {}\n")
+                    "repeating_parent(..) {}\n"
                 )
             };
         }
@@ -355,7 +356,7 @@ fn caching_continues_after_the_only_sibling() {
         let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
         assert_eq!(
             call_log,
-            concat!("repeating_parent(calls_child: false, log: RefCell { value: [] }) {}\n")
+            "repeating_parent(..) {}\n"
         )
     };
 
@@ -367,12 +368,8 @@ fn caching_continues_after_the_only_sibling() {
         assert_eq!(
             call_log,
             concat!(
-                "repeating_parent(calls_child: false, log: RefCell { value: [] }) {}\n",
-                "repeating_parent(calls_child: true, log: RefCell { value: [",
-                        "114, 101, 112, 101, 97, 116, 105, 110, 103, 95, 112, 97, 114, 101, 110, 116, ",
-                        "40, 99, 97, 108, 108, 115, 95, 99, 104, 105, 108, 100, 58, 32, 102, 97, 108, ",
-                        "115, 101, 44, 32, 108, 111, 103, 58, 32, 82, 101, 102, 67, 101, 108, 108, 32, ",
-                        "123, 32, 118, 97, 108, 117, 101, 58, 32, 91, 93, 32, 125, 41, 32, 123, 125, 10] }) {\n",
+                "repeating_parent(..) {}\n",
+                "repeating_parent(..) {\n",
                 "  returning_sibling() {}\n", // Upon this return the caching continues. 
                 "} // repeating_parent().\n", // (Not the subject of this test) Upon this return the second repeating_parent() gets flushed. 
             )

@@ -70,6 +70,7 @@ pub fn non_loggable(
 ///     }
 /// }
 /// ```
+// TODO: Document the attribute params (skip_params, log_params, prefix).
 #[proc_macro_attribute]
 pub fn loggable(
     attr_args_ts: proc_macro::TokenStream,
@@ -367,18 +368,10 @@ fn quote_as_expr_closure(
                         }
                         update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
                     }
-                    // if param_format_str.is_empty() {
-                    //     quote! { None }
-                    // } else {
-                        quote! { Some(format!(#param_format_str, #param_list)) }
-                    // }
+                    quote! { Some(format!(#param_format_str, #param_list)) }
                 }
                 ParamsLogging::Skip => {
-                    // if inputs.is_empty() {
-                    //     quote!{ None }
-                    // } else {
-                        quote!{ Some("..") }
-                    // }
+                    quote!{ Some(String::from("..")) }
                 }
             }
         };
@@ -1601,7 +1594,7 @@ fn input_vals(inputs: &Punctuated<FnArg, Comma>, attr_args: &AttrArgs) -> proc_m
                 quote! { Some(format!(#param_format_str, #param_list)) }
             }
             ParamsLogging::Skip => {
-                quote! { Some("..") }
+                quote! { Some(String::from("..")) }
             }
         }
     }
@@ -2651,7 +2644,8 @@ impl Parse for AttrArgs {
             }
             let lookahead = input.lookahead1();
             if lookahead.peek(Token![,]) {   // Skip any sequence of commas before, among, and after the attr args.
-                 continue
+                input.parse::<Token![,]>()?;
+                continue
             }
             else if lookahead.peek(kw::prefix) {
                 input.parse::<kw::prefix>()?;
@@ -2665,13 +2659,16 @@ impl Parse for AttrArgs {
                     }
                 };
             } else if lookahead.peek(kw::skip_params) {
-                 attr_args.params_logging = ParamsLogging::Skip;
-            }
-            else if lookahead.peek(kw::log_params) {
-                 attr_args.params_logging = ParamsLogging::Log;
-            }
-            else {
-                return Err(lookahead.error()); // TODO: Check the error reporting for an unexpected tokens. Ideally add a test.
+                input.parse::<kw::skip_params>()?;
+                attr_args.params_logging = ParamsLogging::Skip;
+            } else if lookahead.peek(kw::log_params) {
+                input.parse::<kw::log_params>()?;
+                attr_args.params_logging = ParamsLogging::Log;
+            } else {
+                return Err(lookahead.error()); 
+                // Reports an error, e.g.,
+                // error: expected one of: `,`, `prefix`, `skip_params`, `log_params`
+                //    --> fcl\tests\add_call.rs:383:20
             }
         }
         Ok(attr_args)

@@ -380,7 +380,7 @@ mod single_thread {
             }
         }
 
-        #[loggable]
+        #[loggable(skip_params)]
         fn call(log: Rc<RefCell<Vec<u8>>>, indices: (usize, usize)) {
             // Test the log: The log up to this moment, flushed.
             if indices.0 == 0 && indices.1 == 0 {
@@ -393,16 +393,7 @@ mod single_thread {
                             "instrumented_loopbody_container(log: RefCell { value: [] }) {\n",
                             "  { // Loop body start.\n",    // Caching has stopped. Flushed.
                             "    { // Loop body start.\n",  // Caching has stopped. Flushed.
-                            // The call that has put an end to caching (the `call()` params below are not the test subject):
-                            // TODO: After implementing the param logging suppression
-                            // suppress the params logging in `fn call()` above
-                            // and remove the params from the string literals below.
-                            "      call(log: RefCell { value: [105, 110, 115, 116, 114, 117, 109, 101, 110, 116, 101, 100, 95, ",
-                                                              "108, 111, 111, 112, 98, 111, 100, 121, 95, 99, 111, 110, 116, 97, ",
-                                                              "105, 110, 101, 114, 40, 108, 111, 103, 58, 32, 82, 101, 102, 67, ",
-                                                              "101, 108, 108, 32, 123, 32, 118, 97, 108, 117, 101, 58, 32, 91, ",
-                                                              "93, 32, 125, 41, 32, 123] }, ",
-                                        "indices: (0, 0)) {"
+                            "      call(..) {"
                         )
                     )
                 };
@@ -426,16 +417,7 @@ mod single_thread {
                     "instrumented_loopbody_container(log: RefCell { value: [] }) {\n",
                     "  { // Loop body start.\n",
                     "    { // Loop body start.\n",
-                    // Disregard the `call()` params below.
-                    // TODO: After implementing the param logging suppression
-                    // suppress the params logging in `fn call()` above
-                    // remove the `call()` params from the string literals below.
-                    "      call(log: RefCell { value: [105, 110, 115, 116, 114, 117, 109, 101, 110, 116, 101, 100, 95, ",
-                                                      "108, 111, 111, 112, 98, 111, 100, 121, 95, 99, 111, 110, 116, 97, ",
-                                                      "105, 110, 101, 114, 40, 108, 111, 103, 58, 32, 82, 101, 102, 67, ",
-                                                      "101, 108, 108, 32, 123, 32, 118, 97, 108, 117, 101, 58, 32, 91, ",
-                                                      "93, 32, 125, 41, 32, 123] }, ",
-                                "indices: (0, 0)) {}\n",
+                    "      call(..) {}\n",
                     "    } // Loop body end.\n",
                     "    // Loop body repeats 2 time(s).\n",
                     "  } // Loop body end.\n",
