@@ -1,8 +1,49 @@
 # Need ASAP
-* Parameter logging suppression
-  * Update the tests.
+
+# Must
+
+# Next
+* Tests
+  * code_commons\src\call_graph.rs (the tests are in fcl)
+>
+    * add_loopbody_end.rs
+    * Others, if any, in the "call_graph.rs".
+  * fcl_proc_macros\src\lib.rs (the tests are still to be in fcl)
+    * closures
+    * funcs
+    * Impl
+    * mod
+    * local (autoprefixing)
 
 # Unsorted
+* TODO: The report of {some errors in the annotated function} does not point to the actual line and column number, 
+  but points to the annotation line.
+  ```rs 
+  #[loggable(skip_params)]  // The error report points to here.
+  fn loop_instrumenter() {
+    // ...
+    f(log.clone()/*, test_nested_loop*/); // While the error is here ("expected 2 arguments, found 1").
+  ```
+  Whereas the following error is reported as expected:
+  ```rs
+  #[loggable(skip_params)]
+  fn loop_instrumenter() {
+    // ...
+    match /*Integer type value*/ {  // The error report points to here or below (as expected).
+      // Missing arms, or `..` instead of `_` in the catch-all arm.
+    }
+  }
+  ```
+* TODO: Consider preserving the prefix in the nested/inner `#[loggable]`:
+  ```rs
+  #[loggable] // Gives the prefix "m::" to the internals.
+  mod m {
+    #[loggable(skip_params)]  // Clears the prefix "m::" for `f()` and its internals.
+    fn f() {}
+  }
+  ```
+  How: The outer one can convert the inner one to `#[loggable(skip_params, prefix = m::)]`, if the inner one has no explicit `prefix=`.
+* TODO: To doc-comments: `#[loggable]` is the same as `#[loggable(prefix=)]`.
 * TODO: To tests: Prefixes (see user[_all]: "calls()::closure{74,14:82,9}::closure{79,21:79,26}(v: true) {} -> false" (OK), but  
   "f_with_f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>(fun: ?, _b: true) {
                                                       closure{468,13:468,17}() {" (no prefix in closure))

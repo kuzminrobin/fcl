@@ -795,7 +795,7 @@ impl CallGraph {
     //        . . .
     //        current_loop_child() { .. }   // At least one mandatory function or closure call
     //                                      // (otherwise the previous iterations of the current loop would be removed).
-    //         [// current_loop_child() repeats 7 time(s).]
+    //        [// current_loop_child() repeats 7 time(s).]
     //        . . .
     //     } // Loop body end.
     //     // Loop body repeats 9 time(s). // Not yet logged unless flushed.]
@@ -804,6 +804,10 @@ impl CallGraph {
     //
     //     { // Loop body start that's being handled.
     pub fn add_loopbody_start(&mut self) {
+        // TODO: In the logic below strictly delimit 
+        //      the pseudocode (starting with `// `) that results in the actual code,
+        //      and the comments for the pseudocode (starting with `// // `).
+        //      The pseudocode must use the imperative mood (the commands).
         // Logic.
         // By this moment in the call graph there's
         //  * either no sibling-level node (just parent (who can also be an enclosing_loopbody) or pseudo)
@@ -819,9 +823,9 @@ impl CallGraph {
         // Create the loopbody node, add it to the call graph, make it current.
         // If caching is not active {
         //      Begin caching the newly-added loopbody node
-        //      (if it ends up having no (direct or indirect) nested function or closure calls then it will be removed).
+        //      (if it ends up being childless then it will be removed).
         //      If it is the initial loopbody (i.e. the first-most loopbody (iteration) of the loop
-        //      or all the previous loopbodies (iterations) of the current loop had no child calls and have been removed)
+        //      or all the previous loopbodies (iterations) of the current loop have been removed for being childless)
         //      {
         //          The caching info
         //              * gets NO model_node (that's how the new loopbody node gets marked as initial),
@@ -834,15 +838,15 @@ impl CallGraph {
         //          //     * or flush.
         //          // Upon the first-most nested function or closure call the cache will be flushed
         //          // (beginning with the current loopbody start,
-        //          // through the nested loopbodies' starts, and ending with the first-most nested function or closure call/start),
+        //          // through the nested loopbodies' starts, and ending with the first-most nested function or closure start),
         //          // caching will end, and execution will continue.
         //          // Upon initial loopbody end,
         //          // if the loopbody ends up having no (direct or indirect) nested function or closure calls
         //          //          (and caching didn't end upon flush), then
         //          //     the childless loopbody will get removed and the subsequent loopbody, if any, of the current loop
         //          //     will be marked later as initial.
-        //          // Otherwise (the inital loopbody has (logged) children) the last child's repeat count
-        //          // (which will be the only non-flushed thing) will get flushed, if non-flushed. Plus the loop body end.
+        //          // Otherwise (the inital loopbody has (logged) children) the last child's non-flushed repeat count
+        //          // (which will be the only non-flushed thing) will get flushed. Plus the loop body end.
         //      } otherwise (it is non-initial loopbody) {
         //          caching info
         //            * gets the model_node pointing to the previous loopbody of the current loop
@@ -851,16 +855,14 @@ impl CallGraph {
         //                  // is duplicated in `if` and `else` part of the current comment, but not in the code.
         //
         //          // For a non-initial loopbody the caching will continue until {loopbody end or `flush()`}, where the loopbody,
-        //          //     * if will not have nested calls, will be removed,
+        //          //     * if childless, will be removed,
         //          //     * otherwise will be analized in a similar way as repeted function call,
         //          //       i.e. will be compared to the previous iteration's loopbody, and,
         //          //         * if equal, will get removed, incrementing the repeat count for the previous loopbody,
         //          //         * otherwise (will differ) will cause previous loopbody's repeat count flush and one's own subtree flush.
         //      }
         // } Otherwise (caching is active) {
-        //      (Caching has started at the parent or earlier because if the previous node is a loopbody
-        //      and cahing started at it, then caching ended upon its end)
-        //
+        //      (Caching has started at the parent or earlier)
         //      Do nothing (after creating and adding the new loopbody to the graph, continue caching).
         // }
 

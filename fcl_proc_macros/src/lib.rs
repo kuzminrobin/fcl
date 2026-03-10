@@ -70,32 +70,63 @@ pub fn non_loggable(
 ///     }
 /// }
 /// ```
+/// 
+/// <br>
+/// 
 /// ## Parameters
 /// 
+/// ### No attribute macro parameters
+/// The `#[loggable]` attribute with no parameters has the same effect as `#[loggable(log_params)]`, 
+/// i.e., the function and closure parameters are logged by default.
+/// 
 /// ### `log_params` (default, optional)
-/// Log the parameters in the annotated entity and its local entities recursively.
+/// Log the parameters in the annotated entity and its internal entities recursively.
 /// 
 /// ### `skip_params` (optional)
-/// Skip the parameters logging in the annotated entity and its local entities recursively.  
+/// Skip the parameters logging in the annotated entity and its internal entities recursively.  
 /// 
-/// If the function has no prameters then its parameters block is logged as `()`, otherwise `(..)`.
+/// If the (directly or recursively) annotated function or closure has no parameters 
+/// then its parameter block will be logged as `()`, otherwise `(..)`.
 /// 
 /// ### Examples 
-/// ```ignore
-/// #[loggable(skip_params)] // Skip the parameter logging for function `f()` and its local entities recursively.
-/// fn f(b: bool) {} // Logs: `f(..) {}`. The parameter `b` is not logged.
+/// ```compile_fail, E0432, E0433, E0599
+/// use fcl_proc_macros::loggable;
 /// 
-/// #[loggable(log_params)] // Log the parameters of the functions and closures inside of module `m` recursively.
-/// mod m {
-///     fn f(b: bool) {}    // Log example: `m::f(b: true) {}`. The parameter `b` is logged.
+/// #[loggable] // Log by defualt the function and closure parameters inside of module `m` recursively 
+/// mod m {     // (and add prefix "m::" to the function and closure names).
+///     use fcl_proc_macros::loggable;
+///
+///     pub fn f(b: bool) {        // Log example: `m::f(b: true) {`. 
+///                                // The parameter `b: true` is logged by default.
+///         Some(5).map(|x| x + 1);// Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`. 
+///                                // The closure parameter `x: 5` is logged by default.
+///     }
+///     #[loggable(skip_params)]   // Skip the parameters logging for `g()` and its internals 
+///                                // (and clear the prefix "m::" (TODO: Prevent clearing)).
+///     pub fn g(p: u8) {          // Logs: `g(..) {`. The parameter `p` is not logged, 
+///                                // the `..` instead tells that `g()` has parameter(s).
+///         Some(p).map(|x| x + 2);// Log example: `g()::closure{176,29:176,37}(..) {} -> 3`. 
+///                                // The closure parameter `x` is not logged (the `..` instead).
+///         #[loggable(log_params)]// Log the parameters for `h()` and its internals 
+///                                // (and clear the prefix "g()::" (TODO: Prevent clearing)).
+///         fn h(ph: u8) {         // Log example: `h(ph: 1) {`. The parameter `ph: 1` is logged.
+///             Some(ph).map(|y| y + 3); // `h()::closure{180,34:180,42}(y: 1) {} -> 4`. 
+///                                // The parameter `y: 1` is logged.
+///         }
+///
+///         h(p);                  // Call `h()` from `g()`.
+///     }
 /// }
-/// ```
-/// `#[loggable]` has the same effect as `#[loggable(log_params)]`, i.e., the parameters are logged by default.
+/// // Call the instrumented functions to generate the FCL log:
+/// m::f(true);
+/// m::g(1)
+/// ``` 
+/// <br>
 /// 
 /// ### `prefix` (optional)
 /// Is unlikely to be used by the user.
 /// 
-/// Sets the name prefix for the annotated entity recursively.
+/// Sets the name prefix for the annotated entity and its internals recursively.
 /// 
 /// #### Examples
 /// ```ignore

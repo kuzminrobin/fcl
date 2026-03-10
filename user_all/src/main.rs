@@ -1,3 +1,5 @@
+use fcl_proc_macros::*;
+
 #[fcl_proc_macros::loggable]
 mod func_and_closure_review {
     pub fn f() { // The user's function definition.
@@ -161,6 +163,31 @@ pub fn main() {
         my_func(); // Invocation of the function.
     }
     func_and_closure_review::f();
+    
+    {
+        #[loggable] // Log by defualt the function and closure parameters inside of module `m` recursively 
+                    // (and add prefix "m::" to the function and closure names).
+        mod m {
+            use fcl_proc_macros::loggable;
+
+            pub fn f(b: bool) {             // Log example: `m::f(b: true) {`. The parameter `b: true` is logged by default.
+                Some(5).map(|x| x + 1);// Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`. The closure parameter `x: 5` is logged by default.
+            }
+            #[loggable(skip_params)]        // Skip the parameters logging for `g()` and its internals (and clear the prefix "m::" (TODO: Prevent clearing)).
+            pub fn g(p: u8) {               // Logs: `g(..) {`. The parameter `p` is not logged, the `..` instead tells that `g()` has parameter(s).
+                Some(p).map(|x| x + 2); // Log example: `g()::closure{176,29:176,37}(..) {} -> 3`. The closure parameter `x` is not logged (the `..` instead).
+
+                #[loggable(log_params)]     // Log the parameters for `h()` and its internals (and clear the prefix "g()::" (TODO: Prevent clearing)).
+                fn h(ph: u8) {              // Log example: `h(ph: 1) {`. The parameter `ph: 1` is logged.
+                    Some(ph).map(|y| y + 3); // `h()::closure{180,34:180,42}(y: 1) {} -> 4`. The parameter `y: 1` is logged.
+                }
+
+                h(p);
+            }
+        }
+        m::f(true);
+        m::g(1)
+    }
 }
 
 // use fcl_proc_macros::loggable;

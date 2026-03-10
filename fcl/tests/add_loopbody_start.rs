@@ -32,14 +32,176 @@ fn flush_log() {
 //     [parent // Previous parent to activate caching.]
 //     parent {  // It's a call or an enclosing loop body. Caching is {inactive, active}.
 //       Either a previous loop [with [non-]identical children];
-//       or a call: {function, closure};
+// B:    or a call: {function, closure};
 // A:    or a previous iteration of the current loop [A: with [non-]identical children]
 //
-// A:    { // Loop body start that's being tested.
+// A,B:  { // Loop body start that's being tested.
 //
 // Test cases:
 //
-// A: `basics`:
+// B: `loopbody_after_call()`:
+// call()
+// while() {
+//      Assert: 
+//          Loop body start is being cached (before and after those with child(ren)).
+//          A few childless iterations are removed (before and after those with child(ren)).
+//      [loop { // Optional nested loop.
+//          Assert: 
+//              Loop body start is being cached (before and after those with child(ren)).
+//              A few childless iterations are removed (before and after those with child(ren)).
+//          // After the first few childless iterations:
+//          f() {
+//              Assert: Caching stopped.
+//          }
+//      }]
+//      // After the first few childless iterations:
+//      f() {
+//          Assert: Caching stopped.
+//      }
+// }
+#[test]
+fn loopbody_after_call() {
+    // Instrumented functions:
+    #[loggable(skip_params)]
+    fn f(log: Rc<RefCell<Vec<u8>>>, test_nested_loop: bool) {
+        let expected  = if test_nested_loop {
+            concat!(
+                "loop_instrumenter(..) {\n",
+                // Iterations [0..=2] are removed.
+                "  { // Loop body start.\n",
+                "    { // Loop body start.\n",
+                "      f(..) {",   // Caching stopped.
+            )
+        } else {
+            concat!(
+                "loop_instrumenter(..) {\n",
+                // Iterations [0..=2] are removed.
+                "  { // Loop body start.\n",  
+                "    f(..) {",    // Caching stopped.
+            )
+        };
+        // Assert: Caching stopped.
+        test_assert!(log, expected);
+    }
+    #[loggable(skip_params)]
+    fn loop_instrumenter(log: Rc<RefCell<Vec<u8>>>, test_nested_loop: bool) {
+        let mut while_count = 0;
+        while while_count < 7 {
+            match while_count {
+                0..=2 => {
+                    // Assert:
+                    //  Loop body start is being cached (before those with child(ren)).
+                    //  A few childless iterations are removed (before those with child(ren)).
+                    test_assert!(
+                        log,
+                        concat!(
+                            "loop_instrumenter(..) {",
+                            // Iterations [0..=1] are removed.
+                        )
+                    )
+                }
+                3 => {
+                    if !test_nested_loop {
+                        f(log.clone(), test_nested_loop);   // Stop caching.
+                    } else {
+                        let mut loop_count = 0;
+                        loop{
+                            match loop_count {
+                                0..=2 => {
+                                    // Assert:
+                                    //  Loop body start is being cached (before those with child(ren)).
+                                    //  A few childless iterations are removed (before those with child(ren)).
+                                    test_assert!(
+                                        log,
+                                        concat!(
+                                            "loop_instrumenter(..) {",
+                                            // Nested loop's iterations [0..=1] are removed.
+                                        )
+                                    );
+                                }
+                                3 => {
+                                    f(log.clone(), test_nested_loop); // Stop caching both loops.
+                                }
+                                4..=6 => {
+                                    // Assert:
+                                    //  Loop body start is being cached (after those with child(ren)).
+                                    //  A few childless iterations are removed (after those with child(ren)).
+                                    test_assert!(
+                                        log,
+                                        concat!(
+                                            "loop_instrumenter(..) {\n",
+                                            // Iterations [0..=2] are removed.
+                                            "  { // Loop body start.\n",
+                                            "    { // Loop body start.\n",
+                                            "      f(..) {}\n",   // Caching stopped.
+                                            "    } // Loop body end.\n", // Nested loop's iteration [3] ended.
+                                            //   Nested loop's iterations [4..=6] are being cached.
+                                            //   Nested loop's iterations [4..=5] have been removed.
+                                        )
+                                    )
+                                }
+                                _ => ()
+                            }
+                            loop_count += 1;
+                            if loop_count > 6 {
+                                break
+                            }
+                        }
+                    }
+                }
+                4..=6 => {
+                    let expected = if !test_nested_loop {
+                        concat!(
+                            "loop_instrumenter(..) {\n",
+                            // Iterations [0..=2] are removed.
+                            "  { // Loop body start.\n",  
+                            "    f(..) {}\n",           // Caching stopped.
+                            "  } // Loop body end.\n",  // The iteration with child(ren).
+                            // The iterations [4..=6] are being cached.
+                            // The iterations [4..=5] have been removed.
+                        )
+                    } else {
+                        concat!(
+                            "loop_instrumenter(..) {\n",
+                            // Iterations [0..=2] are removed.
+                            "  { // Loop body start.\n",
+                            "    { // Loop body start.\n",
+                            "      f(..) {}\n",   // Caching stopped.
+                            "    } // Loop body end.\n", // Nested loop's iteration [3] ended.
+                            //   Nested loop's iterations [4..=6] have been removed.
+                            "  } // Loop body end.\n", // Outer loop's iteration [3] ended.
+                            // Outer loop's iterations [4..=6] are being cached.
+                            // Outer loop's iterations [4..=5] have been removed.
+                        )
+                    };
+                    // Assert:
+                    //  Loop body start is being cached (after those with child(ren)).
+                    //  A few childless iterations are removed (after those with child(ren)).
+                    test_assert!(log, expected);
+                }
+                _ => ()
+            }
+
+            while_count += 1;
+        }
+    }
+
+    // Mock log writer creation and substitution of the default one:
+    let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+    // Generate the log and check it step by step:
+    loop_instrumenter(log.clone(), false); // No nested loop.
+
+    flush_log();
+    log.borrow_mut().clear();
+    
+    loop_instrumenter(log.clone(), true); // Has nested loop.
+    flush_log();
+
+}
+
+// A: `loopbody_after_loopbody()`:
 // // `for` { // Loop start.
 //   {} // [0]. Childless loop body. Gets removed.
 //   {
@@ -61,26 +223,19 @@ fn flush_log() {
 // Assert:
 //   Iteration [4] is logged as a repeat count 1.
 #[test]
-fn basics() {
+fn loopbody_after_loopbody() {
     // Instrumented functions:
     #[loggable]
     fn f() {}
     // Function that instruments the `for` loop
     // since the loops (the expressions) cannot be annotated directly in Rust.
-    #[loggable]
+    #[loggable(skip_params)]
     fn loop_instrumenter(log: Rc<RefCell<Vec<u8>>>, different_iterations: bool) {
-
-        // Remove "loop_instrumenter(log: RefCell { value: [...] }, different_iterations: ...) {\n" 
-        // from the log because this log fragment is different 
-        // for multiple calls of `loop_instrumenter()`.
-        // TODO: Suppress param printing instead of log clearing here.
-        log.borrow_mut().clear();
-
         let mut iter_count_sum = 0;
         let loop_result = // At the moment of writing the unit value `()`
         // is the only known possible value returnable by the `for` loop.
         for iter_count in 0..6 {
-            iter_count_sum += iter_count; // Generate some testable state.
+            iter_count_sum += iter_count; // Generate some testable behavior that must not be affected by the FCL instrumentation.
 
             if iter_count == 1 {
                 f(); // Generate some call log.
@@ -91,7 +246,7 @@ fn basics() {
                 test_assert!(
                     log,
                     concat!(
-                        "\n", // Stayed in decorator after "loop_instrumenter(...) {" went to the call log.
+                        "loop_instrumenter(..) {\n",
                         // Iteration [0] is removed.
                         "  { // Loop body start.\n",
                         "    f() {}\n",
@@ -99,11 +254,11 @@ fn basics() {
                     )
                 )
             } else if iter_count == 4 {
-                // Assert: Iterations [2] and [3] did not affect the log.
+                // Assert: Iterations [2] and [3] did not affect the log (they don't make instrumented calls).
                 test_assert!(
                     log,
                     concat!(
-                        "\n",
+                        "loop_instrumenter(..) {\n",
                         "  { // Loop body start.\n",
                         "    f() {}\n",
                         "  } // Loop body end.\n",
@@ -116,6 +271,7 @@ fn basics() {
                     f(); // Generate the difference from [1].
                 }
             }
+            // Iteration [5] is childless, gets removed.
         };
 
         if different_iterations {
@@ -123,7 +279,7 @@ fn basics() {
             test_assert!(
                 log,
                 concat!(
-                    "\n",
+                    "loop_instrumenter(..) {\n",
                     "  { // Loop body start.\n",
                     "    f() {}\n",
                     "  } // Loop body end.\n",
@@ -138,7 +294,7 @@ fn basics() {
             test_assert!(
                 log,
                 concat!(
-                    "\n",
+                    "loop_instrumenter(..) {\n",
                     "  { // Loop body start.\n",
                     "    f() {}\n",
                     "  } // Loop body end.\n",
@@ -173,7 +329,7 @@ fn adjacent_identical_loops() {
     fn f() {}
     #[loggable]
     fn loop_instrumenter() {
-        // Two adjacent identical loops:
+        // Two adjacent loops with identical bodies:
         for _ in 0..2 {
             f()
         }
@@ -198,7 +354,7 @@ fn adjacent_identical_loops() {
             "    f() {}\n",
             "  } // Loop body end.\n",
             "  // Loop body repeats 1 time(s).\n",
-            "  { // Loop body start.\n",
+            "  { // Loop body start.\n", // The second loop is not logged as repeating iterations of the previous loop.
             "    f() {}\n",
             "  } // Loop body end.\n",
             "  // Loop body repeats 2 time(s).\n",
