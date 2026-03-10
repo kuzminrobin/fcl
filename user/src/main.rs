@@ -88,7 +88,7 @@ fn calls() {
         // #[loggable]
         impl MyStruct {
             // #[loggable(prefix=)]
-            #[loggable(prefix=MyStruct)]
+            #[loggable(prefix = MyStruct)]
             fn new() -> Self {
                 Self
             }

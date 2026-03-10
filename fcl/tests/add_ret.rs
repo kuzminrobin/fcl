@@ -217,7 +217,7 @@ fn ret_from_cached_func() {
 //     [child() {}   // The optional child
 //      [// Repeats]]   // and optional non-zero repeat count.
 // }
-// assert_eq!(): The log above.
+// Assert: The log above.
 #[test]
 fn no_caching_child_repeats() {
     #[loggable]
@@ -306,14 +306,13 @@ fn no_caching_child_repeats() {
 
 // B: `caching_continues_after_the_only_sibling`
 // repeating_parent() { /* No children */ } // The original call.
-// assert_eq!(): The log above.
+// Assert: The log above.
 // repeating_parent() {      // The repeated call (call with the same name). Triggers caching.
-//     assert_eq!(): No second repeating_parent() in the log. Caching is active.
+//     Assert: No second repeating_parent() in the log. Caching is active.
 //     returning_sibling() {} // The `return` of interest.
-//     assert_eq!(): No second repeating_parent() (and returning_sibling()) in the log. Caching continues.
+//     Assert: No second repeating_parent() (and returning_sibling()) in the log. Caching continues.
 // } // Caching stops since the same-name calls differ with internals. The second repeating_parent() gets flushed.
-// assert_eq!(): The whole log above.
-// TODO: `assert_eq!():` -> `Assert:`.
+// Assert: The whole log above.
 #[test]
 fn caching_continues_after_the_only_sibling() {
 
@@ -323,7 +322,7 @@ fn caching_continues_after_the_only_sibling() {
     #[loggable(skip_params)]
     fn repeating_parent(calls_child: bool, log: Rc<RefCell<Vec<u8>>>) {
         if calls_child {
-            // assert_eq!(): No second repeating_parent() in the log. Caching is active.
+            // Assert: No second repeating_parent() in the log. Caching is active.
             unsafe {
                 let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
                 assert_eq!(
@@ -333,7 +332,7 @@ fn caching_continues_after_the_only_sibling() {
             };
 
             returning_sibling();
-            // assert_eq!(): No second repeating_parent() (and returning_sibling()) in the log. Caching continues.
+            // Assert: No second repeating_parent() (and returning_sibling()) in the log. Caching continues.
             unsafe {
                 let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
                 assert_eq!(
@@ -351,7 +350,7 @@ fn caching_continues_after_the_only_sibling() {
     // Generate the log and check it:
 
     repeating_parent(false, log.clone()); // The original call.
-    // assert_eq!(): The log above.
+    // Assert: The log above.
     unsafe {
         let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
         assert_eq!(
@@ -361,7 +360,7 @@ fn caching_continues_after_the_only_sibling() {
     };
 
     repeating_parent(true, log.clone()); // The repeated call (call with the same name). Triggers caching.
-    // assert_eq!(): The whole log above.
+    // Assert: The whole log above.
     #[rustfmt::skip]
     unsafe {
         let call_log  = String::from(std::str::from_utf8_unchecked(&*log.borrow()));
@@ -384,14 +383,14 @@ fn caching_continues_after_the_only_sibling() {
 // C: D: parent() {
 // C: D:      [sibling() { .. } // Optional sibling for the cases when caching starts upon the call of interest below.
 // C: D:      [// Repeats n time(s)]]
-// C: D:      // assert_eq!(): 
+// C: D:      // Assert: 
 // C:             If caching started at parent then there is no current (latest) parent in the call log.
 //    D:          otherwise the log above, except the sibling's repeat count, is in the call log.
 // C: D:      sibling() { // The call of interest.
 // C: D:          [..
 // C: D:           [// Repeats]]
 // C: D:      } // The return under test.
-// C: D:      // assert_eq!(): 
+// C: D:      // Assert: 
 // C:             If caching started at parent then there is no current (latest) parent in the call log.
 //    D:          otherwise
 //    D:              if there is a previous sibling then
@@ -401,7 +400,7 @@ fn caching_continues_after_the_only_sibling() {
 //    -                   Tested in test B. Do nothing in this test.
 // C: D: }
 // C:    // Flush the log (flush the `parent()` repeat count to the call log).
-// C: D: // assert_eq!(): 
+// C: D: // Assert: 
 // C:         If caching started at parent then 
 // [TODO:]        if parents differ then the whole log above,
 // C:             otherwise 

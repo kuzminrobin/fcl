@@ -49,7 +49,7 @@ pub fn non_loggable(
 
 /// Instruments the item and nested definitions recursively to be logged
 /// by the Function Call Logger (FCL).
-/// # Examples
+/// ### Examples
 /// ```compile_fail, E0432, E0433, E0599
 /// use fcl_proc_macros::{loggable, non_loggable};
 ///
@@ -65,18 +65,62 @@ pub fn non_loggable(
 ///             );
 ///         }
 ///         
-///         #[non_loggable] // Suppresses the automatic instrumentation.
-///         fn assoc_func_non_loggable(&self) {} // This associated function doesn't get instrumented.
+///         #[non_loggable] // Suppresses the automatic instrumentation recursively.
+///         fn assoc_func_non_loggable(&self) {} // This associated function and its local entities don't get instrumented.
 ///     }
 /// }
 /// ```
-// TODO: Document the attribute params (skip_params, log_params, prefix).
+/// ## Parameters
+/// 
+/// ### `log_params` (default, optional)
+/// Log the parameters in the annotated entity and its local entities recursively.
+/// 
+/// ### `skip_params` (optional)
+/// Skip the parameters logging in the annotated entity and its local entities recursively.  
+/// 
+/// If the function has no prameters then its parameters block is logged as `()`, otherwise `(..)`.
+/// 
+/// ### Examples 
+/// ```ignore
+/// #[loggable(skip_params)] // Skip the parameter logging for function `f()` and its local entities recursively.
+/// fn f(b: bool) {} // Logs: `f(..) {}`. The parameter `b` is not logged.
+/// 
+/// #[loggable(log_params)] // Log the parameters of the functions and closures inside of module `m` recursively.
+/// mod m {
+///     fn f(b: bool) {}    // Log example: `m::f(b: true) {}`. The parameter `b` is logged.
+/// }
+/// ```
+/// `#[loggable]` has the same effect as `#[loggable(log_params)]`, i.e., the parameters are logged by default.
+/// 
+/// ### `prefix` (optional)
+/// Is unlikely to be used by the user.
+/// 
+/// Sets the name prefix for the annotated entity recursively.
+/// 
+/// #### Examples
+/// ```ignore
+/// #[loggable(prefix = A)]
+/// fn f() { 
+///     fn local_func() {}  // Define a local function.
+/// 
+///     local_func();       // Call the local function.
+/// }   
+/// // FCL Log: 
+/// A::f() {                    // Is prefixed with "A::".
+///   A::f()::local_func() {}   // Is prefixed with "A::".
+/// } // A::f()
+/// 
+/// #[loggable(prefix = my_module::<MyStruct as MyPureTrait>::B)]
+/// fn f() {}   
+/// // FCL Log: 
+/// my_module::<MyStruct as MyPureTrait>::B::f() {} // Is prefixed with "my_module::<MyStruct as MyPureTrait>::B::".
+/// ```
 #[proc_macro_attribute]
 pub fn loggable(
     attr_args_ts: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args = parse_macro_input!(attr_args_ts as AttrArgs); // Handles the compilation errors appropriately (TODO: Check).
+    let attr_args = parse_macro_input!(attr_args_ts as AttrArgs); // Handles the compilation errors appropriately (checked).
     let output = {
         if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
             quote_as_item(&item, &attr_args)
@@ -353,7 +397,7 @@ fn quote_as_expr_closure(
             return quote! { #expr_closure };
         }
     }
-    // Get the token stream of {param names and values optional string}:
+    // Get the token stream of {{param names and values} optional string}:
     let input_vals = 
         if inputs.is_empty() {
             quote!{ None }
@@ -376,30 +420,6 @@ fn quote_as_expr_closure(
             }
         };
     
-    // if attr_args.params_logging == ParamsLogging::Log {
-    //     let mut param_format_str = String::new();
-    //     let mut param_list = quote! {};
-    //     for (idx, input_pat) in inputs.iter().enumerate() {
-    //         if idx != 0 {
-    //             param_format_str.push_str(", ");
-    //         }
-    //         update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
-    //     }
-    //     if param_format_str.is_empty() {
-    //         quote! { None }
-    //     } else {
-    //         quote! { Some(format!(#param_format_str, #param_list)) }
-    //     }
-    // } else if attr_args.params_logging == ParamsLogging::Skip {
-    //     if inputs.is_empty() {
-    //         quote!{ None }
-    //     } else {
-    //         quote!{ Some("..") }
-    //     }
-    // } else {
-    //     quote!{ None }
-    // };
-
     // Closure name:
     let (start_line, start_col) = {
         let proc_macro2::LineColumn { line, column } = or1_token.span().start();
@@ -2528,8 +2548,8 @@ impl Parse for ExprClosureWOptComma {
 mod kw {
     // syn::custom_keyword!(name);
 
-    // `#[loggable(prefix="My::Path")]`
-    syn::custom_keyword!(prefix);   
+    // `#[loggable(prefix = My::Path)]` // <MyStruct as MyPureTrait>
+    syn::custom_keyword!(prefix);
 
     // Skip the parameters logging in the annotated entity and its local entities recursively.
     // 
