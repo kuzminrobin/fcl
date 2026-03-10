@@ -11,7 +11,14 @@
     * local function 
   * `impl` prefix in the nested items
   * `mod` prefix in the nested items
-* TODO: Break-up "fcl_proc_macros\src\lib.rs" into multiple files (exprs, items, publics).
+* TODO: Break-up "fcl_proc_macros\src\lib.rs" into multiple files, e.g.:
+  * exprs, 
+  * items, 
+  * publics
+    * `AttrArgs` (including QSelfOrPath, FclQSelf, kw)
+    * `non_loggable()`
+    * `loggable()`
+    * Commons
 * TODO: Non-zero repeat count -> Non-flushed repeat count.
 * To docs: FCL can be used for testing, to make sure that a function calls at least certain functions in a certain order 
   required number of times with certain arguments and gets certain return value. The mandatory functions are annotated, the optional ones are not.

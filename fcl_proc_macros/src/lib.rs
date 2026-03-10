@@ -352,22 +352,60 @@ fn quote_as_expr_closure(
             return quote! { #expr_closure };
         }
     }
-    // Get the token stream of param names and values optional string:
-    let input_vals = {
-        let mut param_format_str = String::new();
-        let mut param_list = quote! {};
-        for (idx, input_pat) in inputs.iter().enumerate() {
-            if idx != 0 {
-                param_format_str.push_str(", ");
+    // Get the token stream of {param names and values optional string}:
+    let input_vals = 
+        if inputs.is_empty() {
+            quote!{ None }
+        } else { 
+            match attr_args.params_logging {
+                ParamsLogging::Log => {
+                    let mut param_format_str = String::new();
+                    let mut param_list = quote! {};
+                    for (idx, input_pat) in inputs.iter().enumerate() {
+                        if idx != 0 {
+                            param_format_str.push_str(", ");
+                        }
+                        update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
+                    }
+                    // if param_format_str.is_empty() {
+                    //     quote! { None }
+                    // } else {
+                        quote! { Some(format!(#param_format_str, #param_list)) }
+                    // }
+                }
+                ParamsLogging::Skip => {
+                    // if inputs.is_empty() {
+                    //     quote!{ None }
+                    // } else {
+                        quote!{ Some("..") }
+                    // }
+                }
             }
-            update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
-        }
-        if param_format_str.is_empty() {
-            quote! { None }
-        } else {
-            quote! { Some(format!(#param_format_str, #param_list)) }
-        }
-    };
+        };
+    
+    // if attr_args.params_logging == ParamsLogging::Log {
+    //     let mut param_format_str = String::new();
+    //     let mut param_list = quote! {};
+    //     for (idx, input_pat) in inputs.iter().enumerate() {
+    //         if idx != 0 {
+    //             param_format_str.push_str(", ");
+    //         }
+    //         update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
+    //     }
+    //     if param_format_str.is_empty() {
+    //         quote! { None }
+    //     } else {
+    //         quote! { Some(format!(#param_format_str, #param_list)) }
+    //     }
+    // } else if attr_args.params_logging == ParamsLogging::Skip {
+    //     if inputs.is_empty() {
+    //         quote!{ None }
+    //     } else {
+    //         quote!{ Some("..") }
+    //     }
+    // } else {
+    //     quote!{ None }
+    // };
 
     // Closure name:
     let (start_line, start_col) = {
@@ -393,7 +431,8 @@ fn quote_as_expr_closure(
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
     let attr_args = AttrArgs { 
-        prefix: log_closure_name_ts 
+        prefix: log_closure_name_ts,
+        params_logging: attr_args.params_logging,
     };
 
     let body = { quote_as_expr(&**body, None, &attr_args) };
@@ -1530,34 +1569,41 @@ fn update_param_data_from_pat(
         _ => {} // Do not print the param values.
     }
 }
-fn input_vals(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {
-    let mut param_format_str = String::new();
-    let mut param_list = quote! {};
-    for (index, fn_param) in inputs.iter().enumerate() {
-        if index != 0 {
-            param_format_str.push_str(", ");
-        }
-        match fn_param {
-            FnArg::Receiver(_receiver) => {
-                param_format_str.push_str("self: ");
-                if _receiver.reference.is_some() {
-                    param_format_str.push_str("&");
-                }
-                if _receiver.mutability.is_some() {
-                    param_format_str.push_str("mut ");
-                }
-                param_format_str.push_str("{}");
-                param_list = quote! { #param_list self.maybe_print(), };
-            }
-            FnArg::Typed(pat_type) => {
-                update_param_data_from_pat(&*pat_type.pat, &mut param_format_str, &mut param_list);
-            }
-        }
-    }
-    if param_format_str.is_empty() {
+fn input_vals(inputs: &Punctuated<FnArg, Comma>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    if inputs.is_empty() {
         quote! { None }
     } else {
-        quote! { Some(format!(#param_format_str, #param_list)) }
+        match attr_args.params_logging {
+            ParamsLogging::Log => {
+                let mut param_format_str = String::new();
+                let mut param_list = quote! {};
+                for (index, fn_param) in inputs.iter().enumerate() {
+                    if index != 0 {
+                        param_format_str.push_str(", ");
+                    }
+                    match fn_param {
+                        FnArg::Receiver(_receiver) => {
+                            param_format_str.push_str("self: ");
+                            if _receiver.reference.is_some() {
+                                param_format_str.push_str("&");
+                            }
+                            if _receiver.mutability.is_some() {
+                                param_format_str.push_str("mut ");
+                            }
+                            param_format_str.push_str("{}");
+                            param_list = quote! { #param_list self.maybe_print(), };
+                        }
+                        FnArg::Typed(pat_type) => {
+                            update_param_data_from_pat(&*pat_type.pat, &mut param_format_str, &mut param_list);
+                        }
+                    }
+                }
+                quote! { Some(format!(#param_format_str, #param_list)) }
+            }
+            ParamsLogging::Skip => {
+                quote! { Some("..") }
+            }
+        }
     }
 }
 fn traversed_block_from_sig(
@@ -1572,7 +1618,7 @@ fn traversed_block_from_sig(
         output,   //: ReturnType,
         ..
     } = sig;
-    let inputs = input_vals(inputs);
+    let inputs = input_vals(inputs, attr_args);
 
     let mut returns_something = false;
     if let ReturnType::Type(..) = output {
@@ -1590,7 +1636,10 @@ fn traversed_block_from_sig(
         };
 
         // Instrument the local functions and closures inside of the function body:
-        let attr_args = AttrArgs { prefix: quote! { #func_log_name #generics() } };
+        let attr_args = AttrArgs { 
+            prefix: quote! { #func_log_name #generics() },
+            params_logging: attr_args.params_logging 
+        };
         let block = quote_as_block(block, &attr_args);
 
         // The proc_macros (the pre-compile) part of the infrastructure for
@@ -1792,7 +1841,8 @@ fn quote_as_item_impl(
             } else {
                 let prefix = &attr_args.prefix;
                 quote! { #prefix::#self_ty }
-            }
+            },
+            params_logging: attr_args.params_logging,
         };
 
         let mut traversed_impl_items = quote! {};
@@ -1836,7 +1886,8 @@ fn quote_as_item_mod(
         } else {
             let prefix = &attr_args.prefix;
             quote! { #prefix::#ident }
-        }
+        },
+        params_logging: attr_args.params_logging,
     };
 
     let content = content.as_ref().map(|(_brace, items)| {
@@ -2029,7 +2080,8 @@ fn quote_as_item_trait(
             } else {
                 let prefix = &attr_args.prefix;
                 quote! { #prefix::#ident #generics }
-            }
+            },
+            params_logging: attr_args.params_logging,
         };
         let mut traversed_items = quote! {};
         for item in items {
@@ -2479,9 +2531,24 @@ impl Parse for ExprClosureWOptComma {
     }
 }
 
+/// FCL-specific keywords (in particular in the `#[loggable]` attribute).
 mod kw {
     // syn::custom_keyword!(name);
-    syn::custom_keyword!(prefix);
+
+    // `#[loggable(prefix="My::Path")]`
+    syn::custom_keyword!(prefix);   
+
+    // Skip the parameters logging in the annotated entity and its local entities recursively.
+    // 
+    // If the function has no prameters then its parameters block is logged as `()`, otherwise `(..)`.
+    // ### Examples
+    // `#[loggable(skip_params)]`
+    syn::custom_keyword!(skip_params);
+
+    // Log the parameters in the annotated entity and its local entities recursively.
+    // ### Examples
+    // `#[loggable(log_params)]`
+    syn::custom_keyword!(log_params);
 }
 
 struct FclQSelf {
@@ -2499,7 +2566,7 @@ impl quote::ToTokens for FclQSelf {
             // lt_token, // : Token![<],
             ty, // : Box<Type>,
             // as_token, // : Token![as],
-            // gt_token, // : Token![>],
+            // gt_token, // : Token![>], // TODO: Swap `gt_token` and `path` lines or explain why the order is right.
             path, // : Path,
             ..
         } = self;
@@ -2542,31 +2609,70 @@ impl Parse for QSelfOrPath {
     }
 }
 
+#[derive(Copy, Clone)]
+enum ParamsLogging {    
+    /// Log the parameters (the default). 
+    /// ### Examples 
+    /// `#[loggable(log_params)]`
+    Log,
+    /// Skip the parameter logging.
+    /// ### Examples 
+    /// `#[loggable(skip_params)]`
+    Skip,
+    // Others, e.g. `Shallow`, // `#[loggable(shallow_params)]` (log params _non-recursively_, i.e. skip (with `..`) the nested structs)
+}
+
 struct AttrArgs {
     prefix: proc_macro2::TokenStream,
+    /// Tells whether and/or how to log the function or closure parameters. 
+    /// ### Examples 
+    /// ```ignore
+    /// #[loggable(skip_params)] // Skip the parameter logging for function `f()` and its local entities recursively.
+    /// fn f(b: bool) {} // Logs: `f(..) {}`.
+    /// 
+    /// #[loggable(log_params)] // Log the parameters of the functions and closures inside of module `m` recursively.
+    /// mod m {
+    ///     fn f(b: bool) {}    // Log example: `m::f(b: true) {}`.
+    /// }
+    /// 
+    /// #[loggable] // Has the same effect as `#[loggable(log_params)]`, i.e., the parameters are logged by default.
+    /// ```
+    params_logging: ParamsLogging
 }
 impl Parse for AttrArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut attr_args = AttrArgs {
             prefix: quote! {},
+            params_logging: ParamsLogging::Log,
         };
-        if input.is_empty() {
-            return Ok(attr_args);
-        }
-        let lookahead = input.lookahead1();
-        if lookahead.peek(kw::prefix) {
-            input.parse::<kw::prefix>()?;
-            input.parse::<Token![=]>()?;
-            let optional_refix = input.parse()?;
+        loop {
+            if input.is_empty() {
+                break
+            }
+            let lookahead = input.lookahead1();
+            if lookahead.peek(Token![,]) {   // Skip any sequence of commas before, among, and after the attr args.
+                 continue
+            }
+            else if lookahead.peek(kw::prefix) {
+                input.parse::<kw::prefix>()?;
+                input.parse::<Token![=]>()?;
+                let optional_prefix = input.parse()?;
 
-            if let QSelfOrPath(Some(q_self_or_path)) = optional_refix {
-                match q_self_or_path {
-                    LogPrefix::QSelf(qself) => attr_args.prefix = quote! { #qself },
-                    LogPrefix::Path(path) => attr_args.prefix = quote! { #path },
-                }
-            };
-        } else {
-            return Err(lookahead.error());
+                if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
+                    match q_self_or_path {
+                        LogPrefix::QSelf(qself) => attr_args.prefix = quote! { #qself },
+                        LogPrefix::Path(path) => attr_args.prefix = quote! { #path },
+                    }
+                };
+            } else if lookahead.peek(kw::skip_params) {
+                 attr_args.params_logging = ParamsLogging::Skip;
+            }
+            else if lookahead.peek(kw::log_params) {
+                 attr_args.params_logging = ParamsLogging::Log;
+            }
+            else {
+                return Err(lookahead.error()); // TODO: Check the error reporting for an unexpected tokens. Ideally add a test.
+            }
         }
         Ok(attr_args)
     }
