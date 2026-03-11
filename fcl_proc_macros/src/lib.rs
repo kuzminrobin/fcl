@@ -731,17 +731,19 @@ fn quote_as_expr_loop(
     quote! {
         // // Ret val for `loop` has been deprioritized since it requires extra
         // // refactoring for the case of a (removed) loopbody with no nested calls.
-        // {
-        //     let ret_val =
-                #(#attrs)* #label #loop_token #body
-        //     ;
+        {
+            let ret_val = #(#attrs)* #label #loop_token #body ;
 
-        //     let ret_val_str = format!("{}", ret_val.maybe_print());
-        //     fcl::call_log_infra::THREAD_LOGGER.with(|thread_logger| {
-        //         thread_logger.borrow_mut().set_loop_ret_val(ret_val_str);
-        //     });
-        //     ret_val
-        // }
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
+                logger.borrow_mut().log_loop_end());
+
+            // TODO:
+            // let ret_val_str = format!("{}", ret_val.maybe_print());
+            // fcl::call_log_infra::instances::THREAD_LOGGER.with(|thread_logger| {
+            //     thread_logger.borrow_mut().set_loop_ret_val(ret_val_str);
+            // });
+            ret_val
+        }
     }
 }
 fn quote_as_arm(arm: &Arm, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
@@ -1232,7 +1234,16 @@ fn quote_as_expr_while(
     }
     let cond = quote_as_expr(&**cond, None, attr_args);
     let body = quote_as_loop_block(body, attr_args);
-    quote! { #(#attrs)* #label #while_token #cond #body }
+    quote! {
+        { 
+            let ret_val = #(#attrs)* #label #while_token #cond #body ;
+
+            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
+                logger.borrow_mut().log_loop_end());
+
+            ret_val
+        }
+    }
 }
 fn quote_as_expr_yield(
     expr_yield: &ExprYield,

@@ -236,6 +236,7 @@
           * fn
             * local
           * closure
+          * loops
       * Test with {vec, file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
       * Features
         * minimal_writer
