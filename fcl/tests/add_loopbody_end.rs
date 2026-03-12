@@ -8,6 +8,7 @@ use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_DECORATOR};
 
 mod common;
+use crate::common::flush_log;
 
 // High-level logic to test:
 //
@@ -200,7 +201,7 @@ fn flush_between_iters() {
                         // Assert: Repeated `f()` is being cached.
                     ));
 
-                    common::flush_log();
+                    flush_log();
 
                     #[rustfmt::skip]
                     test_assert!(log, concat!(
@@ -281,7 +282,7 @@ fn flush_between_iters() {
 
     e(0, log.clone());
     e(1, log.clone());
-    common::flush_log();    // Flush "// e() repeats 1 time(s).\n".
+    flush_log();    // Flush "// e() repeats 1 time(s).\n".
 
     #[rustfmt::skip]
     test_assert!(log, concat!(
@@ -306,6 +307,58 @@ fn flush_between_iters() {
     ));
 }
 
-// TODO: Double-check the scenario when upon thread context switch the initial loopbody gets flushed,
-// subsequently it has no nested calls, but if its beginning is flushed then its end must be flushed too,
+// Test the scenario when upon thread context switch (causing flush) the initial loopbody gets flushed,
+// subsequently it has no nested calls, but if its beginning is flushed then its end must be logged too,
 // after which the childless loopbody must be removed from the call graph.
+// f() {
+//     { // Loop body start.    // Not logged yet.
+//                              // Assert: Loop body is being cached.
+//         Flush
+//     }                        // Should be logged but this childless loop body must be removed from the call graph.
+//                              // The extra childless loop bodies must be removed and must not be logged.
+// } // f()
+// // f() repeats 1 time(s).    // Identical call to `f()`. Must compare equal to the previous `f()`.
+//                              // Assert: Log above. 
+//                              //      Childless loop body start and end have been flushed.
+//                              //      The second `f()` increments the rep.count.
+#[test]
+fn childless_loopbody_flush() {
+    #[loggable(skip_params)]
+    fn f(log: Rc<RefCell<Vec<u8>>>, call_count: usize) {
+        let mut iter_count = 0;
+        loop {
+            if call_count == 0 && iter_count == 0 {
+                // Assert: Loop body is being cached.
+                #[rustfmt::skip]
+                test_assert!(log, concat!(
+                    "f(..) {",
+                ));
+
+                flush_log();
+            }
+            iter_count += 1;
+            if iter_count < 2 {
+                continue
+            }
+            break;
+        }
+    }
+
+    // Mock log writer creation and substitution of the default one:
+    let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+    f(log.clone(), 0);
+    f(log.clone(), 1);
+    flush_log();    // Log the `f()` repeat count.
+    
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "f(..) {\n",
+        "  { // Loop body start.\n",
+        // Flush.
+        "  } // Loop body end.\n",      // Assert: The childless loop body start and end are flushed.
+        "} // f().\n",
+        "// f() repeats 1 time(s).\n",  // Assert: The second `f()` increments the rep.count.
+    ));
+}

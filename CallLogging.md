@@ -5,8 +5,8 @@
 # Next
 * Tests
   * code_commons\src\call_graph.rs (the tests are in fcl)
->
     * add_loopbody_end.rs
+>
     * Others, if any, in the "call_graph.rs".
   * fcl_proc_macros\src\lib.rs (the tests are still to be in fcl)
     * closures
@@ -16,6 +16,11 @@
     * local (autoprefixing)
 
 # Unsorted
+* TODO: To mdBook: What this project can be useful for.
+  Familiarize with the unknown project quickly by running it instrumented. To understand which functions output 
+  the lines/messages/signals of interest, what preceded that, what in general happens, which functions call which, 
+  how many threads are used, what each thread does, how often the threads are spawned and terminated, if any threads
+  panic.
 * TODO: The report of {some errors in the annotated function} does not point to the actual line and column number, 
   but points to the annotation line.
   ```rs 
