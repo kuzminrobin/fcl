@@ -1187,10 +1187,10 @@ impl CallGraph {
 
     pub fn add_loop_end(&mut self) {
         // When the loop ends
-        // If the current node (parent) has children and the last child is a loop body {
+        // If the current node (parent) has children and the last child is a loop body { // If the loop has child(ren)
         //     If the last loop body is not marked as `ends_the_loop: true` (it is the last survived loop body of the currently ending loop) {
         //          If cahing is not active
-        //              Flush the last loop body's repeat count, if non-zero.
+        //              Log the last loop body's non-flushed repeat count.
         //          Mark it as `ends_the_loop: true`.   // Based on this the subsequent loop body, if any,
         //                                              // will be interpreted as the first loop body of the next loop.
         //     }

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[cfg(feature = "singlethreaded")]
 use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_LOGGER};
