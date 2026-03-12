@@ -5,28 +5,9 @@ use fcl_proc_macros::loggable;
 
 #[cfg(feature = "singlethreaded")]
 use fcl::CallLogger;
-use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
+use fcl::call_log_infra::instances::{THREAD_DECORATOR};
 
-// NOTE: Extracting this to a macro rather than a function
-// in order to preserve the line numbers (inside of the tests) in the assertion failure reports.
-macro_rules! test_assert {
-    ($log:ident, $expected_str:expr $(,)?) => {
-        unsafe {
-            let log_contents = String::from(std::str::from_utf8_unchecked(&*$log.borrow()));
-            assert_eq!(log_contents, $expected_str)
-        }
-    };
-}
-
-fn flush_log() {
-    // Flush the log:
-    THREAD_LOGGER.with(|logger| {
-        #[cfg(feature = "singlethreaded")]
-        let logger = logger.borrow_mut();
-
-        logger.borrow_mut().flush();
-    });
-}
+mod common;
 
 // High-level logic to test:
 // D:  [parent // Previous parent to activate caching.]
@@ -366,11 +347,11 @@ fn loopbody_after_call() {
     // Generate the log and check it step by step:
     loop_instrumenter(log.clone(), false); // No nested loop.
 
-    flush_log();
+    common::flush_log();
     log.borrow_mut().clear();
 
     loop_instrumenter(log.clone(), true); // Has nested loop.
-    flush_log();
+    common::flush_log();
 }
 
 // A: `loopbody_after_loopbody()`:
@@ -487,11 +468,11 @@ fn loopbody_after_loopbody() {
     // Generate the log and check it step by step:
     loop_instrumenter(log.clone(), false); // Identical iterations.
 
-    flush_log();
+    common::flush_log();
     log.borrow_mut().clear();
 
     loop_instrumenter(log.clone(), true); // Different iterations.
-    flush_log();
+    common::flush_log();
 }
 
 #[test]

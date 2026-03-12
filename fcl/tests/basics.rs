@@ -460,7 +460,7 @@ mod single_thread {
         let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
         THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
-        // // ## Single non-childless sibling with an childless child.
+        // // ## Single non-childless sibling with a childless child.
         // parent() {
         //     sibling_a() { // Single non-childless sibling.
         //         child_a() {} // Empty child.
