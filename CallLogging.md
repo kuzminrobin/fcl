@@ -6,14 +6,94 @@
 * Tests
   * code_commons\src\call_graph.rs (the tests are in fcl)
     * add_loopbody_end.rs
->
+    * flush() // Nothing extra to test.
     * Others, if any, in the "call_graph.rs".
-  * fcl_proc_macros\src\lib.rs (the tests are still to be in fcl)
-    * closures
-    * funcs
-    * Impl
-    * mod
-    * local (autoprefixing)
+* Testing:
+  * Algorithm (fcl/algo_tests*.rs)
+    * Reasonable possible combinations (reasonable code coverage)
+      * Call/ret/repeat for fn/closure/loop
+    * fcl/algo_tests_basics.rs
+    * fcl/algo_tests_add_call.rs
+    * fcl/algo_tests_add_ret.rs
+    * fcl/algo_tests_add_loopbody_start.rs
+    * fcl/algo_tests_add_loopbody_end.rs
+>
+  * Unsorted specific cases
+    * Repeat count for closure.
+    * Ret val logging
+      * For `loop` specifically.
+    * Call params logging
+    * user[_all] cases.
+    * fcl_proc_macros\src\lib.rs (the tests are still to be in fcl)
+      * closures
+      * funcs
+      * Impl
+      * mod
+      * local (autoprefixing)
+  * stdout, stderr[, panic] sync
+  * Macro ({fcl_proc_macros?}/macro_tests*.rs)
+    * Parameters (loggable, non_lggable, prefix)
+    * Recursion (from mod/impl to functions)
+    * `#[loggable]` Different items (mod, trait, impl, fn, closure[, loop])
+  * Enabling/disabling, global/local/temporary
+  * `user` and `user_all` cases to the tests (or separate crate(s) of examples for the users).
+  * feature 'singlethreaded'
+  * Test
+    * Testing
+      * Basics (from user/main.rs).
+        * Log to string/Vector and compare.
+        * Generics
+      * Test coverage
+        * All branches of all the code.
+        * user, user_all
+        * Code coverage
+          * mod
+          * trait / fn with default impl
+          * impl
+            * T
+            * Trait for
+          * fn
+            * local
+          * closure
+          * loops
+      * Test with {vec, file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
+      * Features
+        * minimal_writer
+        * singlethreaded
+        * multithreaded
+      * Decorators
+        * CodeLike
+        * TreeLike
+      * Code
+        * Single-threaded
+        * Multithreaded
+      * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
+      * std output and panic sync.
+      * [Temporarily] Enable/disable logging. 
+      * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
+      * ```rs
+        // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
+        // Const(ItemConst)
+        // Enum(ItemEnum)
+        // ExternCrate(ItemExternCrate)
+        // ForeignMod(ItemForeignMod)
+        // Macro(ItemMacro)
+        // Static(ItemStatic)
+        // Struct(ItemStruct)
+        // Trait(ItemTrait)
+        // TraitAlias(ItemTraitAlias)
+        // Type(ItemType)
+        // Union(ItemUnion)
+        // Verbatim(TokenStream)
+        ```
+    * Test with the existing projects.
+      * Update the instructions, how to enable func call logging in your project.
+      * (After testing with real code) Finalize the user's use
+        * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
+          log thread func or not).
+        * Customizing the thread indent.
+  * Consider tests.rs / {`mod singlethreaded` -> `mod single_threaded_tests`}.
+
 
 # Unsorted
 * TODO: To mdBook: What this project can be useful for.
@@ -207,78 +287,6 @@
   globally, locally (at specific items, at specific time frames, both).
 
 # TODO:
-* Testing:
-  * Algorithm (fcl/algo_tests*.rs)
-    * All possible combinations (full code coverage)
-      * Call/ret/repeat for fn/closure/loop
-    * fcl/algo_tests_basics.rs
-    * fcl/algo_tests_add_call.rs
-    * fcl/algo_tests_add_ret.rs
-    * fcl/algo_tests_add_loopbody_start.rs
-    * fcl/algo_tests_add_loopbody_end.rs
-  * stdout, stderr[, panic] sync
-  * Macro ({fcl_proc_macros?}/macro_tests*.rs)
-    * Parameters (loggable, non_lggable, prefix)
-    * Recursion (from mod/impl to functions)
-    * `#[loggable]` Different items (mod, trait, impl, fn, closure[, loop])
-  * Enabling/disabling, global/local/temporary
-  * `user` and `user_all` cases to the tests (or separate crate(s) of examples for the users).
-  * feature 'singlethreaded'
-  * Test
-    * Testing
-      * Basics (from user/main.rs).
-        * Log to string/Vector and compare.
-        * Generics
-      * Test coverage
-        * All branches of all the code.
-        * user, user_all
-        * Code coverage
-          * mod
-          * trait / fn with default impl
-          * impl
-            * T
-            * Trait for
-          * fn
-            * local
-          * closure
-          * loops
-      * Test with {vec, file, socket, pipe} writer as an arg to `ThreadSharedWriter::new()`.
-      * Features
-        * minimal_writer
-        * singlethreaded
-        * multithreaded
-      * Decorators
-        * CodeLike
-        * TreeLike
-      * Code
-        * Single-threaded
-        * Multithreaded
-      * `indent_step: indent_step.unwrap_or(&"  "), // TODO: Test "    ", "\t".`
-      * std output and panic sync.
-      * [Temporarily] Enable/disable logging. 
-      * Test the `Drop for crate::call_log_infra::CallLoggerArbiter`
-      * ```rs
-        // TODO: Test: All other items at https://docs.rs/syn/latest/syn/enum.Item.html
-        // Const(ItemConst)
-        // Enum(ItemEnum)
-        // ExternCrate(ItemExternCrate)
-        // ForeignMod(ItemForeignMod)
-        // Macro(ItemMacro)
-        // Static(ItemStatic)
-        // Struct(ItemStruct)
-        // Trait(ItemTrait)
-        // TraitAlias(ItemTraitAlias)
-        // Type(ItemType)
-        // Union(ItemUnion)
-        // Verbatim(TokenStream)
-        ```
-    * Test with the existing projects.
-      * Update the instructions, how to enable func call logging in your project.
-      * (After testing with real code) Finalize the user's use
-        * Enabling or disabling logging (by default?) upon infra creation (log `main()` or not, 
-          log thread func or not).
-        * Customizing the thread indent.
-  * Consider tests.rs / {`mod singlethreaded` -> `mod single_threaded_tests`}.
 * Consider making the decorators chainable, such that the CodeLikeDecorator or TreeLikeDecorator 
   can be followed by
   * an HtmlDecorator, combined with or followed by HtmlColoringDecorator,
