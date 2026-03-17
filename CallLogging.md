@@ -18,6 +18,19 @@
     * fcl/algo_tests_add_loopbody_start.rs
     * fcl/algo_tests_add_loopbody_end.rs
 >
+  * Ask ChatGPT's CodEx to review the doc-comments in the workspace.
+  * Language constructs
+    * Items
+      * Functions
+      * mod
+      * impl
+      * trait (if applicable, see `user[_all]`)
+      * impl .. for ..
+      * Other (see "fcl_proc_macros\src\lib.rs")
+    * Expressions
+      * Closures
+      * Loops
+      * Other (see "fcl_proc_macros\src\lib.rs")
   * Unsorted specific cases
     * Repeat count for closure.
     * Ret val logging
