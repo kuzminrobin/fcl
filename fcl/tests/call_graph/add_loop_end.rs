@@ -7,7 +7,7 @@ use fcl_proc_macros::{loggable};
 use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_DECORATOR};
 
-mod common;
+use crate::common::*;
 
 // f() {
 //     { // Loop body start.

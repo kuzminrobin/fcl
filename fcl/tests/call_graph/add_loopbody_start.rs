@@ -7,7 +7,7 @@ use fcl_proc_macros::loggable;
 use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_DECORATOR};
 
-mod common;
+use crate::common::*;
 
 // High-level logic to test:
 // D:  [parent // Previous parent to activate caching.]
@@ -347,11 +347,11 @@ fn loopbody_after_call() {
     // Generate the log and check it step by step:
     loop_instrumenter(log.clone(), false); // No nested loop.
 
-    common::flush_log();
+    flush_log();
     log.borrow_mut().clear();
 
     loop_instrumenter(log.clone(), true); // Has nested loop.
-    common::flush_log();
+    flush_log();
 }
 
 // A: `loopbody_after_loopbody()`:
@@ -468,11 +468,11 @@ fn loopbody_after_loopbody() {
     // Generate the log and check it step by step:
     loop_instrumenter(log.clone(), false); // Identical iterations.
 
-    common::flush_log();
+    flush_log();
     log.borrow_mut().clear();
 
     loop_instrumenter(log.clone(), true); // Different iterations.
-    common::flush_log();
+    flush_log();
 }
 
 #[test]

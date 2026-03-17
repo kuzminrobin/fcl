@@ -34,7 +34,7 @@ fn _h() {
 }
 
 #[loggable]
-pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, ...) -> f64 {
+pub(crate) unsafe extern "C" fn _i<T, U>(_x: i32, _y: f32, _z: bool, _: ...) -> f64 {
     #[loggable]
     fn j(_x: u32, _y: u32) -> bool {
         // Local function.

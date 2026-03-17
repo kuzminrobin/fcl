@@ -18,7 +18,6 @@
     * fcl/algo_tests_add_loopbody_start.rs
     * fcl/algo_tests_add_loopbody_end.rs
 >
-  * Ask ChatGPT's CodEx to review the doc-comments in the workspace.
   * Language constructs
     * Items
       * Functions
@@ -109,6 +108,8 @@
 
 
 # Unsorted
+* TODO: Use `test_assert!` in all the tests (written before).
+* Ask ChatGPT's CodEx to review the doc-comments in the workspace.
 * TODO: To mdBook: What this project can be useful for.
   Familiarize with the unknown project quickly by running it instrumented. To understand which functions output 
   the lines/messages/signals of interest, what preceded that, what in general happens, which functions call which, 

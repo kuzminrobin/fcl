@@ -15,6 +15,7 @@ macro_rules! test_assert {
         }
     };
 }
+pub use crate::test_assert;
 
 pub fn flush_log() {
     // Flush the log:
