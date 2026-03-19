@@ -1873,9 +1873,12 @@ fn quote_as_item_impl(
     // // closures (as opposed to compile time const functions and closures).
     // let generics = quote_as_generics(generics, prefix);
 
-    let prefix_extender = trait_.as_ref().map(|(_opt_not, path, _for_token)| {
-        quote! { <#self_ty as #path> }
-    });
+    let prefix_extender = match trait_.as_ref() {
+        // trait impl
+        Some((_opt_not, path, _for_token)) => quote! { <#self_ty as #path> },
+        // struct impl
+        None => quote! { #self_ty }
+    };
     // Workaround for:
     // the trait bound `(Option<syn::token::Not>, syn::Path, For): quote::ToTokens` is not satisfied
     let trait_ = trait_.as_ref().map(|(opt_not, path, for_token)| {

@@ -3,27 +3,92 @@ use std::rc::Rc;
 
 use fcl_proc_macros::{loggable, non_loggable};
 
-use fcl::call_log_infra::instances::{THREAD_DECORATOR/* , THREAD_LOGGER*/};
+#[cfg(feature = "singlethreaded")]
+use fcl::CallLogger;
+use fcl::call_log_infra::instances::THREAD_DECORATOR;
 
 use crate::common::*;
 
-/*
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use fcl_proc_macros::loggable;
-
-#[cfg(feature = "singlethreaded")]
-use fcl::CallLogger;
-use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
- */
-// fn
 // static
+
+#[test]
+fn in_fn() {
+    #[loggable]
+    // The `instrumenter()` recursively makes the local entities loggable by default.
+    fn instrumenter() {
+        // fn and closure:
+        #[non_loggable]
+        fn non_loggable_fn() {
+            // Non-loggable fn and closure.
+            Some(2).map(|x| x + 1);
+        }
+        non_loggable_fn();
+
+        // mod
+        #[non_loggable]
+        mod non_loggable_mod {
+            pub fn non_loggable_mod_fn() {}
+        }
+        non_loggable_mod::non_loggable_mod_fn();
+
+        // trait
+        #[non_loggable]
+        trait NonLoggableTrait {
+            fn non_loggable_trait_fn() {}
+        }
+        impl NonLoggableTrait for i8 {}
+        i8::non_loggable_trait_fn();
+
+        // trait impl
+        #[non_loggable]
+        impl NonLoggableTrait for u8 {
+            fn non_loggable_trait_fn() {}
+        }
+        u8::non_loggable_trait_fn();
+
+        // struct impl
+        struct LoggingNeutralStruct {}
+        #[non_loggable]
+        impl LoggingNeutralStruct {
+            fn non_loggable_impl_struct_fn() {}
+            fn non_loggable_impl_struct_self_fn(&mut self) {}
+        }
+        LoggingNeutralStruct::non_loggable_impl_struct_fn();
+        LoggingNeutralStruct {}.non_loggable_impl_struct_self_fn();
+    }
+
+    let log = substitute_log_writer!();
+
+    // Generate some log:
+    instrumenter();
+
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "instrumenter() {",
+            // Assert: The following are not logged:
+            // * `non_loggable_fn()` and closure in it.
+            //   "  instrumenter()::non_loggable_fn() {\n",
+            //   "    instrumenter()::non_loggable_fn()::closure{28,25:28,33}(x: 2) {} -> 3\n",
+            //   "  } // instrumenter()::non_loggable_fn().\n",
+            // * `non_loggable_mod::non_loggable_mod_fn()`.
+            //   "  instrumenter()::non_loggable_mod::non_loggable_mod_fn() {}\n"
+            // * `<i8 as NonLoggableTrait>::non_loggable_trait_fn()`.
+            //   "  instrumenter()::NonLoggableTrait::non_loggable_trait_fn() {}\n"
+            // * `<u8 as NonLoggableTrait>::non_loggable_trait_fn()`. 
+            //   "  instrumenter()::<u8 as NonLoggableTrait>::non_loggable_trait_fn() {}\n"
+            // * `LoggingNeutralStruct::non_loggable_impl_struct_fn()`. 
+            //   "  instrumenter()::LoggingNeutralStruct::non_loggable_impl_struct_fn() {}\n"
+            // * `LoggingNeutralStruct::non_loggable_impl_struct_self_fn(&mut self: {})`.
+            //   "  instrumenter()::LoggingNeutralStruct::non_loggable_impl_struct_self_fn(self: &mut ?) {}\n"
+        "}\n",
+    ));
+}
 
 #[test]
 fn in_impl() {
     #[loggable]
     fn prefixing_test(log: Rc<RefCell<Vec<u8>>>) {
+        // TODO: `impl Struct`.
 
         // In the `trait` - loggable, in `impl` - non-loggable.
         trait TestTrait<T> {
@@ -54,10 +119,7 @@ fn in_impl() {
         ));
     }
 
-    // Create the mock log writer and substitute the default one with it:
-    let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
-
-    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+    let log = substitute_log_writer!();
 
     prefixing_test(log.clone());
 
@@ -86,7 +148,6 @@ fn in_impl() {
         "trait_fn(_p: \"Log\") {}\n",
         // Assert: All other calls are not logged.
     ));
-
 }
 
 #[test]

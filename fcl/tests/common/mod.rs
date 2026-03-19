@@ -2,8 +2,28 @@
 
 #[cfg(feature = "singlethreaded")]
 use fcl::CallLogger;
-use fcl::call_log_infra::instances::{THREAD_LOGGER};
+use fcl::call_log_infra::instances::THREAD_LOGGER;
 
+// TODO: Use everywhere.
+macro_rules! substitute_log_writer {
+    () => {
+        {
+            // Create the mock log writer and substitute the default one with it:
+            let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+
+            fcl::call_log_infra::instances::THREAD_DECORATOR
+                .with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+            log
+        }
+    };
+}
+pub(crate) use substitute_log_writer;
+
+// TODO: Use everywhere.
+// TODO: 
+// * Remove `#[macro_export]`.
+// * `pub(crate) use crate::test_assert;`
 #[macro_export]
 // TODO: Doc-comment.
 // NOTE: Extracting this to a macro rather than a function
