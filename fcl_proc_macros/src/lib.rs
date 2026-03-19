@@ -162,8 +162,7 @@ pub fn loggable(
             quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
         }
     };
-    let ret_val = quote! { #output };
-    ret_val.into()
+    output.into()
 }
 
 /// Removes spaces from a string, except around 'as' (in framgents like "\<MyType as MyTrait>").
@@ -1763,7 +1762,7 @@ fn traversed_block_from_sig(
                         generic_func_name.push_str(">");
                     }
 
-                    // Log the call, like `f(param: 5) {`:
+                    // Log the call, like `f<char, u8>(param: 5) {`:
                     let mut callee_logger = fcl::CalleeLogger::new(&generic_func_name, param_val_str);
 
                     // Execute the function body and catch the return value:
@@ -2115,7 +2114,7 @@ fn quote_as_item_trait(
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, attr_args);
 
-    // NOTE: Future: restriction. Unused, but reserved for RFC 3323 restrictions.
+    // NOTE: Future: `restriction`. Unused, but reserved for RFC 3323 restrictions.
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -2128,6 +2127,11 @@ fn quote_as_item_trait(
     //     }
     //     traversed_supertraits
     // };
+
+    // NOTE: The traits are defined at compile time 
+    // when the actual generic arguments are not known yet 
+    // (and whether the trait will be used at all).
+    // That's why we cannot expand the traits' `#generics` when extending the prefix.
     let items = {
         let attr_args = AttrArgs { prefix:  
             if attr_args.prefix.is_empty() {
@@ -2145,7 +2149,7 @@ fn quote_as_item_trait(
         }
         traversed_items
     };
-    quote! { #(#attrs)* #vis #unsafety #auto_token
+    quote! { #(#attrs)* #vis #unsafety #auto_token // #restriction
     #trait_token #ident #generics #colon_token #supertraits { #items } }
 }
 // // Likely not applicable for instrumenting the run time functions and

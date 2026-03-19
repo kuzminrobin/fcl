@@ -108,6 +108,14 @@
 
 
 # Unsorted
+* TODO: In the tests skip the generics comparison (between the atual and expected log), 
+  since their expansion done with `std::any::type_name` is not guaranteed. The comparison can fail after 
+  the compiler update (the test can break).
+* TODO: Try `#[loggable(expand_trait_generics)]`. I.e. expand the trait's generics at runtime, like generic func's generics. 
+  * Refactor the `AttrArgs::prefix` to a container of Option<Strings, Generics> 
+  * Pass the trait's generics to the prefix (as `Generics` type).
+  * In the call code (fn, closure) at runtime iterate through the `AttrArgs::prefix` and expand `Generics`.
+* TODO: #[loggable(skip_generic_params)]
 * TODO: Use `test_assert!` in all the tests (written before).
 * Ask ChatGPT's CodEx to review the doc-comments in the workspace.
 * TODO: To mdBook: What this project can be useful for.

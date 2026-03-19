@@ -5,6 +5,7 @@ use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_LOGGER};
 
 #[macro_export]
+// TODO: Doc-comment.
 // NOTE: Extracting this to a macro rather than a function
 // in order to preserve the line numbers (inside of the tests) in the assertion failure reports.
 macro_rules! test_assert {
@@ -15,8 +16,9 @@ macro_rules! test_assert {
         }
     };
 }
-pub use crate::test_assert;
+pub use crate::test_assert; // Re-export as `crate::common::test_assert` (in addition to `crate::test_assert`).
 
+// TODO: Doc-comment.
 pub fn flush_log() {
     // Flush the log:
     THREAD_LOGGER.with(|logger| {
