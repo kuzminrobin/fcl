@@ -5,7 +5,7 @@ use fcl_proc_macros::{loggable, non_loggable};
 
 use fcl::call_log_infra::instances::{THREAD_DECORATOR/* , THREAD_LOGGER*/};
 
-use crate::{common::*};
+use crate::common::*;
 
 /*
 use std::cell::RefCell;
@@ -17,12 +17,50 @@ use fcl_proc_macros::loggable;
 use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
  */
-// trait
-// impl
 // in trait loggable in impl non_loggable
 //      vice versa
 // fn
 // static
+
+#[test]
+fn in_impl() {
+    #[loggable]
+    fn prefixing_test(log: Rc<RefCell<Vec<u8>>>) {
+        trait TestTrait<T> {
+            fn trait_fn(_p: &str) {} // Loggable in the `trait`.
+            fn trait_fn_loggable() {} // Loggable in the `trait`.
+        }
+        impl TestTrait<bool> for u8 {
+            #[non_loggable]
+            fn trait_fn(_p: &str) {} // Loggable in the `trait`, non_loggable in the `impl`.
+            fn trait_fn_loggable() {} // Loggable (after `#[non_loggable]` fn) both in the `trait` and in the `impl`.
+        }
+        impl TestTrait<f32> for u8 {} // All the associated funcs are loggable from the `trait`.
+
+        // Generate some test log:
+        <u8 as TestTrait<bool>>::trait_fn(&"Don't Log"); // Do not log.
+        <u8 as TestTrait<f32>>::trait_fn(&"Log");
+
+        <u8 as TestTrait<bool>>::trait_fn_loggable();
+        <u8 as TestTrait<f32>>::trait_fn_loggable();
+
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "prefixing_test(log: RefCell { value: [] }) {\n",
+            // Assert: `<u8 as TestTrait<bool>>::trait_fn()` is not logged.
+            "  prefixing_test()::TestTrait<T>::trait_fn(_p: \"Log\") {}\n",
+            "  prefixing_test()::<u8 as TestTrait<bool>>::trait_fn_loggable() {}\n",
+            "  prefixing_test()::TestTrait<T>::trait_fn_loggable() {}\n",
+        ));
+    }
+
+    // Create the mock log writer and substitute the default one with it:
+    let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+
+    THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+
+    prefixing_test(log.clone());
+}
 
 #[test]
 fn in_trait() {

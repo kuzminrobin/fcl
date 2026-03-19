@@ -507,7 +507,7 @@ fn quote_as_expr_closure(
                 let param_val_str = #input_vals;
 
                 // Get the body as a closure (to be executed later):
-                let mut body = move || { #body };
+                let mut body = #capture || { #body };
 
                 // If logging is off then do nothing
                 // except executing the body and returning the value:
@@ -1873,6 +1873,9 @@ fn quote_as_item_impl(
     // // closures (as opposed to compile time const functions and closures).
     // let generics = quote_as_generics(generics, prefix);
 
+    let prefix_extender = trait_.as_ref().map(|(_opt_not, path, _for_token)| {
+        quote! { <#self_ty as #path> }
+    });
     // Workaround for:
     // the trait bound `(Option<syn::token::Not>, syn::Path, For): quote::ToTokens` is not satisfied
     let trait_ = trait_.as_ref().map(|(opt_not, path, for_token)| {
@@ -1891,10 +1894,10 @@ fn quote_as_item_impl(
         // (to pass such an updated prefix to the nested items):
         let attr_args = AttrArgs { prefix:  
             if attr_args.prefix.is_empty() {
-                quote! { #self_ty }
+                quote! { #prefix_extender }
             } else {
                 let prefix = &attr_args.prefix;
-                quote! { #prefix::#self_ty }
+                quote! { #prefix::#prefix_extender }
             },
             params_logging: attr_args.params_logging,
         };
