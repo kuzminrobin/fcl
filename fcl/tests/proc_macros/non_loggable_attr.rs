@@ -9,7 +9,61 @@ use fcl::call_log_infra::instances::THREAD_DECORATOR;
 
 use crate::common::*;
 
-// static
+#[test]
+fn in_static() {
+    #[loggable(skip_closure_coords)]
+    // The `instrumenter()` recursively makes the local entities loggable by default.
+    fn instrumenter() {
+        static STATIC_VAR: u8 = {
+            // NOTE: The const context.
+            // * The called functions must be const (cannot be `#[loggable]`).
+            // * The const closures `Some(4).map(const |x| true)` are not allowed on stable:
+            //   error[E0277]: the trait bound `[const] Destruct` is not satisfied.
+            #[non_loggable]
+            const fn non_loggable_const_initializer() -> u8 {
+                1
+            }
+            non_loggable_const_initializer()
+        };
+
+        // Assert: The behavior didn't change because of FCL.
+        let testable_behavior = STATIC_VAR;
+        assert_eq!(1, testable_behavior);
+
+        static S: std::sync::LazyLock<bool> = {
+            fn loggable_initializer() -> bool {
+                false
+            }
+            #[non_loggable]
+            fn non_loggable_initializer() -> bool {
+                true
+            }
+            std::sync::LazyLock::new(|| loggable_initializer() | non_loggable_initializer())
+        };
+
+        // Assert: The behavior didn't change because of FCL.
+        let testable_behavior = *S;
+        assert_eq!(true, testable_behavior);
+
+        // TODO: `#[non_loggable] static S..`
+    }
+
+    let log = substitute_log_writer!();
+
+    // Generate some log:
+    instrumenter();
+
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "instrumenter() {\n",
+           // Assert: `non_loggable_const_initializer()` is not logged:
+        "  instrumenter()::closure{..}() {\n",
+        "    instrumenter()::loggable_initializer() {} -> false\n",
+            // Assert: "instrumenter()::non_loggable_initializer() {} -> true\n" is not logged:
+        "  } -> true // instrumenter()::closure{..}().\n",
+        "} // instrumenter().\n",
+    ));
+}
 
 #[test]
 fn in_fn() {

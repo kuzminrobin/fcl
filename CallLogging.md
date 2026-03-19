@@ -1,16 +1,28 @@
 # Need ASAP
+* Closure coordinates (line,col numbers) suppression: `closure{42,38:42,49}()` -> `closure{..}()`. 
+  For testing purposes (if the test file is updated then the coords change, the test breaks). 
 
 # Must
 
 # Need
-* Preserve the prefix in nested `#[loggable]`.
+* TODO: Consider preserving the prefix in the nested/inner `#[loggable]`:
   ```rs
-  #[loggable] // 2. If nested `#[loggable]` attrs have no explicit `prefix=`, then nested ones -> `#[loggable(prefix = f())]`
-  fn f() {
-    #[loggable(skip_params)]  // 1. Currently "clears" the prefix "f::". Need to preserve it, if no explicit `prefix=`.
-    fn g(b: bool) {}
+  #[loggable] // Gives the prefix "m::" to the internals.
+  mod m {
+    #[loggable(skip_params)]  // Clears the prefix "m::" for `f()` and its internals (but is not expected to).
+    fn f() {}
   }
   ```
+  How: The outer one can convert the inner one to `#[loggable(skip_params, prefix = m::)]`, if the inner one has no explicit `prefix=`.
+  * Preserve the prefix in nested `#[loggable]`.
+    ```rs
+    #[loggable] // 2. If nested `#[loggable]` attrs have no explicit `prefix=`, then nested ones -> `#[loggable(prefix = f())]`
+    fn f() {
+      #[loggable(skip_params)]  // 1. Currently "clears" the prefix "f::". Need to preserve it, if no explicit `prefix=`.
+      fn g(b: bool) {}
+    }
+    ```
+  * Same for closure coords.
 
 # Next
 * Tests
@@ -118,6 +130,16 @@
 
 
 # Unsorted
+* TODO: miri
+  * Test with [miri](https://rust-book.cs.brown.edu/ch20-01-unsafe-rust.html?highlight=static#using-miri-to-check-unsafe-code). 
+    The output sync (`let tempfile = NamedTempFile::new()?;`) conflicts with miri, invokes something that miri does not support.
+    Will likely have to make the output sync an optional feature (suppressable).
+  * To Docs:
+    * Tell about the conflict with miri in the Output Sync section. Refer to troubleshooting for the ways to work around.
+    * Trooubleshooting seciton: Demo the conflict log, tell how to disable the output sync.
+* TODO: To Docs (Troubleshooting): statics have to be initialized with const expressions where 
+  * the const closures cannot be used on stable since `error[E0277]: the trait bound `[const] Destruct` is not satisfied`;
+  * the functions must be const (which means they cannot be instrumented - `#[loggable]`)
 * TODO: In the tests skip the generics comparison (between the atual and expected log), 
   since their expansion done with `std::any::type_name` is not guaranteed. The comparison can fail after 
   the compiler update (the test can break).
@@ -129,10 +151,20 @@
 * TODO: Use `test_assert!` in all the tests (written before).
 * Ask ChatGPT's CodEx to review the doc-comments in the workspace.
 * TODO: To mdBook: What this project can be useful for.
-  Familiarize with the unknown project quickly by running it instrumented. To understand which functions output 
-  the lines/messages/signals of interest, what preceded that, what in general happens, which functions call which, 
-  how many threads are used, what each thread does, how often the threads are spawned and terminated, if any threads
-  panic.
+  * Familiarize with the unknown project quickly by running it instrumented. To understand which functions output 
+    the lines/messages/signals of interest, what preceded that, what in general happens, which functions call which, 
+    how many threads are used, what each thread does, how often the threads are spawned and terminated, if any threads
+    panic and terminate abnormally.
+  * Testing: Make sure that 
+    * a fn calls certian other fns 
+      * in a certain order 
+      * certain number of times 
+      * with certain args 
+      * they return certain value
+    * at certain moments certain lines are sent to standard output (stdout and/or stderr)
+    * (in some implementations/environments currently not considered) at certain moments the panic handling is triggered
+      * it sends specific data to the standard output
+      * (after extra changes) with the unwinding runtimes certain destructors are called in a certain order as part of the panic handling.
 * TODO: The report of {some errors in the annotated function} does not point to the actual line and column number, 
   but points to the annotation line.
   ```rs 
@@ -147,19 +179,10 @@
   fn loop_instrumenter() {
     // ...
     match /*Integer type value*/ {  // The error report points to here or below (as expected).
-      // Missing arms, or `..` instead of `_` in the catch-all arm.
+      // Missing arms; or `..` instead of `_` in the catch-all arm.
     }
   }
   ```
-* TODO: Consider preserving the prefix in the nested/inner `#[loggable]`:
-  ```rs
-  #[loggable] // Gives the prefix "m::" to the internals.
-  mod m {
-    #[loggable(skip_params)]  // Clears the prefix "m::" for `f()` and its internals.
-    fn f() {}
-  }
-  ```
-  How: The outer one can convert the inner one to `#[loggable(skip_params, prefix = m::)]`, if the inner one has no explicit `prefix=`.
 * TODO: To doc-comments: `#[loggable]` is the same as `#[loggable(prefix=)]`.
 * TODO: To tests: Prefixes (see user[_all]: "calls()::closure{74,14:82,9}::closure{79,21:79,26}(v: true) {} -> false" (OK), but  
   "f_with_f<user::thread_func::{{closure}}::{{closure}}::{{closure}}>(fun: ?, _b: true) {

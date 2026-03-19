@@ -451,21 +451,24 @@ fn quote_as_expr_closure(
         };
     
     // Closure name:
-    let (start_line, start_col) = {
-        let proc_macro2::LineColumn { line, column } = or1_token.span().start();
-        (line, column + 1)
-    };
-    let (end_line, end_col) = {
-        let proc_macro2::LineColumn { line, column } = body.span().end();
-        (line, column)
-    };
-    let coords_str = format!("{},{}:{},{}", start_line, start_col, end_line, end_col);
-    let coords_ts = {
+    let coords_ts = if attr_args.log_closure_coords {
+        let (start_line, start_col) = {
+            let proc_macro2::LineColumn { line, column } = or1_token.span().start();
+            (line, column + 1)
+        };
+        let (end_line, end_col) = {
+            let proc_macro2::LineColumn { line, column } = body.span().end();
+            (line, column)
+        };
+        let coords_str = format!("{},{}:{},{}", start_line, start_col, end_line, end_col);
+
         let to_ts_res = proc_macro2::TokenStream::from_str(&coords_str);
         match to_ts_res {
             Ok(ts) => quote! { #ts },
             Err(_lex_err) => quote! { #coords_str },
         }
+    } else {
+        quote!{ .. }
     };
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
     if !attr_args.prefix.is_empty() {
@@ -475,7 +478,7 @@ fn quote_as_expr_closure(
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
     let attr_args = AttrArgs { 
         prefix: log_closure_name_ts,
-        params_logging: attr_args.params_logging,
+        ..*attr_args
     };
 
     let body = { quote_as_expr(&**body, None, &attr_args) };
@@ -1432,7 +1435,7 @@ impl IsTraverseStopper for Attribute {
         if let Some(last_path_segment) = path.segments.last() {
             let last_path_segment_str = last_path_segment.ident.to_string();
             last_path_segment_str == "loggable" // Will be handled in a separate pass
-            // of the preprocessor (otherwise was causing a double instrumentation or smth. like that).
+            // of the preprocessor (otherwise causes a double instrumentation or smth. like that).
             || last_path_segment_str == "non_loggable"
         } else {
             return false;
@@ -1692,7 +1695,7 @@ fn traversed_block_from_sig(
         // Instrument the local functions and closures inside of the function body:
         let attr_args = AttrArgs { 
             prefix: quote! { #func_log_name #generics() },
-            params_logging: attr_args.params_logging 
+            ..*attr_args
         };
         let block = quote_as_block(block, &attr_args);
 
@@ -1902,7 +1905,7 @@ fn quote_as_item_impl(
                 let prefix = &attr_args.prefix;
                 quote! { #prefix::#prefix_extender }
             },
-            params_logging: attr_args.params_logging,
+            ..*attr_args
         };
 
         let mut traversed_impl_items = quote! {};
@@ -1947,7 +1950,7 @@ fn quote_as_item_mod(
             let prefix = &attr_args.prefix;
             quote! { #prefix::#ident }
         },
-        params_logging: attr_args.params_logging,
+        ..*attr_args
     };
 
     let content = content.as_ref().map(|(_brace, items)| {
@@ -2146,7 +2149,7 @@ fn quote_as_item_trait(
                 let prefix = &attr_args.prefix;
                 quote! { #prefix::#ident #generics }
             },
-            params_logging: attr_args.params_logging,
+            ..*attr_args
         };
         let mut traversed_items = quote! {};
         for item in items {
@@ -2600,8 +2603,14 @@ impl Parse for ExprClosureWOptComma {
 mod kw {
     // syn::custom_keyword!(name);
 
+    // ### Examples
     // `#[loggable(prefix = My::Path)]` // <MyStruct as MyPureTrait>
     syn::custom_keyword!(prefix);
+
+    // Log the parameters in the annotated entity and its local entities recursively.
+    // ### Examples
+    // `#[loggable(log_params)]`
+    syn::custom_keyword!(log_params);
 
     // Skip the parameters logging in the annotated entity and its local entities recursively.
     // 
@@ -2610,10 +2619,37 @@ mod kw {
     // `#[loggable(skip_params)]`
     syn::custom_keyword!(skip_params);
 
-    // Log the parameters in the annotated entity and its local entities recursively.
+    // Log the closure coordinates.
     // ### Examples
-    // `#[loggable(log_params)]`
-    syn::custom_keyword!(log_params);
+    // ```
+    // #[loggable(skip_closure_coords)] // Skip the closure coordinates in the internals of `f()`.
+    // fn f() {
+    //      #[loggable(log_closure_coords)] // Log the closure coordinates in the internals of `g()`.
+    //      fn g() {
+    //          Some(4).map(
+    //              |x| x + 1); // Logs "closure{4,10:4,18}() {}".
+    //      }
+    //      Some(4).map(
+    //          |x| x + 1); // Logs "closure{..}() {}".
+    // }
+    // ```
+    syn::custom_keyword!(log_closure_coords);
+
+    // Skip the closure coordiantes when logging.
+    // ### Examples
+    // ```
+    // #[loggable]
+    // fn f() {
+    //      Some(4).map(
+    //          |x| x + 1); // Logs "  f()::closure{4,10:4,18}() {}".
+    // }
+    // #[loggable(skip_closure_coords)]
+    // fn g() {
+    //      Some(4).map(
+    //          |x| x + 1); // Logs "  g()::closure{..}() {}". The fragment `{..}` delimits a closure from a function named `closure`.
+    // }
+    // ```
+    syn::custom_keyword!(skip_closure_coords);
 }
 
 struct FclQSelf {
@@ -2684,7 +2720,7 @@ enum ParamsLogging {
     /// ### Examples 
     /// `#[loggable(skip_params)]`
     Skip,
-    // Others, e.g. `Shallow`, // `#[loggable(shallow_params)]` (log params _non-recursively_, i.e. skip (with `..`) the nested structs)
+    // Others, e.g. `Shallow`, // `#[loggable(shallow_params)]` (log param constructs _non-recursively_, i.e. skip (with `..`) the nested structs)
 }
 
 struct AttrArgs {
@@ -2702,13 +2738,45 @@ struct AttrArgs {
     /// 
     /// #[loggable] // Has the same effect as `#[loggable(log_params)]`, i.e., the parameters are logged by default.
     /// ```
-    params_logging: ParamsLogging
+    params_logging: ParamsLogging,
+    /// Whether to log the closure coordinates. Log (`true`) by default.
+    /// ### Examples
+    /// ```ignore
+    /// #[loggable(skip_closure_coords)] // Skip the closure coordinates in the internals of `f()`.
+    /// fn f() {
+    ///      #[loggable(log_closure_coords)] // Log the closure coordinates in the internals of `g()`.
+    ///      fn g() {
+    ///          Some(4).map(
+    ///              |x| x + 1); // Logs "closure{4,10:4,18}() {}".
+    ///      }
+    ///      Some(4).map(
+    ///          |x| x + 1); // Logs "closure{..}() {}".
+    /// }
+    /// ```
+    /// 
+    /// <br>
+    /// 
+    /// ```ignore
+    /// #[loggable]
+    /// fn f() {
+    ///      Some(4).map(
+    ///          |x| x + 1); // Logs "  f()::closure{4,10:4,18}() {}".
+    /// }
+    /// #[loggable(skip_closure_coords)]
+    /// fn g() {
+    ///      Some(4).map(
+    ///          |x| x + 1); // Logs "  g()::closure{..}() {}". 
+    ///          // The fragment `{..}` delimits a closure from a function named `closure`.
+    /// }
+    /// ```
+    log_closure_coords: bool,
 }
 impl Parse for AttrArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut attr_args = AttrArgs {
             prefix: quote! {},
             params_logging: ParamsLogging::Log,
+            log_closure_coords: true,
         };
         loop {
             if input.is_empty() {
@@ -2736,6 +2804,12 @@ impl Parse for AttrArgs {
             } else if lookahead.peek(kw::log_params) {
                 input.parse::<kw::log_params>()?;
                 attr_args.params_logging = ParamsLogging::Log;
+            } else if lookahead.peek(kw::skip_closure_coords) {
+                input.parse::<kw::skip_closure_coords>()?;
+                attr_args.log_closure_coords = false;
+            } else if lookahead.peek(kw::log_closure_coords) {
+                input.parse::<kw::log_closure_coords>()?;
+                attr_args.log_closure_coords = true;
             } else {
                 return Err(lookahead.error()); 
                 // Reports an error, e.g.,
