@@ -2,6 +2,16 @@
 
 # Must
 
+# Need
+* Preserve the prefix in nested `#[loggable]`.
+  ```rs
+  #[loggable] // 2. If nested `#[loggable]` attrs have no explicit `prefix=`, then nested ones -> `#[loggable(prefix = f())]`
+  fn f() {
+    #[loggable(skip_params)]  // 1. Currently "clears" the prefix "f::". Need to preserve it, if no explicit `prefix=`.
+    fn g(b: bool) {}
+  }
+  ```
+
 # Next
 * Tests
   * code_commons\src\call_graph.rs (the tests are in fcl)

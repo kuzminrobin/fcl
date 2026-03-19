@@ -17,8 +17,6 @@ use fcl_proc_macros::loggable;
 use fcl::CallLogger;
 use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
  */
-// in trait loggable in impl non_loggable
-//      vice versa
 // fn
 // static
 
@@ -26,6 +24,8 @@ use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 fn in_impl() {
     #[loggable]
     fn prefixing_test(log: Rc<RefCell<Vec<u8>>>) {
+
+        // In the `trait` - loggable, in `impl` - non-loggable.
         trait TestTrait<T> {
             fn trait_fn(_p: &str) {} // Loggable in the `trait`.
             fn trait_fn_loggable() {} // Loggable in the `trait`.
@@ -60,6 +60,33 @@ fn in_impl() {
     THREAD_DECORATOR.with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
     prefixing_test(log.clone());
+
+    log.borrow_mut().clear();
+
+    // In the `trait` - non-loggable, in the `impl` - loggable.
+    trait TestTrait<T> {
+        fn trait_fn(_p: &str) {} // Non-loggable in the `trait`.
+        fn trait_fn_non_loggable() {} // Non-loggable in the `trait`.
+    }
+    impl TestTrait<bool> for u8 {
+        #[loggable]
+        fn trait_fn(_p: &str) {} // Non-loggable in the `trait`, loggable in the `impl`.
+        fn trait_fn_non_loggable() {} // Non-loggable (after `#[loggable]` fn) both in the `trait` and in the `impl`.
+    }
+    impl TestTrait<f32> for u8 {} // All the associated funcs are non-loggable from the `trait`.
+
+    // Generate some test log:
+    <u8 as TestTrait<bool>>::trait_fn(&"Log");
+    <u8 as TestTrait<f32>>::trait_fn(&"Don't log"); // Do not log.
+    <u8 as TestTrait<bool>>::trait_fn_non_loggable(); // Do not log.
+    <u8 as TestTrait<f32>>::trait_fn_non_loggable(); // Do not log.
+
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "trait_fn(_p: \"Log\") {}\n",
+        // Assert: All other calls are not logged.
+    ));
+
 }
 
 #[test]
