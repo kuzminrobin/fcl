@@ -130,6 +130,14 @@
 
 
 # Unsorted
+* TODO: trait IsTraverseStopper -> ..
+* TODO: Make FCL ingnore new functionality added to syn, proc_macro2, etc.
+  ```rs 
+  match <Other crate's entity> {
+    ..
+    _ => // Use as is.
+  }
+  ```
 * TODO: If user has their own attributes `#[loggable]`/`#[non_loggable]` then to avoid conflict, 
   enable the analysis in `is_traverse_stopper()`: 
   If the last segment on the path is "loggable" or "non_loggable" then 
