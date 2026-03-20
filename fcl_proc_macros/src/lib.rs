@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+// use proc_macro2::Literal;
 use quote::quote;
 use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, *};
 
@@ -1422,15 +1423,183 @@ fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStre
 //     // let vis = quote_as_vis(vis, attr_args);
 //     quote!{ #(#attrs)* #vis #extern_token #crate_token #ident #rename #semi_token }
 // }
+struct LoggableAttrInfo {
+    prefix: Option<proc_macro2::TokenStream>, //Option<String>,
+    params_logging: Option<ParamsLogging>,
+    log_closure_coords: Option<bool>,
+}
+
+struct LoggableAttrArgsOpt {
+    prefix: Option<proc_macro2::TokenStream>, // Option<String>,
+    params_logging: Option<ParamsLogging>,
+    log_closure_coords: Option<bool>,
+}
+impl Parse for LoggableAttrArgsOpt {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut args = LoggableAttrArgsOpt {
+            prefix: None,
+            params_logging: None,
+            log_closure_coords: None,
+        };
+
+        //println!("input: {}", input);
+
+        // syn::quoted
+        
+
+        // let content;
+        // let _paren = syn::parenthesized!(content in input);
+        // let input = content;
+
+        // let _paren: syn::token::Paren = input.parse()?;
+        // input.parse::<Token![(]>()?;
+
+        // println!("input2: {}", input);
+        loop {
+            // if content.is_empty() {
+            if input.is_empty() {
+                break;
+            }
+            let lookahead = input.lookahead1();
+            if lookahead.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+                continue;
+            } else if lookahead.peek(kw::prefix) {
+                input.parse::<kw::prefix>()?;
+                input.parse::<Token![=]>()?;
+                // // use proc_macro2::TokenTree::Literal;
+                // if lookahead.peek(proc_macro2::Literal) {
+                // // if lookahead.peek(proc_macro2::TokenTree::Literal) {
+                // } else {
+                    let optional_prefix = input.parse::<QSelfOrPath>()?;
+                    if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
+                        let prefix_ts = match q_self_or_path {
+                            LogPrefix::QSelf(qself) => quote! { #qself },
+                            LogPrefix::Path(path) => quote! { #path },
+                        };
+                        args.prefix = Some(prefix_ts); //Some(remove_spaces(&prefix_ts.to_string()));
+                    }
+                // }
+            } else if lookahead.peek(kw::skip_params) {
+                input.parse::<kw::skip_params>()?;
+                args.params_logging = Some(ParamsLogging::Skip);
+            } else if lookahead.peek(kw::log_params) {
+                input.parse::<kw::log_params>()?;
+                args.params_logging = Some(ParamsLogging::Log);
+            } else if lookahead.peek(kw::skip_closure_coords) {
+                input.parse::<kw::skip_closure_coords>()?;
+                args.log_closure_coords = Some(false);
+                // println!("args.log_closure_coords: {:?}", args.log_closure_coords);
+            } else if lookahead.peek(kw::log_closure_coords) {
+                input.parse::<kw::log_closure_coords>()?;
+                args.log_closure_coords = Some(true);
+            } else {
+                return Err(lookahead.error());
+            }
+        }
+        Ok(args)
+    }
+}
 trait IsTraverseStopper {
+    fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo>;
+
+    fn is_fcl_attribute(attr: &Attribute, attr_name: &str) -> bool {
+        let path = match &attr.meta {
+            Meta::Path(path) => path,
+            Meta::List(MetaList { path, .. }) => path,
+            _ => return false,
+        };
+        // If the last path segment equals `attr_name` // e.g. "non_loggable"
+        //      && preceeding path segment is None or is "fcl_proc_macros"
+        // then 
+        //      return true // is `non_loggable`
+        // return false // is not `non_loggable` or is user's own `non_loggable` (`<user's_path>::non_loggable`).
+        if let Some(last_path_segment) = path.segments.last() && 
+            last_path_segment.ident.to_string() == attr_name &&
+            (path.segments.len() < 2 || {
+                let prev_segment_idx = path.segments.len() - 2;
+                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
+            })
+        {
+            return true
+        }
+        return false
+    }
     fn is_traverse_stopper(&self) -> bool;
+    fn is_non_loggable(&self) -> bool;
+    // fn is_loggable(&self) -> bool;
 }
 impl IsTraverseStopper for Attribute {
+    fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo> {
+        let (path, optional_tokens) = match &self.meta {
+            Meta::Path(path) => (path, None),
+            Meta::List(MetaList { path, tokens, .. }) => (path, Some(tokens)),
+            _ => return None,
+        };
+
+        let mut ret_val = None;
+
+        // If the last path segment equals "loggable"
+        //      && preceeding path segment is None or is "fcl_proc_macros"
+        // then 
+        //      Get and return LoggableAttrInfo
+        // return None
+        if let Some(last_path_segment) = path.segments.last() && 
+            last_path_segment.ident.to_string() == "loggable" &&
+            (path.segments.len() < 2 || {
+                let prev_segment_idx = path.segments.len() - 2;
+                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
+            })
+        {
+            if let Some(tokens) = optional_tokens {
+                ret_val = Some(LoggableAttrInfo {
+                    prefix: None, // Option<String>,
+                    params_logging: None, // Option<ParamsLogging>,
+                    log_closure_coords: None, //Option<bool>,
+                });
+                // println!("optional_tokens: {:?}", optional_tokens);
+                if let Ok(parsed) = syn::parse2::<LoggableAttrArgsOpt>(tokens.clone()) {
+                    ret_val = Some(LoggableAttrInfo {
+                        prefix: parsed.prefix,
+                        params_logging: parsed.params_logging,
+                        log_closure_coords: parsed.log_closure_coords,
+                    });
+                }
+            }
+        } 
+        return ret_val
+/*
+        if let Some(last_path_segment) = path.segments.last() && 
+            last_path_segment.ident.to_string() == "loggable" &&
+            (path.segments.len() < 2 || {
+                let prev_segment_idx = path.segments.len() - 2;
+                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
+            })
+        {
+            return true
+        }
+        return false
+ */        
+        // let ret_val = if self.is_loggable() {
+
+        // } else {
+        //     None
+        // }
+    }
+
+    fn is_non_loggable(&self) -> bool {
+        <Attribute as IsTraverseStopper>::is_fcl_attribute(self, "non_loggable")
+    }
+    // fn is_loggable(&self) -> bool {
+    //     IsTraverseStopper::is_fcl_attribute(self, "loggable")
+    // }
+
     fn is_traverse_stopper(&self) -> bool {
         let path = match &self.meta {
             Meta::Path(path) => path,
             Meta::List(MetaList { path, .. }) => path,
-            Meta::NameValue(MetaNameValue { path, .. }) => path,
+            // Meta::NameValue(MetaNameValue { path, .. }) => path,
+            _ => return false,
         };
         if let Some(last_path_segment) = path.segments.last() {
             let last_path_segment_str = last_path_segment.ident.to_string();
@@ -1694,7 +1863,8 @@ fn traversed_block_from_sig(
 
         // Instrument the local functions and closures inside of the function body:
         let attr_args = AttrArgs { 
-            prefix: quote! { #func_log_name #generics() },
+            prefix: quote! { #func_log_name #generics },
+            // prefix: quote! { #func_log_name #generics() },
             ..*attr_args
         };
         let block = quote_as_block(block, &attr_args);
@@ -1788,9 +1958,74 @@ fn traversed_block_from_sig(
 
     block
 }
+
+fn get_loggable_attr_params_meta_tokens(user_provided_attr_info: &LoggableAttrInfo, enclosing_item_attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    let mut updated_tokens = quote!{};
+    let LoggableAttrInfo {
+        prefix: user_provided_prefix,
+        params_logging: user_provided_params_logging,
+        log_closure_coords: user_provided_log_closure_coords,
+    } = user_provided_attr_info;
+
+    let new_prefix = user_provided_prefix.as_ref().unwrap_or(&enclosing_item_attr_args.prefix/* .clone()*/);
+    // println!("prefix: {:?}", prefix);
+    updated_tokens = quote!{ prefix = #new_prefix, };
+    // println!("updated_tokens: {:?}", updated_tokens);
+    // if let Some(specified_prefix) = prefix {
+    //     updated_tokens = quote!{ prefix = #specified_prefix, };
+    // } else {
+    //     let inherited_prefix = &attr_args.prefix;
+    //     updated_tokens = quote!{ prefix = #inherited_prefix, };
+    // }
+
+    let new_params_logging = user_provided_params_logging.unwrap_or(enclosing_item_attr_args.params_logging);
+    match new_params_logging {
+        ParamsLogging::Log => updated_tokens = quote!{ #updated_tokens log_params, },
+        ParamsLogging::Skip => updated_tokens = quote!{ #updated_tokens skip_params, },
+        // Any new ones require attention.
+    }
+    // println!("log_closure_coords: {:?}", log_closure_coords);
+    let new_log_closure_coords = user_provided_log_closure_coords.unwrap_or(enclosing_item_attr_args.log_closure_coords);
+    if new_log_closure_coords {
+        updated_tokens = quote!{ #updated_tokens log_closure_coords, }
+    } else {
+        updated_tokens = quote!{ #updated_tokens skip_closure_coords, }
+    }
+    // println!("updated_tokens: {:?}", updated_tokens);
+    updated_tokens
+}
+
+fn handle_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, enclosing_item_attr_args: &AttrArgs, new_attrs: &mut Vec<Attribute>) {
+    if let Some(user_provided_attr_info) = attr.get_loggable_attr_info() {
+        *has_loggable = true;
+        let new_attr = syn::Attribute {
+            pound_token: attr.pound_token,
+            style: attr.style,
+            bracket_token: attr.bracket_token,
+            meta: match &attr.meta {
+                syn::Meta::List(metalist) =>
+                    Meta::List(MetaList {
+                        path: metalist.path.clone(),
+                        delimiter: metalist.delimiter.clone(),
+                        tokens: {
+                            get_loggable_attr_params_meta_tokens(&user_provided_attr_info, enclosing_item_attr_args)
+                        }
+                    }),
+                // Path(Path),
+                // NameValue(MetaNameValue),
+                _ => attr.meta.clone(),
+            },
+        };
+        // println!("new_attr: {:?}", new_attr.meta.);
+        new_attrs.push(new_attr);
+    } else {
+        new_attrs.push(attr.clone());
+    }
+}
+
 fn quote_as_item_fn(
     item_fn: &ItemFn,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let ItemFn {
         attrs, //: Vec<Attribute>,
@@ -1798,15 +2033,51 @@ fn quote_as_item_fn(
         sig,   //: Signature,
         block, //: Box<Block>,
     } = item_fn;
+    // println!("{:?} {{", sig.ident);
 
+    let mut new_attrs = vec![];
+    let mut has_loggable = false;
+
+    // println!("attrs.len(): {}", attrs.len());
     for attr in attrs {
-        if attr.is_traverse_stopper() {
+        // match &attr.meta {
+        //     Meta::Path(path) => println!("Path: {:?}", path.get_ident()),
+        //     Meta::List(metalist) => println!("Meta::List Path{:?}", metalist.path.get_ident()),
+        //     Meta::NameValue(meta_name_value) => println!("NameValue Path: {:?}", meta_name_value.path.get_ident()),
+        // }
+        // println!("attr: {:?}", attr.meta);
+
+        if attr.is_non_loggable() {
+        // if attr.is_traverse_stopper() {
+            // println!("}} {:?} // non_loggable", sig.ident);
+
             return quote! { #item_fn };
         }
+        handle_loggable_attr_params(attr, &mut has_loggable, enclosing_item_attr_args, &mut new_attrs);
     }
 
-    let block = traversed_block_from_sig(block, sig, attr_args);
-    quote! { #(#attrs)* #vis #sig #block }
+    let block = if has_loggable {
+        // println!("not traversing");
+
+        // After updating/adding the params of/to #[loggable(<params>)]
+        // leave the fn body uninstrumented, so that a separate #[loggable(<params>)] macro invocation 
+        // will instrument the body.
+        quote!{ #block }
+        // block
+    } else {
+        // println!("traversing");
+        traversed_block_from_sig(block, sig, enclosing_item_attr_args)
+    };
+
+    // println!("{:?} }} // end", sig.ident);
+
+    // // let attrs = if new_attrs.is_empty() { attrs } else { &new_attrs };
+    // let block = traversed_block_from_sig(block, sig, attr_args);
+    let ret_val = quote! { #(#new_attrs)* #vis #sig #block };
+    // println!("quote_as_item_fn()::ret_val: {}", ret_val);
+    ret_val
+    // quote! { #(#new_attrs)* #vis #sig #block }
+    // quote! { #(#attrs)* #vis #sig #block }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -2699,6 +2970,8 @@ impl Parse for QSelfOrPath {
             Ok(result)
         } else {
             let lookahead = input.lookahead1();
+            // if lookahead.peek(Token!["]) {
+            // }
             if lookahead.peek(Token![<]) {
                 result = Self(Some(LogPrefix::QSelf(input.parse()?))); // <T as U::V>
             } else {

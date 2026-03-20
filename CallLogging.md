@@ -130,6 +130,14 @@
 
 
 # Unsorted
+* TODO: If user has their own attributes `#[loggable]`/`#[non_loggable]` then to avoid conflict, 
+  enable the analysis in `is_traverse_stopper()`: 
+  If the last segment on the path is "loggable" or "non_loggable" then 
+  if preceeding segment is present && preceeding segment is not "fcl_proc_macros" {
+      leave uninstrumented
+  } else ("fcl_proc_macros" or none) {
+    potentially add "prefix", "skip_params"/"log_params", "skip_closure_coords"/"log_closure_coords".
+  }
 * TODO: miri
   * Test with [miri](https://rust-book.cs.brown.edu/ch20-01-unsafe-rust.html?highlight=static#using-miri-to-check-unsafe-code). 
     The output sync (`let tempfile = NamedTempFile::new()?;`) conflicts with miri, invokes something that miri does not support.

@@ -9,6 +9,171 @@ use fcl::call_log_infra::instances::THREAD_DECORATOR;
 
 use crate::common::*;
 
+// use fcl_proc_macros::loggable;
+
+#[test]
+fn tmp0() {
+    #[loggable]
+    fn m() {
+        #[loggable(skip_closure_coords)]
+        fn n() {
+            Some(0).map(|y| y + 2);
+        }
+        n();
+    }
+    // fn m()
+    // {
+    //     use fcl :: { CallLogger, MaybePrint }; let ret_val = fcl :: call_log_infra
+    //     :: instances ::
+    //     THREAD_LOGGER.with(| logger |
+    //     {
+    //         let param_val_str = None; let mut body = move ||
+    //         {
+    //             #[loggable(prefix = m, log_params, skip_closure_coords)] fn n()
+    //             { Some(0).map(| y | y + 2); } n();
+    //         }; if ! logger.borrow().logging_is_on() { return body(); } let mut
+    //         generic_func_name = String :: with_capacity(64);
+    //         generic_func_name.push_str("m"); if ! true
+    //         {
+    //             generic_func_name.push_str("<"); let generic_arg_names_vec : Vec <
+    //             & 'static str > = vec! []; for (idx, generic_arg_name) in
+    //             generic_arg_names_vec.into_iter().enumerate()
+    //             {
+    //                 if idx != 0 { generic_func_name.push_str(","); }
+    //                 generic_func_name.push_str(generic_arg_name);
+    //             } generic_func_name.push_str(">");
+    //         } let mut callee_logger = fcl :: CalleeLogger ::
+    //         new(& generic_func_name, param_val_str); let ret_val = body(); if
+    //         false
+    //         {
+    //             let ret_val_str = format! ("{}", ret_val.maybe_print());
+    //             callee_logger.set_ret_val(ret_val_str);
+    //         } ret_val
+    //     }); ret_val
+    // }
+}
+
+#[test]
+fn tmp() {
+    #[loggable]
+    fn f() {
+        fn g(b: bool) {
+            Some(1).map(|x| x + 1);
+        }
+        g(true);
+    }
+
+    let log = substitute_log_writer!();
+    f();
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "f() {\n",
+        "  f::g(b: true) {\n",
+        "    f::g::closure{62,25:62,33}(x: 1) {} -> 2\n",
+        "  } // f::g().\n",
+        "} // f().\n",
+    ));
+
+    #[loggable]
+    fn h() {
+        #[loggable]
+        fn i() {}
+        i();
+    }
+    log.borrow_mut().clear();
+    h();
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "h() {\n",
+        "  h::i() {}\n",  // Still "h::".
+        "} // h().\n",
+    ));
+/*
+"h() {\n
+  i() {\n
+    i::closure{78,5:78,15}(logger: ?) {\n
+      h::i() {\n
+        i::closure{78,5:78,15}::closure{78,5:78,15}() {} -> ()\n
+      } // h::i().\n
+    } -> () // i::closure{78,5:78,15}().\n
+  } // i().\n
+} // h().\n"
+*/
+    {
+        #[loggable(skip_params)]
+        fn j(_u: u8) {
+            #[loggable] // (skip_params) is inherited.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        log.borrow_mut().clear();
+        j(4);
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(..) {\n",
+            "  j::k(..) {}\n",  // Still no params.
+            "} // j().\n",
+        ));
+    }
+    {
+        #[loggable]
+        fn j(_u: u8) {
+            #[loggable(skip_params)] // (skip_params) is user-provided.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        log.borrow_mut().clear();
+        j(4);
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(_u: 4) {\n",       // Params.
+            "  j::k(..) {}\n",  // No params.
+            "} // j().\n",
+        ));
+    }
+
+    {
+        #[loggable(skip_closure_coords)]
+        fn m() {
+            #[loggable]
+            fn n() {
+                Some(0).map(|y| y + 2);
+            }
+            n();
+        }
+        log.borrow_mut().clear();
+        m();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "m() {\n",
+            "  m::n() {\n",
+            "    m::n::closure{..}() {} -> 2\n", // Still no coords
+            "  } // m::n().\n",
+            "} // m().\n",
+        ));
+    }
+
+    #[loggable]
+    fn m() {
+        #[loggable(skip_closure_coords)]
+        fn n() {
+            Some(0).map(|y| y + 2);
+        }
+        n();
+    }
+    log.borrow_mut().clear();
+    m();
+    #[rustfmt::skip]
+    test_assert!(log, concat!(
+        "m() {\n",
+        "  m::n() {\n",
+        "    m::n::closure{..}() {} -> 2\n", // Still no coords
+        "  } // m::n().\n",
+        "} // m().\n",
+    ));
+}
+
+
 #[test]
 fn in_static() {
     #[loggable(skip_closure_coords)]
@@ -57,10 +222,10 @@ fn in_static() {
     test_assert!(log, concat!(
         "instrumenter() {\n",
            // Assert: `non_loggable_const_initializer()` is not logged:
-        "  instrumenter()::closure{..}() {\n",
-        "    instrumenter()::loggable_initializer() {} -> false\n",
-            // Assert: "instrumenter()::non_loggable_initializer() {} -> true\n" is not logged:
-        "  } -> true // instrumenter()::closure{..}().\n",
+        "  instrumenter::closure{..}() {\n",
+        "    instrumenter::loggable_initializer() {} -> false\n",
+            // Assert: "instrumenter::non_loggable_initializer() {} -> true\n" is not logged:
+        "  } -> true // instrumenter::closure{..}().\n",
         "} // instrumenter().\n",
     ));
 }
@@ -121,19 +286,19 @@ fn in_fn() {
         "instrumenter() {",
             // Assert: The following are not logged:
             // * `non_loggable_fn()` and closure in it.
-            //   "  instrumenter()::non_loggable_fn() {\n",
-            //   "    instrumenter()::non_loggable_fn()::closure{28,25:28,33}(x: 2) {} -> 3\n",
-            //   "  } // instrumenter()::non_loggable_fn().\n",
+            //   "  instrumenter::non_loggable_fn() {\n",
+            //   "    instrumenter::non_loggable_fn::closure{28,25:28,33}(x: 2) {} -> 3\n",
+            //   "  } // instrumenter::non_loggable_fn().\n",
             // * `non_loggable_mod::non_loggable_mod_fn()`.
-            //   "  instrumenter()::non_loggable_mod::non_loggable_mod_fn() {}\n"
+            //   "  instrumenter::non_loggable_mod::non_loggable_mod_fn() {}\n"
             // * `<i8 as NonLoggableTrait>::non_loggable_trait_fn()`.
-            //   "  instrumenter()::NonLoggableTrait::non_loggable_trait_fn() {}\n"
+            //   "  instrumenter::NonLoggableTrait::non_loggable_trait_fn() {}\n"
             // * `<u8 as NonLoggableTrait>::non_loggable_trait_fn()`. 
-            //   "  instrumenter()::<u8 as NonLoggableTrait>::non_loggable_trait_fn() {}\n"
+            //   "  instrumenter::<u8 as NonLoggableTrait>::non_loggable_trait_fn() {}\n"
             // * `LoggingNeutralStruct::non_loggable_impl_struct_fn()`. 
-            //   "  instrumenter()::LoggingNeutralStruct::non_loggable_impl_struct_fn() {}\n"
+            //   "  instrumenter::LoggingNeutralStruct::non_loggable_impl_struct_fn() {}\n"
             // * `LoggingNeutralStruct::non_loggable_impl_struct_self_fn(&mut self: {})`.
-            //   "  instrumenter()::LoggingNeutralStruct::non_loggable_impl_struct_self_fn(self: &mut ?) {}\n"
+            //   "  instrumenter::LoggingNeutralStruct::non_loggable_impl_struct_self_fn(self: &mut ?) {}\n"
         "}\n",
     ));
 }
@@ -167,9 +332,9 @@ fn in_impl() {
         test_assert!(log, concat!(
             "prefixing_test(log: RefCell { value: [] }) {\n",
             // Assert: `<u8 as TestTrait<bool>>::trait_fn()` is not logged.
-            "  prefixing_test()::TestTrait<T>::trait_fn(_p: \"Log\") {}\n",
-            "  prefixing_test()::<u8 as TestTrait<bool>>::trait_fn_loggable() {}\n",
-            "  prefixing_test()::TestTrait<T>::trait_fn_loggable() {}\n",
+            "  prefixing_test::TestTrait<T>::trait_fn(_p: \"Log\") {}\n",
+            "  prefixing_test::<u8 as TestTrait<bool>>::trait_fn_loggable() {}\n",
+            "  prefixing_test::TestTrait<T>::trait_fn_loggable() {}\n",
         ));
     }
 
