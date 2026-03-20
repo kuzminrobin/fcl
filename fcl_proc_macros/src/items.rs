@@ -1,5 +1,5 @@
 use quote::quote;
-use crate::{AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::quote_as_expr, traversed_block_from_sig};
+use crate::{AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::quote_as_expr, remove_spaces, update_param_data_from_pat};
 
 
 // // Likely not applicable for instrumenting the run time functions and
@@ -129,6 +129,171 @@ fn handle_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, e
     } else {
         new_attrs.push(attr.clone());
     }
+}
+
+fn input_vals(inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    if inputs.is_empty() {
+        quote! { None }
+    } else {
+        match attr_args.params_logging {
+            ParamsLogging::Log => {
+                let mut param_format_str = String::new();
+                let mut param_list = quote! {};
+                for (index, fn_param) in inputs.iter().enumerate() {
+                    if index != 0 {
+                        param_format_str.push_str(", ");
+                    }
+                    match fn_param {
+                        syn::FnArg::Receiver(_receiver) => {
+                            param_format_str.push_str("self: ");
+                            if _receiver.reference.is_some() {
+                                param_format_str.push_str("&");
+                            }
+                            if _receiver.mutability.is_some() {
+                                param_format_str.push_str("mut ");
+                            }
+                            param_format_str.push_str("{}");
+                            param_list = quote! { #param_list self.maybe_print(), };
+                        }
+                        syn::FnArg::Typed(pat_type) => {
+                            update_param_data_from_pat(&*pat_type.pat, &mut param_format_str, &mut param_list);
+                        }
+                    }
+                }
+                quote! { Some(format!(#param_format_str, #param_list)) }
+            }
+            ParamsLogging::Skip => {
+                quote! { Some(String::from("..")) }
+            }
+        }
+    }
+}
+
+fn traversed_block_from_sig(
+    block: &syn::Block,
+    sig: &syn::Signature,
+    attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
+    let syn::Signature {
+        ident,    //: Ident,
+        generics, //: Generics,
+        inputs,   //: Punctuated<FnArg, Comma>,
+        output,   //: ReturnType,
+        ..
+    } = sig;
+    let inputs = input_vals(inputs, attr_args);
+
+    let mut returns_something = false;
+    if let syn::ReturnType::Type(..) = output {
+        returns_something = true;
+    }
+
+    let block = {
+        let func_log_name = {
+            if attr_args.prefix.is_empty() {
+                quote! { #ident }
+            } else {
+                let prefix = &attr_args.prefix;
+                quote! { #prefix::#ident }
+            }
+        };
+
+        // Instrument the local functions and closures inside of the function body:
+        let attr_args = AttrArgs { 
+            prefix: quote! { #func_log_name #generics },
+            // prefix: quote! { #func_log_name #generics() },
+            ..*attr_args
+        };
+        let block = crate::exprs::quote_as_block(block, &attr_args);
+
+        // The proc_macros (the pre-compile) part of the infrastructure for
+        // generic parameters substitution with actual generic arguments,
+        // i.e. `<T, U>` -> `<char, u8>`.
+        let generics_params_iter = generics.type_params();
+        let generic_params_is_empty = generics.params.is_empty();
+
+        let func_log_name = remove_spaces(&func_log_name.to_string());
+
+        // Get the multithreading-dependent `logging_is_on()` call token stream:
+        let logging_is_on = quote! {
+            logger.borrow()
+        };
+        #[cfg(feature = "singlethreaded")]
+        let logging_is_on = quote! {
+            #logging_is_on.borrow()
+        };
+        let logging_is_on = quote! {
+            #logging_is_on.logging_is_on()
+        };
+
+        // Return the token stream of the instrumented function call:
+        quote! {
+            {
+                use fcl::{CallLogger, MaybePrint};
+
+                let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                    // NOTE: Borrows the parameters. Has to be ahead of the `body`
+                    // that moves the parameters to the `body` closure.
+                    //
+                    // At run time get the string of parameter names and values:
+                    let param_val_str = #inputs;
+
+                    // NOTE: The `block` (the function body) will be executed (later)
+                    // as a closure (rather than as is)
+                    // to handle the `return` in the `block` correctly
+                    // (i.e. to catch the return value after the `return` and log that return value).
+                    //
+                    // Get the function body as a closure:
+                    let mut body = move || #block;
+
+                    // If logging is off then do nothing
+                    // except executing the body and returning the value:
+                    if !#logging_is_on {
+                        return body();
+                    }
+                    // Else (loggign is on):
+
+                    // At run time get the generic function name,
+                    // like `f<char,u8>` instead of `f<T,U>`
+                    // (at pre-compile (i.e. macro expansion) time the generic arguments
+                    // are not known yet):
+                    let mut generic_func_name = String::with_capacity(64);
+                    generic_func_name.push_str(#func_log_name);
+                    if !#generic_params_is_empty {
+                        generic_func_name.push_str("<");
+                        let generic_arg_names_vec: Vec<&'static str> =
+                            vec![#(std::any::type_name::< #generics_params_iter >(),)*];
+                        for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+                            if idx != 0 {
+                                generic_func_name.push_str(",");
+                            }
+                            generic_func_name.push_str(generic_arg_name);
+                        }
+                        generic_func_name.push_str(">");
+                    }
+
+                    // Log the call, like `f<char, u8>(param: 5) {`:
+                    let mut callee_logger = fcl::CalleeLogger::new(&generic_func_name, param_val_str);
+
+                    // Execute the function body and catch the return value:
+                    let ret_val = body();
+
+                    // Convert the return value to string and assign to the logger:
+                    if #returns_something {
+                        let ret_val_str = format!("{}", ret_val.maybe_print());
+                        callee_logger.set_ret_val(ret_val_str);
+                    }
+
+                    // Log the return (and the return value), like `} -> 5 // f().`
+                    // in the `CalleeLogger` destructor and return the value to the caller:
+                    ret_val
+                });
+                ret_val
+            }
+        }
+    };
+
+    block
 }
 
 fn quote_as_item_fn(

@@ -168,42 +168,6 @@ pub fn loggable(
     output.into()
 }
 
-fn quote_as_init(init: &LocalInit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
-    // `LocalInit` represents `= s.parse()?` in `let x: u64 = s.parse()?` and
-    // `= r else { return }` in `let Ok(x) = r else { return }`.
-    let LocalInit {
-        eq_token, //: Eq,
-        expr,     //: Box<Expr>,
-        diverge,  //: Option<(Else, Box<Expr>)>,
-    } = init;
-    let expr = exprs::quote_as_expr(expr, None, attr_args);
-    let diverge = diverge.as_ref().map(|(else_token, expr)| {
-        let expr = exprs::quote_as_expr(expr, None, attr_args);
-        quote! { #else_token #expr }
-    });
-    quote! { #eq_token #expr #diverge }
-}
-
-fn quote_as_local(local: &Local, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
-    let Local {
-        attrs,      //: Vec<Attribute>,
-        let_token,  //: Let,
-        pat,        //: Pat,
-        init,       //: Option<LocalInit>,
-        semi_token, //: Semi,
-    } = local;
-
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #local };
-        }
-    }
-
-    let init = init.as_ref().map(|init| quote_as_init(init, attr_args));
-
-    quote! { #(#attrs)* #let_token #pat #init #semi_token }
-}
-
 struct LoggableAttrInfo {
     prefix: Option<proc_macro2::TokenStream>, //Option<String>,
     params_logging: Option<ParamsLogging>,
@@ -392,6 +356,31 @@ impl IsTraverseStopper for Attribute {
         }
     }
 }
+
+/// Removes spaces from a string, except around 'as' (in framgents like "\<MyType as MyTrait>").
+///
+/// Returns a copy of an argument with spaces removed, except around 'as'.
+///
+/// NOTE: If the argument contains sequences of '$as$', those will be replaced with ' as '.
+///
+/// ### Examples
+///
+/// ```ignore
+/// assert_eq!(
+///     remove_spaces(&"<MyType as MyTrait> :: my_func"),
+///     "<MyType as MyTrait>::my_func" // The spaces around '::' are removed, but around 'as' are not.
+/// );
+/// ```
+fn remove_spaces(s: &str) -> String {
+    // Preserve spaces in fragments like `<MyType as MyTrait>`.
+    let tmp_str: String = s
+        .replace(" as ", "$as$")
+        .chars()
+        .filter(|ch| *ch != ' ')
+        .collect();
+    tmp_str.replace("$as$", " as ")
+}
+
 fn update_param_data_from_pat(
     input_pat: &Pat,
     param_format_str: &mut String,
@@ -510,7 +499,7 @@ fn update_param_data_from_pat(
             }
             param_format_str.push_str(&format!(
                 "{}{{{{{}}}}}", // "MyPoint{{x: {}, y: _y: {}}}"
-                exprs::remove_spaces(&quote! {#path}.to_string()),
+                remove_spaces(&quote! {#path}.to_string()),
                 fields_format_str
             )); // + "MyStruct: { <fileds> }"
         }
@@ -545,12 +534,12 @@ fn update_param_data_from_pat(
                 param_format_str.push_str(&format!(
                     "<{} as {}>(",
                     quote! { #ty },
-                    exprs::remove_spaces(&quote! { #path }.to_string())
+                    remove_spaces(&quote! { #path }.to_string())
                 ));
             } else {
                 param_format_str.push_str(&format!(
                     "{}(",
-                    exprs::remove_spaces(&quote! { #path }.to_string())
+                    remove_spaces(&quote! { #path }.to_string())
                 ));
             }
             for (idx, elem) in elems.iter().enumerate() {
@@ -575,169 +564,6 @@ fn update_param_data_from_pat(
         // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
         _ => {} // Do not print the param values.
     }
-}
-fn input_vals(inputs: &Punctuated<FnArg, Comma>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
-    if inputs.is_empty() {
-        quote! { None }
-    } else {
-        match attr_args.params_logging {
-            ParamsLogging::Log => {
-                let mut param_format_str = String::new();
-                let mut param_list = quote! {};
-                for (index, fn_param) in inputs.iter().enumerate() {
-                    if index != 0 {
-                        param_format_str.push_str(", ");
-                    }
-                    match fn_param {
-                        FnArg::Receiver(_receiver) => {
-                            param_format_str.push_str("self: ");
-                            if _receiver.reference.is_some() {
-                                param_format_str.push_str("&");
-                            }
-                            if _receiver.mutability.is_some() {
-                                param_format_str.push_str("mut ");
-                            }
-                            param_format_str.push_str("{}");
-                            param_list = quote! { #param_list self.maybe_print(), };
-                        }
-                        FnArg::Typed(pat_type) => {
-                            update_param_data_from_pat(&*pat_type.pat, &mut param_format_str, &mut param_list);
-                        }
-                    }
-                }
-                quote! { Some(format!(#param_format_str, #param_list)) }
-            }
-            ParamsLogging::Skip => {
-                quote! { Some(String::from("..")) }
-            }
-        }
-    }
-}
-fn traversed_block_from_sig(
-    block: &Block,
-    sig: &Signature,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
-    let Signature {
-        ident,    //: Ident,
-        generics, //: Generics,
-        inputs,   //: Punctuated<FnArg, Comma>,
-        output,   //: ReturnType,
-        ..
-    } = sig;
-    let inputs = input_vals(inputs, attr_args);
-
-    let mut returns_something = false;
-    if let ReturnType::Type(..) = output {
-        returns_something = true;
-    }
-
-    let block = {
-        let func_log_name = {
-            if attr_args.prefix.is_empty() {
-                quote! { #ident }
-            } else {
-                let prefix = &attr_args.prefix;
-                quote! { #prefix::#ident }
-            }
-        };
-
-        // Instrument the local functions and closures inside of the function body:
-        let attr_args = AttrArgs { 
-            prefix: quote! { #func_log_name #generics },
-            // prefix: quote! { #func_log_name #generics() },
-            ..*attr_args
-        };
-        let block = quote_as_block(block, &attr_args);
-
-        // The proc_macros (the pre-compile) part of the infrastructure for
-        // generic parameters substitution with actual generic arguments,
-        // i.e. `<T, U>` -> `<char, u8>`.
-        let generics_params_iter = generics.type_params();
-        let generic_params_is_empty = generics.params.is_empty();
-
-        let func_log_name = exprs::remove_spaces(&func_log_name.to_string());
-
-        // Get the multithreading-dependent `logging_is_on()` call token stream:
-        let logging_is_on = quote! {
-            logger.borrow()
-        };
-        #[cfg(feature = "singlethreaded")]
-        let logging_is_on = quote! {
-            #logging_is_on.borrow()
-        };
-        let logging_is_on = quote! {
-            #logging_is_on.logging_is_on()
-        };
-
-        // Return the token stream of the instrumented function call:
-        quote! {
-            {
-                use fcl::{CallLogger, MaybePrint};
-
-                let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                    // NOTE: Borrows the parameters. Has to be ahead of the `body`
-                    // that moves the parameters to the `body` closure.
-                    //
-                    // At run time get the string of parameter names and values:
-                    let param_val_str = #inputs;
-
-                    // NOTE: The `block` (the function body) will be executed (later)
-                    // as a closure (rather than as is)
-                    // to handle the `return` in the `block` correctly
-                    // (i.e. to catch the return value after the `return` and log that return value).
-                    //
-                    // Get the function body as a closure:
-                    let mut body = move || #block;
-
-                    // If logging is off then do nothing
-                    // except executing the body and returning the value:
-                    if !#logging_is_on {
-                        return body();
-                    }
-                    // Else (loggign is on):
-
-                    // At run time get the generic function name,
-                    // like `f<char,u8>` instead of `f<T,U>`
-                    // (at pre-compile (i.e. macro expansion) time the generic arguments
-                    // are not known yet):
-                    let mut generic_func_name = String::with_capacity(64);
-                    generic_func_name.push_str(#func_log_name);
-                    if !#generic_params_is_empty {
-                        generic_func_name.push_str("<");
-                        let generic_arg_names_vec: Vec<&'static str> =
-                            vec![#(std::any::type_name::< #generics_params_iter >(),)*];
-                        for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
-                            if idx != 0 {
-                                generic_func_name.push_str(",");
-                            }
-                            generic_func_name.push_str(generic_arg_name);
-                        }
-                        generic_func_name.push_str(">");
-                    }
-
-                    // Log the call, like `f<char, u8>(param: 5) {`:
-                    let mut callee_logger = fcl::CalleeLogger::new(&generic_func_name, param_val_str);
-
-                    // Execute the function body and catch the return value:
-                    let ret_val = body();
-
-                    // Convert the return value to string and assign to the logger:
-                    if #returns_something {
-                        let ret_val_str = format!("{}", ret_val.maybe_print());
-                        callee_logger.set_ret_val(ret_val_str);
-                    }
-
-                    // Log the return (and the return value), like `} -> 5 // f().`
-                    // in the `CalleeLogger` destructor and return the value to the caller:
-                    ret_val
-                });
-                ret_val
-            }
-        }
-    };
-
-    block
 }
 
 // // Likely not applicable for instrumenting the run time functions and
@@ -927,125 +753,6 @@ fn traversed_block_from_sig(
 //     quote!{ #lt_token #params #gt_token #where_clause }
 // }
 
-fn quote_as_stmt_macro(
-    stmt_macro: &StmtMacro,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
-    let StmtMacro {
-        attrs,      //: Vec<Attribute>,
-        mac,        //: Macro,
-        semi_token, //: Option<Semi>,
-    } = stmt_macro;
-
-    let mut maybe_flush_invocation = quote! {};
-    let mac = exprs::quote_as_macro(&mac, &mut maybe_flush_invocation, attr_args);
-
-    let mut ret_val = quote! { #(#attrs)* #mac #semi_token };
-
-    if !maybe_flush_invocation.is_empty() {
-        ret_val = quote! {
-            {
-                #maybe_flush_invocation;
-                #ret_val
-            }
-        }
-    }
-    ret_val
-}
-fn quote_as_stmt(stmt: &Stmt, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
-    match stmt {
-        Stmt::Local(local) => quote_as_local(local, attr_args),
-        Stmt::Item(item) => items::quote_as_item(item, attr_args),
-        Stmt::Expr(expr, opt_semi) => {
-            let expr = exprs::quote_as_expr(expr, None, attr_args);
-            quote! { #expr #opt_semi }
-        }
-        Stmt::Macro(stmt_macro) => quote_as_stmt_macro(stmt_macro, attr_args),
-    }
-}
-fn quote_as_loop_block(
-    block: &Block,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
-    let Block {
-        // brace_token, //: Brace,
-        stmts, // Vec<Stmt>
-        .. //brace_token,
-    } = block;
-
-    let stmts = {
-        let mut traversed_stmts = quote! {};
-        for stmt in stmts {
-            let traversed_stmt = quote_as_stmt(stmt, attr_args);
-            traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
-        }
-        traversed_stmts
-    };
-
-    // Get the multithreading-dependent `logging_is_on()` call token stream:
-    let logging_is_on = quote! {
-        logger.borrow()
-    };
-    #[cfg(feature = "singlethreaded")]
-    let logging_is_on = quote! {
-        #logging_is_on.borrow()
-    };
-    let logging_is_on = quote! {
-        #logging_is_on.logging_is_on()
-    };
-
-    quote! {
-        {
-            // For now I intentionally leave this reading in every loop iteration
-            // so that the user can filter out some iterations from the log
-            // by enabling/disabling the logging during the iterations.
-            //
-            // To accelerate, this reading can be placed in front of the loop
-            // (but the check `if logging_is_on` still needs to be in every iteration),
-            // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`),
-            // and at the end of that scope the `logging_is_on` dies.
-            let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { #logging_is_on });
-
-            let _loopbody_logger = if logging_is_on {
-                Some(fcl::LoopbodyLogger::new()) // Log the loop body start.
-            } else {
-                None
-            };
-
-            // NOTE: The `loop` can return a value (with the `break <value>` statement),
-            // the `for` and `while` cannnot.
-
-            // Execute the loop body
-            // (and optionally return a value upon `break <value>` in case of the `loop`):
-            //
-            // NOTE: The `#stmts` cannot be moved to a closure (as it is done for the body of functions and closures)
-            // because `break [<value>]` cannot be executed in a closure (compilation error).
-            { // NOTE: This extra scope is to isolate the outer (FCL's) `_loopbody_logger`, `logging_is_on` and possible inner (user's) ones.
-                #stmts
-            }
-
-            // The loop body end is logged in the destructor of `LoopbodyLogger` instance.
-        }
-    }
-}
-
-fn quote_as_block(block: &Block, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
-    let Block {
-        // brace_token, //: Brace,
-        stmts, // Vec<Stmt>
-        .. //brace_token,
-    } = block;
-
-    let stmts = {
-        let mut traversed_stmts = quote! {};
-        for stmt in stmts {
-            let traversed_stmt = quote_as_stmt(stmt, attr_args);
-            traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
-        }
-        traversed_stmts
-    };
-    quote! { { #stmts } }
-}
 
 /// Closure with optional trailing comma
 /// (when closure is the last argument of a function):

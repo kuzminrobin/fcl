@@ -2,31 +2,8 @@ use std::str::FromStr;
 
 use quote::quote;
 use syn::spanned::Spanned;
-use crate::{AttrArgs, IsTraverseStopper, ParamsLogging, quote_as_block, quote_as_loop_block, update_param_data_from_pat};
+use crate::{AttrArgs, IsTraverseStopper, ParamsLogging, remove_spaces, update_param_data_from_pat};
 
-/// Removes spaces from a string, except around 'as' (in framgents like "\<MyType as MyTrait>").
-///
-/// Returns a copy of an argument with spaces removed, except around 'as'.
-///
-/// NOTE: If the argument contains sequences of '$as$', those will be replaced with ' as '.
-///
-/// ### Examples
-///
-/// ```ignore
-/// assert_eq!(
-///     remove_spaces(&"<MyType as MyTrait> :: my_func"),
-///     "<MyType as MyTrait>::my_func" // The spaces around '::' are removed, but around 'as' are not.
-/// );
-/// ```
-pub fn remove_spaces(s: &str) -> String {
-    // Preserve spaces in fragments like `<MyType as MyTrait>`.
-    let tmp_str: String = s
-        .replace(" as ", "$as$")
-        .chars()
-        .filter(|ch| *ch != ' ')
-        .collect();
-    tmp_str.replace("$as$", " as ")
-}
 
 fn quote_as_expr_array(
     expr_array: &syn::ExprArray,
@@ -76,6 +53,99 @@ fn quote_as_expr_assign(
     let right = quote_as_expr(right, None, attr_args);
     quote! { #(#attrs)* #left #eq_token #right }
 }
+
+fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    // `LocalInit` represents `= s.parse()?` in `let x: u64 = s.parse()?` and
+    // `= r else { return }` in `let Ok(x) = r else { return }`.
+    let syn::LocalInit {
+        eq_token, //: Eq,
+        expr,     //: Box<Expr>,
+        diverge,  //: Option<(Else, Box<Expr>)>,
+    } = init;
+    let expr = quote_as_expr(expr, None, attr_args);
+    let diverge = diverge.as_ref().map(|(else_token, expr)| {
+        let expr = quote_as_expr(expr, None, attr_args);
+        quote! { #else_token #expr }
+    });
+    quote! { #eq_token #expr #diverge }
+}
+
+fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    let syn::Local {
+        attrs,      //: Vec<Attribute>,
+        let_token,  //: Let,
+        pat,        //: Pat,
+        init,       //: Option<LocalInit>,
+        semi_token, //: Semi,
+    } = local;
+
+    for attr in attrs {
+        if attr.is_traverse_stopper() {
+            return quote! { #local };
+        }
+    }
+
+    let init = init.as_ref().map(|init| quote_as_init(init, attr_args));
+
+    quote! { #(#attrs)* #let_token #pat #init #semi_token }
+}
+
+fn quote_as_stmt_macro(
+    stmt_macro: &syn::StmtMacro,
+    attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
+    let syn::StmtMacro {
+        attrs,      //: Vec<Attribute>,
+        mac,        //: Macro,
+        semi_token, //: Option<Semi>,
+    } = stmt_macro;
+
+    let mut maybe_flush_invocation = quote! {};
+    let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, attr_args);
+
+    let mut ret_val = quote! { #(#attrs)* #mac #semi_token };
+
+    if !maybe_flush_invocation.is_empty() {
+        ret_val = quote! {
+            {
+                #maybe_flush_invocation;
+                #ret_val
+            }
+        }
+    }
+    ret_val
+}
+
+fn quote_as_stmt(stmt: &syn::Stmt, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    match stmt {
+        syn::Stmt::Local(local) => quote_as_local(local, attr_args),
+        syn::Stmt::Item(item) => crate::items::quote_as_item(item, attr_args),
+        syn::Stmt::Expr(expr, opt_semi) => {
+            let expr = quote_as_expr(expr, None, attr_args);
+            quote! { #expr #opt_semi }
+        }
+        syn::Stmt::Macro(stmt_macro) => quote_as_stmt_macro(stmt_macro, attr_args),
+    }
+}
+
+pub fn quote_as_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+    let syn::Block {
+        // brace_token, //: Brace,
+        stmts, // Vec<Stmt>
+        .. //brace_token,
+    } = block;
+
+    let stmts = {
+        let mut traversed_stmts = quote! {};
+        for stmt in stmts {
+            let traversed_stmt = quote_as_stmt(stmt, attr_args);
+            traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
+        }
+        traversed_stmts
+    };
+    quote! { { #stmts } }
+}
+
 fn quote_as_expr_async(
     expr_async: &syn::ExprAsync,
     attr_args: &AttrArgs,
@@ -418,6 +488,73 @@ fn quote_as_expr_field(
     let base = quote_as_expr(&**base, None, attr_args);
     quote! { #(#attrs)* #base #dot_token #member }
 }
+
+fn quote_as_loop_block(
+    block: &syn::Block,
+    attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
+    let syn::Block {
+        // brace_token, //: Brace,
+        stmts, // Vec<Stmt>
+        .. //brace_token,
+    } = block;
+
+    let stmts = {
+        let mut traversed_stmts = quote! {};
+        for stmt in stmts {
+            let traversed_stmt = quote_as_stmt(stmt, attr_args);
+            traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
+        }
+        traversed_stmts
+    };
+
+    // Get the multithreading-dependent `logging_is_on()` call token stream:
+    let logging_is_on = quote! {
+        logger.borrow()
+    };
+    #[cfg(feature = "singlethreaded")]
+    let logging_is_on = quote! {
+        #logging_is_on.borrow()
+    };
+    let logging_is_on = quote! {
+        #logging_is_on.logging_is_on()
+    };
+
+    quote! {
+        {
+            // For now I intentionally leave this reading in every loop iteration
+            // so that the user can filter out some iterations from the log
+            // by enabling/disabling the logging during the iterations.
+            //
+            // To accelerate, this reading can be placed in front of the loop
+            // (but the check `if logging_is_on` still needs to be in every iteration),
+            // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`),
+            // and at the end of that scope the `logging_is_on` dies.
+            let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { #logging_is_on });
+
+            let _loopbody_logger = if logging_is_on {
+                Some(fcl::LoopbodyLogger::new()) // Log the loop body start.
+            } else {
+                None
+            };
+
+            // NOTE: The `loop` can return a value (with the `break <value>` statement),
+            // the `for` and `while` cannnot.
+
+            // Execute the loop body
+            // (and optionally return a value upon `break <value>` in case of the `loop`):
+            //
+            // NOTE: The `#stmts` cannot be moved to a closure (as it is done for the body of functions and closures)
+            // because `break [<value>]` cannot be executed in a closure (compilation error).
+            { // NOTE: This extra scope is to isolate the outer (FCL's) `_loopbody_logger`, `logging_is_on` and possible inner (user's) ones.
+                #stmts
+            }
+
+            // The loop body end is logged in the destructor of `LoopbodyLogger` instance.
+        }
+    }
+}
+
 fn quote_as_expr_for_loop(
     expr_for_loop: &syn::ExprForLoop,
     attr_args: &AttrArgs,
