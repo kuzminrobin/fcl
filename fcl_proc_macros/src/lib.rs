@@ -1,8 +1,7 @@
-
 use quote::quote;
 
-mod items;
 mod exprs;
+mod items;
 
 /// Suppresses the automatic recursive instrumentation of an item as `#[loggable]`.
 ///
@@ -71,47 +70,47 @@ pub fn non_loggable(
 ///     }
 /// }
 /// ```
-/// 
+///
 /// <br>
-/// 
+///
 /// ## Parameters
-/// 
+///
 /// ### No attribute macro parameters
-/// The `#[loggable]` attribute with no parameters has the same effect as `#[loggable(log_params)]`, 
+/// The `#[loggable]` attribute with no parameters has the same effect as `#[loggable(log_params)]`,
 /// i.e., the function and closure parameters are logged by default.
-/// 
+///
 /// ### `log_params` (default, optional)
 /// Log the parameters in the annotated entity and its internal entities recursively.
-/// 
+///
 /// ### `skip_params` (optional)
 /// Skip the parameters logging in the annotated entity and its internal entities recursively.  
-/// 
-/// If the (directly or recursively) annotated function or closure has no parameters 
+///
+/// If the (directly or recursively) annotated function or closure has no parameters
 /// then its parameter block will be logged as `()`, otherwise `(..)`.
-/// 
-/// ### Examples 
+///
+/// ### Examples
 /// ```compile_fail, E0432, E0433, E0599
 /// use fcl_proc_macros::loggable;
-/// 
-/// #[loggable] // Log by defualt the function and closure parameters inside of module `m` recursively 
+///
+/// #[loggable] // Log by defualt the function and closure parameters inside of module `m` recursively
 /// mod m {     // (and add prefix "m::" to the function and closure names).
 ///     use fcl_proc_macros::loggable;
 ///
-///     pub fn f(b: bool) {        // Log example: `m::f(b: true) {`. 
+///     pub fn f(b: bool) {        // Log example: `m::f(b: true) {`.
 ///                                // The parameter `b: true` is logged by default.
-///         Some(5).map(|x| x + 1);// Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`. 
+///         Some(5).map(|x| x + 1);// Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`.
 ///                                // The closure parameter `x: 5` is logged by default.
 ///     }
-///     #[loggable(skip_params)]   // Skip the parameters logging for `g()` and its internals 
+///     #[loggable(skip_params)]   // Skip the parameters logging for `g()` and its internals
 ///                                // (and clear the prefix "m::" (TODO: Prevent clearing)).
-///     pub fn g(p: u8) {          // Logs: `g(..) {`. The parameter `p` is not logged, 
+///     pub fn g(p: u8) {          // Logs: `g(..) {`. The parameter `p` is not logged,
 ///                                // the `..` instead tells that `g()` has parameter(s).
-///         Some(p).map(|x| x + 2);// Log example: `g()::closure{176,29:176,37}(..) {} -> 3`. 
+///         Some(p).map(|x| x + 2);// Log example: `g()::closure{176,29:176,37}(..) {} -> 3`.
 ///                                // The closure parameter `x` is not logged (the `..` instead).
-///         #[loggable(log_params)]// Log the parameters for `h()` and its internals 
+///         #[loggable(log_params)]// Log the parameters for `h()` and its internals
 ///                                // (and clear the prefix "g()::" (TODO: Prevent clearing)).
 ///         fn h(ph: u8) {         // Log example: `h(ph: 1) {`. The parameter `ph: 1` is logged.
-///             Some(ph).map(|y| y + 3); // `h()::closure{180,34:180,42}(y: 1) {} -> 4`. 
+///             Some(ph).map(|y| y + 3); // `h()::closure{180,34:180,42}(y: 1) {} -> 4`.
 ///                                // The parameter `y: 1` is logged.
 ///         }
 ///
@@ -121,30 +120,30 @@ pub fn non_loggable(
 /// // Call the instrumented functions to generate the FCL log:
 /// m::f(true);
 /// m::g(1)
-/// ``` 
+/// ```
 /// <br>
-/// 
+///
 /// ### `prefix` (optional)
 /// Is unlikely to be used by the user.
-/// 
+///
 /// Sets the name prefix for the annotated entity and its internals recursively.
-/// 
+///
 /// #### Examples
 /// ```ignore
 /// #[loggable(prefix = A)]
-/// fn f() { 
+/// fn f() {
 ///     fn local_func() {}  // Define a local function.
-/// 
+///
 ///     local_func();       // Call the local function.
 /// }   
-/// // FCL Log: 
+/// // FCL Log:
 /// A::f() {                    // Is prefixed with "A::".
 ///   A::f()::local_func() {}   // Is prefixed with "A::".
 /// } // A::f()
-/// 
+///
 /// #[loggable(prefix = my_module::<MyStruct as MyPureTrait>::B)]
 /// fn f() {}   
-/// // FCL Log: 
+/// // FCL Log:
 /// my_module::<MyStruct as MyPureTrait>::B::f() {} // Is prefixed with "my_module::<MyStruct as MyPureTrait>::B::".
 /// ```
 #[proc_macro_attribute]
@@ -159,7 +158,8 @@ pub fn loggable(
         } else if let Ok(expr) = syn::parse::<syn::Expr>(attributed_item.clone()) {
             exprs::quote_as_expr(&expr, None, &attr_args)
         } else {
-            let closure_w_opt_comma = syn::parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
+            let closure_w_opt_comma =
+                syn::parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
             exprs::quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
         }
     };
@@ -240,19 +240,19 @@ trait IsTraverseStopper {
         };
         // If the last path segment equals `attr_name` // e.g. "non_loggable"
         //      && preceeding path segment is None or is "fcl_proc_macros"
-        // then 
+        // then
         //      return true // is `non_loggable`
         // return false // is not `non_loggable` or is user's own `non_loggable` (`<user's_path>::non_loggable`).
-        if let Some(last_path_segment) = path.segments.last() && 
-            last_path_segment.ident.to_string() == attr_name &&
-            (path.segments.len() < 2 || {
+        if let Some(last_path_segment) = path.segments.last()
+            && last_path_segment.ident.to_string() == attr_name
+            && (path.segments.len() < 2 || {
                 let prev_segment_idx = path.segments.len() - 2;
                 path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
             })
         {
-            return true
+            return true;
         }
-        return false
+        return false;
     }
     fn is_traverse_stopper(&self) -> bool;
     fn is_non_loggable(&self) -> bool;
@@ -270,20 +270,20 @@ impl IsTraverseStopper for syn::Attribute {
 
         // If the last path segment equals "loggable"
         //      && preceeding path segment is None or is "fcl_proc_macros"
-        // then 
+        // then
         //      Get and return LoggableAttrInfo
         // return None
-        if let Some(last_path_segment) = path.segments.last() && 
-            last_path_segment.ident.to_string() == "loggable" &&
-            (path.segments.len() < 2 || {
+        if let Some(last_path_segment) = path.segments.last()
+            && last_path_segment.ident.to_string() == "loggable"
+            && (path.segments.len() < 2 || {
                 let prev_segment_idx = path.segments.len() - 2;
                 path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
             })
         {
             if let Some(tokens) = optional_tokens {
                 ret_val = Some(LoggableAttrInfo {
-                    prefix: None, // Option<String>,
-                    params_logging: None, // Option<ParamsLogging>,
+                    prefix: None,             // Option<String>,
+                    params_logging: None,     // Option<ParamsLogging>,
                     log_closure_coords: None, //Option<bool>,
                 });
                 // println!("optional_tokens: {:?}", optional_tokens);
@@ -295,20 +295,20 @@ impl IsTraverseStopper for syn::Attribute {
                     });
                 }
             }
-        } 
-        return ret_val
-/*
-        if let Some(last_path_segment) = path.segments.last() && 
-            last_path_segment.ident.to_string() == "loggable" &&
-            (path.segments.len() < 2 || {
-                let prev_segment_idx = path.segments.len() - 2;
-                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
-            })
-        {
-            return true
         }
-        return false
- */        
+        return ret_val;
+        /*
+               if let Some(last_path_segment) = path.segments.last() &&
+                   last_path_segment.ident.to_string() == "loggable" &&
+                   (path.segments.len() < 2 || {
+                       let prev_segment_idx = path.segments.len() - 2;
+                       path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
+                   })
+               {
+                   return true
+               }
+               return false
+        */
         // let ret_val = if self.is_loggable() {
 
         // } else {
@@ -737,7 +737,6 @@ fn update_param_data_from_pat(
 //     quote!{ #lt_token #params #gt_token #where_clause }
 // }
 
-
 /// Closure with optional trailing comma
 /// (when closure is the last argument of a function):
 struct ExprClosureWOptComma {
@@ -767,7 +766,7 @@ mod kw {
     syn::custom_keyword!(log_params);
 
     // Skip the parameters logging in the annotated entity and its local entities recursively.
-    // 
+    //
     // If the function has no prameters then its parameters block is logged as `()`, otherwise `(..)`.
     // ### Examples
     // `#[loggable(skip_params)]`
@@ -867,13 +866,13 @@ impl syn::parse::Parse for QSelfOrPath {
 }
 
 #[derive(Copy, Clone)]
-enum ParamsLogging {    
-    /// Log the parameters (the default). 
-    /// ### Examples 
+enum ParamsLogging {
+    /// Log the parameters (the default).
+    /// ### Examples
     /// `#[loggable(log_params)]`
     Log,
     /// Skip the parameter logging.
-    /// ### Examples 
+    /// ### Examples
     /// `#[loggable(skip_params)]`
     Skip,
     // Others, e.g. `Shallow`, // `#[loggable(shallow_params)]` (log param constructs _non-recursively_, i.e. skip (with `..`) the nested structs)
@@ -881,17 +880,17 @@ enum ParamsLogging {
 
 struct AttrArgs {
     prefix: proc_macro2::TokenStream,
-    /// Tells whether and/or how to log the function or closure parameters. 
-    /// ### Examples 
+    /// Tells whether and/or how to log the function or closure parameters.
+    /// ### Examples
     /// ```ignore
     /// #[loggable(skip_params)] // Skip the parameter logging for function `f()` and its local entities recursively.
     /// fn f(b: bool) {} // Logs: `f(..) {}`.
-    /// 
+    ///
     /// #[loggable(log_params)] // Log the parameters of the functions and closures inside of module `m` recursively.
     /// mod m {
     ///     fn f(b: bool) {}    // Log example: `m::f(b: true) {}`.
     /// }
-    /// 
+    ///
     /// #[loggable] // Has the same effect as `#[loggable(log_params)]`, i.e., the parameters are logged by default.
     /// ```
     params_logging: ParamsLogging,
@@ -909,9 +908,9 @@ struct AttrArgs {
     ///          |x| x + 1); // Logs "closure{..}() {}".
     /// }
     /// ```
-    /// 
+    ///
     /// <br>
-    /// 
+    ///
     /// ```ignore
     /// #[loggable]
     /// fn f() {
@@ -921,7 +920,7 @@ struct AttrArgs {
     /// #[loggable(skip_closure_coords)]
     /// fn g() {
     ///      Some(4).map(
-    ///          |x| x + 1); // Logs "  g()::closure{..}() {}". 
+    ///          |x| x + 1); // Logs "  g()::closure{..}() {}".
     ///          // The fragment `{..}` delimits a closure from a function named `closure`.
     /// }
     /// ```
@@ -936,14 +935,14 @@ impl syn::parse::Parse for AttrArgs {
         };
         loop {
             if input.is_empty() {
-                break
+                break;
             }
             let lookahead = input.lookahead1();
-            if lookahead.peek(syn::Token![,]) {   // Skip any sequence of commas before, among, and after the attr args.
+            if lookahead.peek(syn::Token![,]) {
+                // Skip any sequence of commas before, among, and after the attr args.
                 input.parse::<syn::Token![,]>()?;
-                continue
-            }
-            else if lookahead.peek(kw::prefix) {
+                continue;
+            } else if lookahead.peek(kw::prefix) {
                 input.parse::<kw::prefix>()?;
                 input.parse::<syn::Token![=]>()?;
                 let optional_prefix = input.parse()?;
@@ -967,7 +966,7 @@ impl syn::parse::Parse for AttrArgs {
                 input.parse::<kw::log_closure_coords>()?;
                 attr_args.log_closure_coords = true;
             } else {
-                return Err(lookahead.error()); 
+                return Err(lookahead.error());
                 // Reports an error, e.g.,
                 // error: expected one of: `,`, `prefix`, `skip_params`, `log_params`
                 //    --> fcl\tests\add_call.rs:383:20

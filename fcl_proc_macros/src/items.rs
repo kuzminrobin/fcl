@@ -1,6 +1,8 @@
+use crate::{
+    AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::quote_as_expr,
+    remove_spaces, update_param_data_from_pat,
+};
 use quote::quote;
-use crate::{AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::quote_as_expr, remove_spaces, update_param_data_from_pat};
-
 
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -67,17 +69,22 @@ use crate::{AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs:
 //     quote!{ #(#attrs)* #vis #extern_token #crate_token #ident #rename #semi_token }
 // }
 
-fn get_loggable_attr_params_meta_tokens(user_provided_attr_info: &LoggableAttrInfo, enclosing_item_attr_args: &AttrArgs) -> proc_macro2::TokenStream {
-    let mut updated_tokens = quote!{};
+fn get_loggable_attr_params_meta_tokens(
+    user_provided_attr_info: &LoggableAttrInfo,
+    enclosing_item_attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
+    let mut updated_tokens = quote! {};
     let LoggableAttrInfo {
         prefix: user_provided_prefix,
         params_logging: user_provided_params_logging,
         log_closure_coords: user_provided_log_closure_coords,
     } = user_provided_attr_info;
 
-    let new_prefix = user_provided_prefix.as_ref().unwrap_or(&enclosing_item_attr_args.prefix/* .clone()*/);
+    let new_prefix = user_provided_prefix
+        .as_ref()
+        .unwrap_or(&enclosing_item_attr_args.prefix /* .clone()*/);
     // println!("prefix: {:?}", prefix);
-    updated_tokens = quote!{ prefix = #new_prefix, };
+    updated_tokens = quote! { prefix = #new_prefix, };
     // println!("updated_tokens: {:?}", updated_tokens);
     // if let Some(specified_prefix) = prefix {
     //     updated_tokens = quote!{ prefix = #specified_prefix, };
@@ -86,24 +93,31 @@ fn get_loggable_attr_params_meta_tokens(user_provided_attr_info: &LoggableAttrIn
     //     updated_tokens = quote!{ prefix = #inherited_prefix, };
     // }
 
-    let new_params_logging = user_provided_params_logging.unwrap_or(enclosing_item_attr_args.params_logging);
+    let new_params_logging =
+        user_provided_params_logging.unwrap_or(enclosing_item_attr_args.params_logging);
     match new_params_logging {
-        ParamsLogging::Log => updated_tokens = quote!{ #updated_tokens log_params, },
-        ParamsLogging::Skip => updated_tokens = quote!{ #updated_tokens skip_params, },
+        ParamsLogging::Log => updated_tokens = quote! { #updated_tokens log_params, },
+        ParamsLogging::Skip => updated_tokens = quote! { #updated_tokens skip_params, },
         // Any new ones require attention.
     }
     // println!("log_closure_coords: {:?}", log_closure_coords);
-    let new_log_closure_coords = user_provided_log_closure_coords.unwrap_or(enclosing_item_attr_args.log_closure_coords);
+    let new_log_closure_coords =
+        user_provided_log_closure_coords.unwrap_or(enclosing_item_attr_args.log_closure_coords);
     if new_log_closure_coords {
-        updated_tokens = quote!{ #updated_tokens log_closure_coords, }
+        updated_tokens = quote! { #updated_tokens log_closure_coords, }
     } else {
-        updated_tokens = quote!{ #updated_tokens skip_closure_coords, }
+        updated_tokens = quote! { #updated_tokens skip_closure_coords, }
     }
     // println!("updated_tokens: {:?}", updated_tokens);
     updated_tokens
 }
 
-fn handle_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, enclosing_item_attr_args: &AttrArgs, new_attrs: &mut Vec<syn::Attribute>) {
+fn get_loggable_attr_params(
+    attr: &syn::Attribute,
+    has_loggable: &mut bool,
+    enclosing_item_attr_args: &AttrArgs,
+) -> syn::Attribute {
+    // fn get_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, enclosing_item_attr_args: &AttrArgs, new_attrs: &mut Vec<syn::Attribute>) {
     if let Some(user_provided_attr_info) = attr.get_loggable_attr_info() {
         *has_loggable = true;
         let new_attr = syn::Attribute {
@@ -111,27 +125,34 @@ fn handle_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, e
             style: attr.style,
             bracket_token: attr.bracket_token,
             meta: match &attr.meta {
-                syn::Meta::List(metalist) =>
-                    syn::Meta::List(syn::MetaList {
-                        path: metalist.path.clone(),
-                        delimiter: metalist.delimiter.clone(),
-                        tokens: {
-                            get_loggable_attr_params_meta_tokens(&user_provided_attr_info, enclosing_item_attr_args)
-                        }
-                    }),
+                syn::Meta::List(metalist) => syn::Meta::List(syn::MetaList {
+                    path: metalist.path.clone(),
+                    delimiter: metalist.delimiter.clone(),
+                    tokens: {
+                        get_loggable_attr_params_meta_tokens(
+                            &user_provided_attr_info,
+                            enclosing_item_attr_args,
+                        )
+                    },
+                }),
                 // Path(Path),
                 // NameValue(MetaNameValue),
                 _ => attr.meta.clone(),
             },
         };
         // println!("new_attr: {:?}", new_attr.meta.);
-        new_attrs.push(new_attr);
+        new_attr
+        // new_attrs.push(new_attr);
     } else {
-        new_attrs.push(attr.clone());
+        attr.clone()
+        // new_attrs.push(attr.clone());
     }
 }
 
-fn input_vals(inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+fn input_vals(
+    inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+    attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
     if inputs.is_empty() {
         quote! { None }
     } else {
@@ -156,7 +177,11 @@ fn input_vals(inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma
                             param_list = quote! { #param_list self.maybe_print(), };
                         }
                         syn::FnArg::Typed(pat_type) => {
-                            update_param_data_from_pat(&*pat_type.pat, &mut param_format_str, &mut param_list);
+                            update_param_data_from_pat(
+                                &*pat_type.pat,
+                                &mut param_format_str,
+                                &mut param_list,
+                            );
                         }
                     }
                 }
@@ -199,7 +224,7 @@ fn traversed_block_from_sig(
         };
 
         // Instrument the local functions and closures inside of the function body:
-        let attr_args = AttrArgs { 
+        let attr_args = AttrArgs {
             prefix: quote! { #func_log_name #generics },
             // prefix: quote! { #func_log_name #generics() },
             ..*attr_args
@@ -308,7 +333,7 @@ fn quote_as_item_fn(
     } = item_fn;
     // println!("{:?} {{", sig.ident);
 
-    let mut new_attrs = vec![];
+    let mut new_fn_attrs = vec![];
     let mut has_loggable = false;
 
     // println!("attrs.len(): {}", attrs.len());
@@ -321,21 +346,27 @@ fn quote_as_item_fn(
         // println!("attr: {:?}", attr.meta);
 
         if attr.is_non_loggable() {
-        // if attr.is_traverse_stopper() {
             // println!("}} {:?} // non_loggable", sig.ident);
-
             return quote! { #item_fn };
         }
-        handle_loggable_attr_params(attr, &mut has_loggable, enclosing_item_attr_args, &mut new_attrs);
+        new_fn_attrs.push(get_loggable_attr_params(
+            attr,
+            &mut has_loggable,
+            enclosing_item_attr_args,
+        ));
+
+        // if attr.is_traverse_stopper() {
+        //    return quote! { #item_fn };
+        //}
     }
 
     let block = if has_loggable {
         // println!("not traversing");
 
         // After updating/adding the params of/to #[loggable(<params>)]
-        // leave the fn body uninstrumented, so that a separate #[loggable(<params>)] macro invocation 
+        // leave the fn body uninstrumented, so that a separate #[loggable(<params>)] macro invocation
         // will instrument the body.
-        quote!{ #block }
+        quote! { #block }
         // block
     } else {
         // println!("traversing");
@@ -346,7 +377,7 @@ fn quote_as_item_fn(
 
     // // let attrs = if new_attrs.is_empty() { attrs } else { &new_attrs };
     // let block = traversed_block_from_sig(block, sig, attr_args);
-    let ret_val = quote! { #(#new_attrs)* #vis #sig #block };
+    let ret_val = quote! { #(#new_fn_attrs)* #vis #sig #block };
     // println!("quote_as_item_fn()::ret_val: {}", ret_val);
     ret_val
     // quote! { #(#new_attrs)* #vis #sig #block }
@@ -379,10 +410,7 @@ fn quote_as_impl_item_fn(
     let block = traversed_block_from_sig(block, sig, attr_args);
     quote! { #(#attrs)* #vis #defaultness #sig #block }
 }
-fn quote_as_impl_item(
-    impl_item: &syn::ImplItem,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_impl_item(impl_item: &syn::ImplItem, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match impl_item {
         syn::ImplItem::Fn(impl_item_fn) => quote_as_impl_item_fn(impl_item_fn, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
@@ -394,10 +422,7 @@ fn quote_as_impl_item(
         other => quote! { #other },
     }
 }
-fn quote_as_item_impl(
-    item_impl: &syn::ItemImpl,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ItemImpl {
         attrs, //: Vec<Attribute>,
         defaultness, //: Option<Default>,
@@ -425,7 +450,7 @@ fn quote_as_item_impl(
         // trait impl
         Some((_opt_not, path, _for_token)) => quote! { <#self_ty as #path> },
         // struct impl
-        None => quote! { #self_ty }
+        None => quote! { #self_ty },
     };
     // Workaround for:
     // the trait bound `(Option<syn::token::Not>, syn::Path, For): quote::ToTokens` is not satisfied
@@ -443,8 +468,8 @@ fn quote_as_item_impl(
     let items = {
         // Add the impl type to the prefix
         // (to pass such an updated prefix to the nested items):
-        let attr_args = AttrArgs { prefix:  
-            if attr_args.prefix.is_empty() {
+        let attr_args = AttrArgs {
+            prefix: if attr_args.prefix.is_empty() {
                 quote! { #prefix_extender }
             } else {
                 let prefix = &attr_args.prefix;
@@ -468,10 +493,7 @@ fn quote_as_item_impl(
 //     // let ItemMacro {} = item_macro;
 //     quote!{ #item_macro }
 // }
-fn quote_as_item_mod(
-    item_mod: &syn::ItemMod,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_item_mod(item_mod: &syn::ItemMod, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ItemMod {
         attrs,     //: Vec<Attribute>,
         vis,       //: Visibility,
@@ -488,8 +510,8 @@ fn quote_as_item_mod(
         }
     }
 
-    let attr_args = AttrArgs { prefix:  
-        if attr_args.prefix.is_empty() {
+    let attr_args = AttrArgs {
+        prefix: if attr_args.prefix.is_empty() {
             quote! { #ident }
         } else {
             let prefix = &attr_args.prefix;
@@ -564,7 +586,7 @@ fn quote_as_item_static(
 //     //     let attr_args = AttrArgs { prefix: {
 //     //             let prefix = &attr_args.prefix;
 //     //             quote!{ #prefix::#ident }
-//     //         } 
+//     //         }
 //     //     };
 //     //     let mut traversed_fields = quote!{};
 //     //     for field in fields {
@@ -621,12 +643,11 @@ fn quote_as_trait_item_fn(
         .map(|block| traversed_block_from_sig(block, sig, attr_args));
     quote! { #(#attrs)* #sig #default #semi_token }
 }
-fn quote_as_trait_item(
-    item: &syn::TraitItem,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_trait_item(item: &syn::TraitItem, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match item {
-        syn::TraitItem::Const(trait_item_const) => quote_as_trait_item_const(trait_item_const, attr_args),
+        syn::TraitItem::Const(trait_item_const) => {
+            quote_as_trait_item_const(trait_item_const, attr_args)
+        }
         syn::TraitItem::Fn(trait_item_fn) => quote_as_trait_item_fn(trait_item_fn, attr_args),
 
         // // Likely not applicable for instrumenting the run time functions and
@@ -682,13 +703,13 @@ fn quote_as_item_trait(
     //     traversed_supertraits
     // };
 
-    // NOTE: The traits are defined at compile time 
-    // when the actual generic arguments are not known yet 
+    // NOTE: The traits are defined at compile time
+    // when the actual generic arguments are not known yet
     // (and whether the trait will be used at all).
     // That's why we cannot expand the traits' `#generics` when extending the prefix.
     let items = {
-        let attr_args = AttrArgs { prefix:  
-            if attr_args.prefix.is_empty() {
+        let attr_args = AttrArgs {
+            prefix: if attr_args.prefix.is_empty() {
                 quote! { #ident #generics }
             } else {
                 let prefix = &attr_args.prefix;

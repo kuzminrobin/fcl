@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
+use crate::{
+    AttrArgs, IsTraverseStopper, ParamsLogging, remove_spaces, update_param_data_from_pat,
+};
 use quote::quote;
 use syn::spanned::Spanned;
-use crate::{AttrArgs, IsTraverseStopper, ParamsLogging, remove_spaces, update_param_data_from_pat};
-
 
 fn quote_as_expr_array(
     expr_array: &syn::ExprArray,
@@ -34,7 +35,7 @@ fn quote_as_expr_array(
 
 fn quote_as_expr_assign(
     expr_assign: &syn::ExprAssign,
-    attr_args: &AttrArgs
+    attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     // a = compute()
     let syn::ExprAssign {
@@ -241,13 +242,12 @@ fn quote_as_expr_break(
             return quote! { #expr_break };
         }
     }
-    let expr = expr.as_ref().map(|expr| quote_as_expr(expr, None, attr_args));
+    let expr = expr
+        .as_ref()
+        .map(|expr| quote_as_expr(expr, None, attr_args));
     quote! { #(#attrs)* #break_token #label #expr }
 }
-fn quote_as_expr_call(
-    expr_call: &syn::ExprCall,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_expr_call(expr_call: &syn::ExprCall, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ExprCall {
         attrs, //: Vec<Attribute>,
         func, //: Box<Expr>,
@@ -293,10 +293,7 @@ fn quote_as_expr_call(
     };
     ret_val
 }
-fn quote_as_expr_cast(
-    expr_cast: &syn::ExprCast,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_expr_cast(expr_cast: &syn::ExprCast, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     // foo as f64
     let syn::ExprCast {
         attrs,    //: Vec<Attribute>,
@@ -337,28 +334,27 @@ pub fn quote_as_expr_closure(
         }
     }
     // Get the token stream of {{param names and values} optional string}:
-    let input_vals = 
-        if inputs.is_empty() {
-            quote!{ None }
-        } else { 
-            match attr_args.params_logging {
-                ParamsLogging::Log => {
-                    let mut param_format_str = String::new();
-                    let mut param_list = quote! {};
-                    for (idx, input_pat) in inputs.iter().enumerate() {
-                        if idx != 0 {
-                            param_format_str.push_str(", ");
-                        }
-                        update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
+    let input_vals = if inputs.is_empty() {
+        quote! { None }
+    } else {
+        match attr_args.params_logging {
+            ParamsLogging::Log => {
+                let mut param_format_str = String::new();
+                let mut param_list = quote! {};
+                for (idx, input_pat) in inputs.iter().enumerate() {
+                    if idx != 0 {
+                        param_format_str.push_str(", ");
                     }
-                    quote! { Some(format!(#param_format_str, #param_list)) }
+                    update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
                 }
-                ParamsLogging::Skip => {
-                    quote!{ Some(String::from("..")) }
-                }
+                quote! { Some(format!(#param_format_str, #param_list)) }
             }
-        };
-    
+            ParamsLogging::Skip => {
+                quote! { Some(String::from("..")) }
+            }
+        }
+    };
+
     // Closure name:
     let coords_ts = if attr_args.log_closure_coords {
         let (start_line, start_col) = {
@@ -377,7 +373,7 @@ pub fn quote_as_expr_closure(
             Err(_lex_err) => quote! { #coords_str },
         }
     } else {
-        quote!{ .. }
+        quote! { .. }
     };
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
     if !attr_args.prefix.is_empty() {
@@ -385,7 +381,7 @@ pub fn quote_as_expr_closure(
         log_closure_name_ts = quote! { #prefix::#log_closure_name_ts }
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
-    let attr_args = AttrArgs { 
+    let attr_args = AttrArgs {
         prefix: log_closure_name_ts,
         ..*attr_args
     };
@@ -489,10 +485,7 @@ fn quote_as_expr_field(
     quote! { #(#attrs)* #base #dot_token #member }
 }
 
-fn quote_as_loop_block(
-    block: &syn::Block,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::Block {
         // brace_token, //: Brace,
         stmts, // Vec<Stmt>
@@ -610,10 +603,7 @@ fn quote_as_expr_group(
     // the trait bound `syn::token::Group: quote::ToTokens` is not satisfied
     quote! { { #(#attrs)* #expr } }
 }
-fn quote_as_expr_if(
-    expr_if: &syn::ExprIf,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_expr_if(expr_if: &syn::ExprIf, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ExprIf {
         attrs,       //: Vec<Attribute>,
         if_token,    //: If,
@@ -661,10 +651,7 @@ fn quote_as_expr_index(
 // fn quote_as_expr_infer(expr_infer: &ExprInfer, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_infer }
 // }
-fn quote_as_expr_let(
-    expr_let: &syn::ExprLet,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_expr_let(expr_let: &syn::ExprLet, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ExprLet {
         attrs,     //: Vec<Attribute>,
         let_token, //: Let,
@@ -689,10 +676,7 @@ fn quote_as_expr_let(
 // fn quote_as_expr_lit(expr_lit: &ExprLit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
 //     quote!{ #expr_lit }
 // }
-fn quote_as_expr_loop(
-    expr_loop: &syn::ExprLoop,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_expr_loop(expr_loop: &syn::ExprLoop, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ExprLoop {
         attrs,      //: Vec<Attribute>,
         label,      //: Option<Label>,
@@ -925,7 +909,9 @@ fn quote_as_expr_range(
     let start = start
         .as_ref()
         .map(|start| quote_as_expr(&**start, None, attr_args));
-    let end = end.as_ref().map(|end| quote_as_expr(&**end, None, attr_args));
+    let end = end
+        .as_ref()
+        .map(|end| quote_as_expr(&**end, None, attr_args));
     quote! { #(#attrs)* #start #limits #end }
 }
 fn quote_as_expr_raw_addr(
@@ -1009,10 +995,7 @@ fn quote_as_expr_return(
         .map(|expr| quote_as_expr(&**expr, None, attr_args));
     quote! { #(#attrs)* #return_token #expr }
 }
-fn quote_as_field_value(
-    field: &syn::FieldValue,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_field_value(field: &syn::FieldValue, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::FieldValue {
         attrs,       //: Vec<Attribute>,
         member,      //: Member,
@@ -1091,10 +1074,7 @@ fn quote_as_expr_struct(
 
     quote! { #(#attrs)* #qself_and_apth { #fields #dot2_token #rest } }
 }
-fn quote_as_expr_try(
-    expr_try: &syn::ExprTry,
-    attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
+fn quote_as_expr_try(expr_try: &syn::ExprTry, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ExprTry {
         // expr?
         attrs,          //: Vec<Attribute>,
@@ -1213,7 +1193,7 @@ fn quote_as_expr_while(
     let cond = quote_as_expr(&**cond, None, attr_args);
     let body = quote_as_loop_block(body, attr_args);
     quote! {
-        { 
+        {
             let ret_val = #(#attrs)* #label #while_token #cond #body ;
 
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
