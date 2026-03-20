@@ -1,7 +1,5 @@
 
-// use proc_macro2::Literal;
 use quote::quote;
-use syn::{parse::Parse, punctuated::Punctuated, token::Comma, *};
 
 mod items;
 mod exprs;
@@ -154,14 +152,14 @@ pub fn loggable(
     attr_args_ts: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args = parse_macro_input!(attr_args_ts as AttrArgs); // Handles the compilation errors appropriately (checked).
+    let attr_args = syn::parse_macro_input!(attr_args_ts as AttrArgs); // Handles the compilation errors appropriately (checked).
     let output = {
-        if let Ok(item) = syn::parse::<Item>(attributed_item.clone()) {
+        if let Ok(item) = syn::parse::<syn::Item>(attributed_item.clone()) {
             items::quote_as_item(&item, &attr_args)
-        } else if let Ok(expr) = syn::parse::<Expr>(attributed_item.clone()) {
+        } else if let Ok(expr) = syn::parse::<syn::Expr>(attributed_item.clone()) {
             exprs::quote_as_expr(&expr, None, &attr_args)
         } else {
-            let closure_w_opt_comma = parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
+            let closure_w_opt_comma = syn::parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
             exprs::quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
         }
     };
@@ -179,7 +177,7 @@ struct LoggableAttrArgsOpt {
     params_logging: Option<ParamsLogging>,
     log_closure_coords: Option<bool>,
 }
-impl Parse for LoggableAttrArgsOpt {
+impl syn::parse::Parse for LoggableAttrArgsOpt {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut args = LoggableAttrArgsOpt {
             prefix: None,
@@ -189,16 +187,6 @@ impl Parse for LoggableAttrArgsOpt {
 
         //println!("input: {}", input);
 
-        // syn::quoted
-        
-
-        // let content;
-        // let _paren = syn::parenthesized!(content in input);
-        // let input = content;
-
-        // let _paren: syn::token::Paren = input.parse()?;
-        // input.parse::<Token![(]>()?;
-
         // println!("input2: {}", input);
         loop {
             // if content.is_empty() {
@@ -206,25 +194,20 @@ impl Parse for LoggableAttrArgsOpt {
                 break;
             }
             let lookahead = input.lookahead1();
-            if lookahead.peek(Token![,]) {
-                input.parse::<Token![,]>()?;
+            if lookahead.peek(syn::Token![,]) {
+                input.parse::<syn::Token![,]>()?;
                 continue;
             } else if lookahead.peek(kw::prefix) {
                 input.parse::<kw::prefix>()?;
-                input.parse::<Token![=]>()?;
-                // // use proc_macro2::TokenTree::Literal;
-                // if lookahead.peek(proc_macro2::Literal) {
-                // // if lookahead.peek(proc_macro2::TokenTree::Literal) {
-                // } else {
-                    let optional_prefix = input.parse::<QSelfOrPath>()?;
-                    if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
-                        let prefix_ts = match q_self_or_path {
-                            LogPrefix::QSelf(qself) => quote! { #qself },
-                            LogPrefix::Path(path) => quote! { #path },
-                        };
-                        args.prefix = Some(prefix_ts); //Some(remove_spaces(&prefix_ts.to_string()));
-                    }
-                // }
+                input.parse::<syn::Token![=]>()?;
+                let optional_prefix = input.parse::<QSelfOrPath>()?;
+                if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
+                    let prefix_ts = match q_self_or_path {
+                        LogPrefix::QSelf(qself) => quote! { #qself },
+                        LogPrefix::Path(path) => quote! { #path },
+                    };
+                    args.prefix = Some(prefix_ts); //Some(remove_spaces(&prefix_ts.to_string()));
+                }
             } else if lookahead.peek(kw::skip_params) {
                 input.parse::<kw::skip_params>()?;
                 args.params_logging = Some(ParamsLogging::Skip);
@@ -245,13 +228,14 @@ impl Parse for LoggableAttrArgsOpt {
         Ok(args)
     }
 }
+// TODO: Rename the trait.
 trait IsTraverseStopper {
     fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo>;
 
-    fn is_fcl_attribute(attr: &Attribute, attr_name: &str) -> bool {
+    fn is_fcl_attribute(attr: &syn::Attribute, attr_name: &str) -> bool {
         let path = match &attr.meta {
-            Meta::Path(path) => path,
-            Meta::List(MetaList { path, .. }) => path,
+            syn::Meta::Path(path) => path,
+            syn::Meta::List(syn::MetaList { path, .. }) => path,
             _ => return false,
         };
         // If the last path segment equals `attr_name` // e.g. "non_loggable"
@@ -274,11 +258,11 @@ trait IsTraverseStopper {
     fn is_non_loggable(&self) -> bool;
     // fn is_loggable(&self) -> bool;
 }
-impl IsTraverseStopper for Attribute {
+impl IsTraverseStopper for syn::Attribute {
     fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo> {
         let (path, optional_tokens) = match &self.meta {
-            Meta::Path(path) => (path, None),
-            Meta::List(MetaList { path, tokens, .. }) => (path, Some(tokens)),
+            syn::Meta::Path(path) => (path, None),
+            syn::Meta::List(syn::MetaList { path, tokens, .. }) => (path, Some(tokens)),
             _ => return None,
         };
 
@@ -333,7 +317,7 @@ impl IsTraverseStopper for Attribute {
     }
 
     fn is_non_loggable(&self) -> bool {
-        <Attribute as IsTraverseStopper>::is_fcl_attribute(self, "non_loggable")
+        <syn::Attribute as IsTraverseStopper>::is_fcl_attribute(self, "non_loggable")
     }
     // fn is_loggable(&self) -> bool {
     //     IsTraverseStopper::is_fcl_attribute(self, "loggable")
@@ -341,9 +325,9 @@ impl IsTraverseStopper for Attribute {
 
     fn is_traverse_stopper(&self) -> bool {
         let path = match &self.meta {
-            Meta::Path(path) => path,
-            Meta::List(MetaList { path, .. }) => path,
-            // Meta::NameValue(MetaNameValue { path, .. }) => path,
+            syn::Meta::Path(path) => path,
+            syn::Meta::List(syn::MetaList { path, .. }) => path,
+            // syn::Meta::NameValue(MetaNameValue { path, .. }) => path,
             _ => return false,
         };
         if let Some(last_path_segment) = path.segments.last() {
@@ -382,7 +366,7 @@ fn remove_spaces(s: &str) -> String {
 }
 
 fn update_param_data_from_pat(
-    input_pat: &Pat,
+    input_pat: &syn::Pat,
     param_format_str: &mut String,
     param_list: &mut proc_macro2::TokenStream,
 ) {
@@ -392,24 +376,24 @@ fn update_param_data_from_pat(
         // https://doc.rust-lang.org/reference/patterns.html#grammar-PatternNoTopAlt
         // https://doc.rust-lang.org/reference/patterns.html#grammar-RangePattern
 
-        // Pat::Const(pat_const) => ?,
+        // syn::Pat::Const(pat_const) => ?,
         // NOTE: Not found in The Rust Reference (links above) for PatternNoTopAlt.
         // NOTE: Example from ChatGPT looks too rare to fully parse the nested `block`:
         // |const [a, b, c]: [u8; 3]| { println!("{a} {b} {c}"); }
-        Pat::Ident(pat_ident) => {
+        syn::Pat::Ident(pat_ident) => {
             // x: f32
             let ident = &pat_ident.ident;
             param_format_str.push_str(&format!("{}: {{}}", ident)); // + "x: {}"
             *param_list = quote! { #param_list #ident.maybe_print(), } // + `x.maybe_print(), `
         }
-        // Pat::Lit(pat_lit) => ?,  // NOTE: Still questionable: Are literals applicable to params pattern?
+        // syn::Pat::Lit(pat_lit) => ?,  // NOTE: Still questionable: Are literals applicable to params pattern?
         // The Rust Reference mentions/lists it but does not add clarity.
         // ChatGPT states "Not Applicable for params".
 
-        // Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
-        // Pat::Or(pat_or) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
-        Pat::Paren(pat_paren) => {
-            let PatParen {
+        // syn::Pat::Macro(pat_macro) => ?, // NOTE: Out of scope.
+        // syn::Pat::Or(pat_or) => ?, // NOTE: Not found in The Rust Reference (for PatternNoTopAlt).
+        syn::Pat::Paren(pat_paren) => {
+            let syn::PatParen {
                 // attrs, //: Vec<Attribute>,
                 // paren_token, //: Paren,
                 pat, //: Box<Pat>,
@@ -419,10 +403,10 @@ fn update_param_data_from_pat(
             update_param_data_from_pat(pat.as_ref(), param_format_str, param_list);
             param_format_str.push_str(&")");
         }
-        // Pat::Path(pat_path) => ?, // NOTE: Example is needed as a param (`path` without `: Type`).
-        // Pat::Range(pat_range) => ?, // NOTE: N/A as a param.
-        Pat::Reference(pat_reference) => {
-            let PatReference {
+        // syn::Pat::Path(pat_path) => ?, // NOTE: Example is needed as a param (`path` without `: Type`).
+        // syn::Pat::Range(pat_range) => ?, // NOTE: N/A as a param.
+        syn::Pat::Reference(pat_reference) => {
+            let syn::PatReference {
                 // attrs, //: Vec<Attribute>,
                 // and_token, //: And, &
                 mutability, //: Option<Mut>,
@@ -434,9 +418,9 @@ fn update_param_data_from_pat(
 
             param_format_str.push_str(&format!("&{} {}", quote! { #mutability }, pat_str)); // + "&mut x: {}"
         }
-        // Pat::Rest(pat_rest) => ?, // NOTE: N/A as a param.
-        Pat::Slice(pat_slice) => {
-            let PatSlice {
+        // syn::Pat::Rest(pat_rest) => ?, // NOTE: N/A as a param.
+        syn::Pat::Slice(pat_slice) => {
+            let syn::PatSlice {
                 // attrs, //: Vec<Attribute>,
                 // bracket_token, //: Bracket,
                 elems, //: Punctuated<Pat, Comma>,
@@ -451,11 +435,11 @@ fn update_param_data_from_pat(
             }
             param_format_str.push_str(&"]");
         }
-        Pat::Struct(pat_struct) => {
+        syn::Pat::Struct(pat_struct) => {
             // struct MyPoint{ x: i32, y: i32}
             // fn f(MyPoint{x, y: _y}: MyPoint) {}
             // f(MyPoint{ x: 2, y: -4});  // Log: f(MyPoint { x: 2, y: _y: -4 }) {}
-            let PatStruct {
+            let syn::PatStruct {
                 // attrs, // : Vec<Attribute>,
                 // qself, // : Option<QSelf>,
                 path, // : Path,
@@ -469,7 +453,7 @@ fn update_param_data_from_pat(
                 if idx != 0 {
                     fields_format_str.push_str(&", ");
                 }
-                let FieldPat {
+                let syn::FieldPat {
                     // attrs, //: Vec<Attribute>,
                     member,      //: Member,
                     colon_token, //: Option<Colon>,
@@ -503,8 +487,8 @@ fn update_param_data_from_pat(
                 fields_format_str
             )); // + "MyStruct: { <fileds> }"
         }
-        Pat::Tuple(pat_tuple) => {
-            let PatTuple {
+        syn::Pat::Tuple(pat_tuple) => {
+            let syn::PatTuple {
                 // attrs, //: Vec<Attribute>,
                 // paren_token, //: Paren,
                 elems, //: Punctuated<Pat, Comma>,
@@ -519,8 +503,8 @@ fn update_param_data_from_pat(
             }
             param_format_str.push_str(&")");
         }
-        Pat::TupleStruct(pat_tuple_struct) => {
-            let PatTupleStruct {
+        syn::Pat::TupleStruct(pat_tuple_struct) => {
+            let syn::PatTupleStruct {
                 // attrs, //: Vec<Attribute>,
                 qself, //: Option<QSelf>,
                 path,  //: Path,
@@ -550,8 +534,8 @@ fn update_param_data_from_pat(
             }
             param_format_str.push_str(&")");
         }
-        Pat::Type(pat_type) => {
-            let PatType {
+        syn::Pat::Type(pat_type) => {
+            let syn::PatType {
                 // attrs, //: Vec<Attribute>,
                 pat, //: Box<Pat>,
                      // colon_token, //: Colon,
@@ -560,8 +544,8 @@ fn update_param_data_from_pat(
             } = pat_type;
             update_param_data_from_pat(pat.as_ref(), param_format_str, param_list);
         }
-        // Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
-        // Pat::Wild(pat_wild) // Ignore `_` in the pattern.
+        // syn::Pat::Verbatim(token_stream) // Ignore unclear sequence of tokens among params.
+        // syn::Pat::Wild(pat_wild) // Ignore `_` in the pattern.
         _ => {} // Do not print the param values.
     }
 }
@@ -757,10 +741,10 @@ fn update_param_data_from_pat(
 /// Closure with optional trailing comma
 /// (when closure is the last argument of a function):
 struct ExprClosureWOptComma {
-    closure: ExprClosure,
-    _optional_comma: Option<Token![,]>,
+    closure: syn::ExprClosure,
+    _optional_comma: Option<syn::Token![,]>,
 }
-impl Parse for ExprClosureWOptComma {
+impl syn::parse::Parse for ExprClosureWOptComma {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(ExprClosureWOptComma {
             closure: input.parse()?,
@@ -824,8 +808,8 @@ mod kw {
 
 struct FclQSelf {
     // <T as U::V>
-    ty: Box<Type>,
-    path: Path,
+    ty: Box<syn::Type>,
+    path: syn::Path,
 }
 impl quote::ToTokens for FclQSelf {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
@@ -844,14 +828,14 @@ impl quote::ToTokens for FclQSelf {
         *tokens = quote! { < #ty as #path > };
     }
 }
-impl Parse for FclQSelf {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
+impl syn::parse::Parse for FclQSelf {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         // <T as U::V>
-        input.parse::<Token![<]>()?;
+        input.parse::<syn::Token![<]>()?;
         let ty = input.parse()?;
-        input.parse::<Token![as]>()?;
+        input.parse::<syn::Token![as]>()?;
         let path = input.parse()?;
-        input.parse::<Token![>]>()?;
+        input.parse::<syn::Token![>]>()?;
         Ok(Self { ty, path })
     }
 }
@@ -862,16 +846,16 @@ enum LogPrefix {
 }
 struct QSelfOrPath(Option<LogPrefix>);
 
-impl Parse for QSelfOrPath {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
+impl syn::parse::Parse for QSelfOrPath {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut result = Self(None);
         if input.is_empty() {
             Ok(result)
         } else {
             let lookahead = input.lookahead1();
-            // if lookahead.peek(Token!["]) {
+            // if lookahead.peek(syn::Token!["]) {
             // }
-            if lookahead.peek(Token![<]) {
+            if lookahead.peek(syn::Token![<]) {
                 result = Self(Some(LogPrefix::QSelf(input.parse()?))); // <T as U::V>
             } else {
                 result = Self(Some(LogPrefix::Path(input.parse()?))); // U::V
@@ -943,7 +927,7 @@ struct AttrArgs {
     /// ```
     log_closure_coords: bool,
 }
-impl Parse for AttrArgs {
+impl syn::parse::Parse for AttrArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut attr_args = AttrArgs {
             prefix: quote! {},
@@ -955,13 +939,13 @@ impl Parse for AttrArgs {
                 break
             }
             let lookahead = input.lookahead1();
-            if lookahead.peek(Token![,]) {   // Skip any sequence of commas before, among, and after the attr args.
-                input.parse::<Token![,]>()?;
+            if lookahead.peek(syn::Token![,]) {   // Skip any sequence of commas before, among, and after the attr args.
+                input.parse::<syn::Token![,]>()?;
                 continue
             }
             else if lookahead.peek(kw::prefix) {
                 input.parse::<kw::prefix>()?;
-                input.parse::<Token![=]>()?;
+                input.parse::<syn::Token![=]>()?;
                 let optional_prefix = input.parse()?;
 
                 if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
