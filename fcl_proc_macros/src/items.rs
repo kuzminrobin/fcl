@@ -1,5 +1,6 @@
 use quote::quote;
-use crate::{AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, quote_as_expr, traversed_block_from_sig};
+use crate::{AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::quote_as_expr, traversed_block_from_sig};
+
 
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).

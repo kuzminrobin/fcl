@@ -130,6 +130,9 @@
 
 
 # Unsorted
+* TODO: Consider 
+  * `exprs::remove_spaces` -> `crate::remove_spaces`
+  * `exprs::quote_as_macro` -> `crate::`
 * TODO: trait IsTraverseStopper -> ..
 * TODO: Make FCL ingnore new functionality added to syn, proc_macro2, etc.
   ```rs 
