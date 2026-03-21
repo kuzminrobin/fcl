@@ -1,5 +1,5 @@
 use crate::{
-    AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::quote_as_expr,
+    AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::{quote_as_block, quote_as_expr},
     remove_spaces, update_param_data_from_pat,
 };
 use quote::quote;
@@ -73,7 +73,6 @@ fn get_loggable_attr_params_meta_tokens(
     user_provided_attr_info: &LoggableAttrInfo,
     enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
-    let mut updated_tokens = quote! {};
     let LoggableAttrInfo {
         prefix: user_provided_prefix,
         params_logging: user_provided_params_logging,
@@ -83,8 +82,8 @@ fn get_loggable_attr_params_meta_tokens(
     let new_prefix = user_provided_prefix
         .as_ref()
         .unwrap_or(&enclosing_item_attr_args.prefix /* .clone()*/);
-    // println!("prefix: {:?}", prefix);
-    updated_tokens = quote! { prefix = #new_prefix, };
+    // println!("prefix: \"{:?}\"", new_prefix);
+    let mut updated_tokens = quote! { prefix = #new_prefix, };
     // println!("updated_tokens: {:?}", updated_tokens);
     // if let Some(specified_prefix) = prefix {
     //     updated_tokens = quote!{ prefix = #specified_prefix, };
@@ -127,6 +126,12 @@ fn get_loggable_attr_params(
             meta: match &attr.meta {
                 syn::Meta::List(metalist) => syn::Meta::List(syn::MetaList {
                     path: metalist.path.clone(),
+                    // delimiter: syn::MacroDelimiter::Paren(
+                    //     Default::default()
+                    //     // syn::token::Paren {
+                    //     //     span: proc_macro2::extra::DelimSpan::from(proc_macro2::Span::call_site())
+                    //     // }
+                    // ),
                     delimiter: metalist.delimiter.clone(),
                     tokens: {
                         get_loggable_attr_params_meta_tokens(
@@ -135,7 +140,18 @@ fn get_loggable_attr_params(
                         )
                     },
                 }),
-                // Path(Path),
+                syn::Meta::Path(path) => syn::Meta::List(syn::MetaList {
+                    path: path.clone(),
+                    delimiter: syn::MacroDelimiter::Paren(
+                        Default::default()
+                    ),
+                    tokens: {
+                        get_loggable_attr_params_meta_tokens(
+                            &user_provided_attr_info,
+                            enclosing_item_attr_args,
+                        )
+                    },
+                }),
                 // NameValue(MetaNameValue),
                 _ => attr.meta.clone(),
             },
@@ -229,7 +245,7 @@ fn traversed_block_from_sig(
             // prefix: quote! { #func_log_name #generics() },
             ..*attr_args
         };
-        let block = crate::exprs::quote_as_block(block, &attr_args);
+        let block = quote_as_block(block, &attr_args);
 
         // The proc_macros (the pre-compile) part of the infrastructure for
         // generic parameters substitution with actual generic arguments,

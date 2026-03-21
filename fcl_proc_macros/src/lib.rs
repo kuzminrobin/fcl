@@ -280,12 +280,12 @@ impl IsTraverseStopper for syn::Attribute {
                 path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
             })
         {
+            ret_val = Some(LoggableAttrInfo {
+                prefix: None,             // Option<String>,
+                params_logging: None,     // Option<ParamsLogging>,
+                log_closure_coords: None, //Option<bool>,
+            });
             if let Some(tokens) = optional_tokens {
-                ret_val = Some(LoggableAttrInfo {
-                    prefix: None,             // Option<String>,
-                    params_logging: None,     // Option<ParamsLogging>,
-                    log_closure_coords: None, //Option<bool>,
-                });
                 // println!("optional_tokens: {:?}", optional_tokens);
                 if let Ok(parsed) = syn::parse2::<LoggableAttrArgsOpt>(tokens.clone()) {
                     ret_val = Some(LoggableAttrInfo {

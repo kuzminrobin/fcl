@@ -38,7 +38,7 @@ macro_rules! test_assert {
 }
 pub use crate::test_assert; // Re-export as `crate::common::test_assert` (in addition to `crate::test_assert`).
 
-// TODO: Doc-comment.
+/// Flushes the log (to log the cached calls, repeat count, to prevent subsequent call caching).
 pub fn flush_log() {
     // Flush the log:
     THREAD_LOGGER.with(|logger| {

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::{
-    AttrArgs, IsTraverseStopper, ParamsLogging, remove_spaces, update_param_data_from_pat,
+    AttrArgs, IsTraverseStopper, ParamsLogging, items::quote_as_item, remove_spaces, update_param_data_from_pat
 };
 use quote::quote;
 use syn::spanned::Spanned;
@@ -120,7 +120,7 @@ fn quote_as_stmt_macro(
 fn quote_as_stmt(stmt: &syn::Stmt, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match stmt {
         syn::Stmt::Local(local) => quote_as_local(local, attr_args),
-        syn::Stmt::Item(item) => crate::items::quote_as_item(item, attr_args),
+        syn::Stmt::Item(item) => quote_as_item(item, attr_args),
         syn::Stmt::Expr(expr, opt_semi) => {
             let expr = quote_as_expr(expr, None, attr_args);
             quote! { #expr #opt_semi }
