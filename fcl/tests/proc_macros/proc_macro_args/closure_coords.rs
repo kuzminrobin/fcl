@@ -12,10 +12,10 @@ use std::rc::Rc;
 //
 // #[loggable]         | TestCases
 // Attribute           | (outer (enclosing) function, inner (local) function)
-// Values              | G: Written by ChatGPT/Codex.                               |   Notes
+// Values              | G: Written by ChatGPT/Codex. g: Rewritten mannually.       |   Notes
 //---------------------|------------------------------------------------------------|-------------
-// Absent              |GG|? |? |? |   | ?|  |  |  |   | ?|  |  |  |    | ?|  |  |  |   // ``
-// NoArgs              |  | ?|  |  |   |? |??|? |? |   |  | ?|  |  |    |  | ?|  |  |   // `#[loggable]`
+// Absent              |GG|g |? |? |   | ?|  |  |  |   | ?|  |  |  |    | ?|  |  |  |   // ``
+// NoArgs              |  | g|  |  |   |? |??|? |? |   |  | ?|  |  |    |  | ?|  |  |   // `#[loggable]`
 // skip_closure_coords |  |  | ?|  |   |  |  | ?|  |   |? |? |??|? |    |  |  | ?|  |   // `#[loggable(skip_closure_coords)]`
 // log_closure_coords  |  |  |  | ?|   |  |  |  | ?|   |  |  |  | ?|    |? |? |? |??|   // `#[loggable(log_closure_coords)]`
 
