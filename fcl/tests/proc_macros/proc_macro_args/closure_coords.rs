@@ -1,8 +1,13 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use fcl_proc_macros::loggable;
+// Crate
 use crate::common::*;
+// Workspace
+use fcl_proc_macros::loggable;
+// crates.io
 
+// std
+use std::cell::RefCell;
+// use std::ops::RemAssign;
+use std::rc::Rc;
 
 //
 // #[loggable]         | TestCases
@@ -47,27 +52,32 @@ fn closure_coords() {
         }
         f();
 
-        // Unstable assert:
+        // Concise but unstable assert:
         //
         // #[rustfmt::skip]
         // test_assert!(log, concat!(
         //     "g() {\n",
-        //     "  g::closure{43,29:43,33}(x: 0) {} -> 0\n",     // The closure coordinates `43,29:43,33` are file-change-intolerant.
+        //     "  g::closure{43,29:43,33}(x: 0) {} -> 0\n",     // Assert: The closure coordinates are logged.
+        //                                                      // Unstable: The closure coordinates `43,29:43,33` are file-change-intolerant.
         //     "} // g().\n",
         // ));
         //
-        // Work-around:
+        // Work-around: Don't compare the actual coordiante numbers,
+        // but expect at least the shortest-length coordinates ("0,0:0,0") there, as opposed to "..".
         #[rustfmt::skip]
-        assert_except_closure_coords!(
-            log, 
+        assert_coords_are_in_between!(
+            log,
+            // Assert: Nothing extra is here.
             concat!(
                 "g() {\n",
                 "  g::closure{",
             ),
+            // Assert: Coordinates are here.
             concat!(
                              "}(x: 0) {} -> 0\n",
                 "} // g().\n",
             )
+            // Assert: Nothing extra is here.
         );
     }
 

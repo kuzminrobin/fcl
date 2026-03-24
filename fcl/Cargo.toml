@@ -11,6 +11,7 @@ fcl_proc_macros = { path = "../fcl_proc_macros" }
 #fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
 #serial_test = "3.2.0"
 #serial_test = "3.3.1"
+regex = "1.12.3"
 
 [features]
 # default = ["singlethreaded"]
