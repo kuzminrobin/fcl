@@ -1,6 +1,11 @@
 # Need ASAP
-* Closure coordinates (line,col numbers) suppression: `closure{42,38:42,49}()` -> `closure{..}()`. 
-  For testing purposes (if the test file is updated then the coords change, the test breaks). 
+* Implement params spreading for {skope/fn}:
+  ```rs
+  #[loggable]
+  {
+      #[loggable]
+      fn g(i: u8) {
+  ```
 
 # Must
 
@@ -40,6 +45,8 @@
     * fcl/algo_tests_add_loopbody_start.rs
     * fcl/algo_tests_add_loopbody_end.rs
 >
+  * prefix, {skip|log}_params, {skip|log}_closure_coords
+    * Implement everywhere (items, exprs, ..).
   * Language constructs
     * Items
       * Functions

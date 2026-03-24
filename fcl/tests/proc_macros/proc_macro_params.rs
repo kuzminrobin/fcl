@@ -12,7 +12,7 @@ use crate::common::*;
 //         fn i() {}
 //         i();
 //     }
-    
+
 //     // #[loggable]
 //     // fn m() {
 //     //     #[loggable(skip_closure_coords)]
@@ -53,119 +53,336 @@ use crate::common::*;
 //     // // }
 // }
 
+//
+// #[loggable] | TestCases
+// Attribute   | (outer (enclosing) function, inner (local) function)
+// Values      | G: Written by ChatGPT/Codex.                               |   Notes
+//-------------|------------------------------------------------------------+-------------
+// Absent      |++|+ |+ |+ |   | +|  |  |  |   | G|  |  |  |    | G|  |  |  |   // ``
+// NoArgs      |  | +|  |  |   |+ |++|+ |+ |   |  | +|  |  |    |  | G|  |  |   // `#[loggable]`
+// skip_params |  |  | +|  |   |  |  | +|  |   |G |+ |GG|+ |    |  |  | G|  |   // `#[loggable(skip_params)]`
+// log_params  |  |  |  | +|   |  |  |  | +|   |  |  |  | +|    |G |G |G |GG|   // `#[loggable(log_params)]`
+
 #[test]
 fn param_pass() {
-    #[loggable]
-    fn f() {
-        fn g(b: bool) {
-            Some(1).map(|x| x + 1);
-        }
-        g(true);
-    }
-
     let log = substitute_log_writer!();
-    f();
 
-    // The following assert is unstable because the closure coordinates change upon file update.
-    // 
-    // #[rustfmt::skip]
-    // test_assert!(log, concat!(
-    //     "f() {\n",
-    //     "  f::g(b: true) {\n",
-    //     "    f::g::closure{62,25:62,33}(x: 1) {} -> 2\n",    // The coords {62,25:62,33} change.
-    //     "  } // f::g().\n",
-    //     "} // f().\n",
-    // ));
-    // 
-    // The work-around follows.
-
-    let log_contents = unsafe { String::from(std::str::from_utf8_unchecked(&*log.borrow())) };
-
-    #[rustfmt::skip]
-    let start = concat!(
-            "f() {\n",
-            "  f::g(b: true) {\n",
-            "    f::g::closure{",
-    );
-    // Find the `start` at the beginning of the `log_contents`.
-    let optional_index = log_contents.find(start);
-
-    // Assert: The `start` is found,
-    if let Some(index) = optional_index {
-        // at the beginning of the `log_contents`.
-        assert_eq!(0, index);
-
-        // Assert: The end is found after the `start`.
-        #[rustfmt::skip]
-        assert!(log_contents[start.len()..].find(concat!(
-                               /*62,25:62,33*/ "}(x: 1) {} -> 2\n",
-            "  } // f::g().\n",
-            "} // f().\n",
-        )).is_some());
-    } else {
-        assert!(false, "Failed to find expected fragment");
-    }
-
-    #[loggable]
-    fn h() {
-        #[loggable]
-        fn i() {}
-        i();
-    }
-    log.borrow_mut().clear();
-    h();
-    #[rustfmt::skip]
-    test_assert!(log, concat!(
-        "h() {\n",
-        "  h::i() {}\n",  // Still "h::".
-        "} // h().\n",
-    ));
-
+    // Absent/Absent
     {
-        #[loggable(skip_params)]
-        fn j(_u: u8) {
-            #[loggable] // (skip_params) is inherited.
-            fn k(_i: i8) {}
-            k(3);
+        // Attribute is absent. Nothing to log.
+        fn f() {
+            // Attribute is absent. Nothing to log.
+            fn g(_b: bool) {}
+            g(true);
         }
+        f();
+
+        flush_log();
+        test_assert!(log, concat!("",)); // Assert: No log.
         log.borrow_mut().clear();
-        j(4);
+    }
+    // Absent/{No args}
+    {
+        // Attribute is absent. Nothing to log.
+        fn f() {
+            #[loggable] // {No args}. 
+            fn g(_b: bool) {} // The params must be logged.
+            g(true);
+        }
+        f();
+
+        flush_log();
         #[rustfmt::skip]
         test_assert!(log, concat!(
-            "j(..) {\n",
-            "  j::k(..) {}\n",  // Still no params.
-            "} // j().\n",
+                                // Assert: `f()` is not logged.
+            "g(_b: true) {}\n", // Assert: The params are logged.
         ));
+        log.borrow_mut().clear();
     }
+
+    // Absent/skip_params
     {
-        #[loggable]
+        // Attribute is absent.
+        fn f(_a: u8) {
+            #[loggable(skip_params)] // Must not log params.
+            fn g(_b: bool) {}
+            g(true);
+        }
+        f(2);
+
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+                            // Assert: `f()` is not logged.
+            "g(..) {}\n",   // Assert: Params are skipped.
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // Absent/log_params
+    {
+        // Attribute is absent.
+        fn f(_a: u8) {
+            #[loggable(log_params)] // Must log params.
+            fn g(_b: bool) {}
+            g(true);
+        }
+        f(2);
+
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+                                // Assert: `f()` is not logged.
+            "g(_b: true) {}\n", // Assert: Params are logged.
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // {No args}/Absent
+    {
+        #[loggable] // Must log params.
+        fn f(_fp: u8) {
+            // Attribute is absent.
+            fn g(_b: bool) {} // Must log prefix `f::`, params.
+            g(true);
+        }
+        f(1);
+
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "f(_fp: 1) {\n",            // Assert: Params.
+            "  f::g(_b: true) {}\n",    // Assert: Prefix, params.
+            "} // f().\n",
+        ));
+        //
+        log.borrow_mut().clear();
+    }
+
+    // {No args}/{No args}
+    {
+        #[loggable] // {No args}. Must log params.
+        fn h(_hp: u16) {
+            #[loggable] // {No args}. Must log prefix `h::`, params.
+            fn i(_ip: u8) {}
+            i(1);
+        }
+        h(9);
+
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "h(_hp: 9) {\n",        // Assert: Params.
+            "  h::i(_ip: 1) {}\n",  // Assert: Prefix `h::`, params.
+            "} // h().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // {No args}/skip_params
+    {
+        #[loggable] // {No args}. Must log params.
         fn j(_u: u8) {
-            #[loggable(skip_params)] // (skip_params) is user-provided.
+            #[loggable(skip_params)] // Must log prefix, must not log params.
             fn k(_i: i8) {}
             k(3);
         }
-        flush_log();
-        log.borrow_mut().clear();
         j(5);
+
+        flush_log();
         #[rustfmt::skip]
         test_assert!(log, concat!(
             "j(_u: 5) {\n",     // Params.
             "  j::k(..) {}\n",  // No params.
             "} // j().\n",
         ));
+        log.borrow_mut().clear();
     }
 
+    // {No args}/log_params
+    {
+        #[loggable] // {No args}. Must log params.
+        fn j(_u: u8) {
+            #[loggable(log_params)] // Must log prefix, params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(_u: 4) {\n",         // Params.
+            "  j::k(_i: 3) {}\n",   // Prefix, params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // skip_params/Absent
+    {
+        #[loggable(skip_params)] // Must skip params.
+        fn j(_u: u8) {
+            // Attribute is absent; must log prefix, skip params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(..) {\n",        // No params.
+            "  j::k(..) {}\n",  // Prefix, no params (inherited).
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // skip_params/{No args}
+    {
+        #[loggable(skip_params)] // Must skip params.
+        fn j(_u: u8) {
+            #[loggable] // Must log prefix, skip params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(..) {\n",        // No params.
+            "  j::k(..) {}\n",  // Prefix, no params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+    // skip_params/skip_params
+    {
+        #[loggable(skip_params)] // Must skip params.
+        fn j(_u: u8) {
+            #[loggable(skip_params)] // Must log prefix, skip params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(..) {\n",        // Skip params.
+            "  j::k(..) {}\n",  // Prefix. Skip params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // skip_params/log_params
+    {
+        #[loggable(skip_params)]    // Must skip params.
+        fn j(_u: u8) {
+            #[loggable(log_params)] // Must log prefix, params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(..) {\n",            // Skip params.
+            "  j::k(_i: 3) {}\n",   // Log prefix, params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // log_params/Absent
+    {
+        #[loggable(log_params)] // Must log params.
+        fn j(_u: u8) {
+            // Attribute is absent. Must log prefix, params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(_u: 4) {\n",         // Params.
+            "  j::k(_i: 3) {}\n",   // Prefix, params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // log_params/{No args}
+    {
+        #[loggable(log_params)] // Must log params.
+        fn j(_u: u8) {
+            #[loggable] // Must lop prefix, params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(_u: 4) {\n",         // Params.
+            "  j::k(_i: 3) {}\n",   // Prefix, params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // log_params/skip_params
+    {
+        #[loggable(log_params)] // Must log params.
+        fn j(_u: u8) {
+            #[loggable(skip_params)] // Must log prefix, skip params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(_u: 4) {\n",     // Params.
+            "  j::k(..) {}\n",  // Prefix, skip params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // log_params/log_params
+    {
+        #[loggable(log_params)] // Must log params.
+        fn j(_u: u8) {
+            #[loggable(log_params)] // Must log prefix, params.
+            fn k(_i: i8) {}
+            k(3);
+        }
+        j(4);
+        flush_log();
+        #[rustfmt::skip]
+        test_assert!(log, concat!(
+            "j(_u: 4) {\n",         // Params.
+            "  j::k(_i: 3) {}\n",   // Prefix, params.
+            "} // j().\n",
+        ));
+        log.borrow_mut().clear();
+    }
+
+    // skip_closure_coords/{No arg}
     {
         #[loggable(skip_closure_coords)]
         fn m() {
-            #[loggable]
+            #[loggable] // `skip_closure_coords` is inherited.
             fn n() {
                 Some(0).map(|y| y + 2);
             }
             n();
         }
-        log.borrow_mut().clear();
         m();
+        flush_log();
         #[rustfmt::skip]
         test_assert!(log, concat!(
             "m() {\n",
@@ -174,11 +391,10 @@ fn param_pass() {
             "  } // m::n().\n",
             "} // m().\n",
         ));
+        log.borrow_mut().clear();
     }
 
-    flush_log();
-    log.borrow_mut().clear();
-    
+    // {No arg}/skip_closure_coords
     #[loggable]
     fn m() {
         #[loggable(skip_closure_coords)]
@@ -188,6 +404,7 @@ fn param_pass() {
         n();
     }
     m();
+    flush_log();
     #[rustfmt::skip]
     test_assert!(log, concat!(
         "m() {\n",
@@ -196,5 +413,5 @@ fn param_pass() {
         "  } // m::n().\n",
         "} // m().\n",
     ));
+    log.borrow_mut().clear();
 }
-
