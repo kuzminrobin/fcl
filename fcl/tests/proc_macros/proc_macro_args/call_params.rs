@@ -3,55 +3,6 @@ use std::rc::Rc;
 use fcl_proc_macros::loggable;
 use crate::common::*;
 
-// #[test]
-// fn tmp0() {
-//     #[loggable]
-//     fn h() {
-//         #[loggable]
-//         fn i() {}
-//         i();
-//     }
-
-//     // #[loggable]
-//     // fn m() {
-//     //     #[loggable(skip_closure_coords)]
-//     //     fn n() {
-//     //         Some(0).map(|y| y + 2);
-//     //     }
-//     //     n();
-//     // }
-//     // // fn m()
-//     // // {
-//     // //     use fcl :: { CallLogger, MaybePrint }; let ret_val = fcl :: call_log_infra
-//     // //     :: instances ::
-//     // //     THREAD_LOGGER.with(| logger |
-//     // //     {
-//     // //         let param_val_str = None; let mut body = move ||
-//     // //         {
-//     // //             #[loggable(prefix = m, log_params, skip_closure_coords)] fn n()
-//     // //             { Some(0).map(| y | y + 2); } n();
-//     // //         }; if ! logger.borrow().logging_is_on() { return body(); } let mut
-//     // //         generic_func_name = String :: with_capacity(64);
-//     // //         generic_func_name.push_str("m"); if ! true
-//     // //         {
-//     // //             generic_func_name.push_str("<"); let generic_arg_names_vec : Vec <
-//     // //             & 'static str > = vec! []; for (idx, generic_arg_name) in
-//     // //             generic_arg_names_vec.into_iter().enumerate()
-//     // //             {
-//     // //                 if idx != 0 { generic_func_name.push_str(","); }
-//     // //                 generic_func_name.push_str(generic_arg_name);
-//     // //             } generic_func_name.push_str(">");
-//     // //         } let mut callee_logger = fcl :: CalleeLogger ::
-//     // //         new(& generic_func_name, param_val_str); let ret_val = body(); if
-//     // //         false
-//     // //         {
-//     // //             let ret_val_str = format! ("{}", ret_val.maybe_print());
-//     // //             callee_logger.set_ret_val(ret_val_str);
-//     // //         } ret_val
-//     // //     }); ret_val
-//     // // }
-// }
-
 //
 // #[loggable] | TestCases
 // Attribute   | (outer (enclosing) function, inner (local) function)
@@ -370,3 +321,53 @@ fn call_param_pass() {
         log.borrow_mut().clear();
     }
 }
+
+// #[test]
+// fn tmp0() {
+//     #[loggable]
+//     fn h() {
+//         #[loggable]
+//         fn i() {}
+//         i();
+//     }
+
+//     // #[loggable]
+//     // fn m() {
+//     //     #[loggable(skip_closure_coords)]
+//     //     fn n() {
+//     //         Some(0).map(|y| y + 2);
+//     //     }
+//     //     n();
+//     // }
+//     // // fn m()
+//     // // {
+//     // //     use fcl :: { CallLogger, MaybePrint }; let ret_val = fcl :: call_log_infra
+//     // //     :: instances ::
+//     // //     THREAD_LOGGER.with(| logger |
+//     // //     {
+//     // //         let param_val_str = None; let mut body = move ||
+//     // //         {
+//     // //             #[loggable(prefix = m, log_params, skip_closure_coords)] fn n()
+//     // //             { Some(0).map(| y | y + 2); } n();
+//     // //         }; if ! logger.borrow().logging_is_on() { return body(); } let mut
+//     // //         generic_func_name = String :: with_capacity(64);
+//     // //         generic_func_name.push_str("m"); if ! true
+//     // //         {
+//     // //             generic_func_name.push_str("<"); let generic_arg_names_vec : Vec <
+//     // //             & 'static str > = vec! []; for (idx, generic_arg_name) in
+//     // //             generic_arg_names_vec.into_iter().enumerate()
+//     // //             {
+//     // //                 if idx != 0 { generic_func_name.push_str(","); }
+//     // //                 generic_func_name.push_str(generic_arg_name);
+//     // //             } generic_func_name.push_str(">");
+//     // //         } let mut callee_logger = fcl :: CalleeLogger ::
+//     // //         new(& generic_func_name, param_val_str); let ret_val = body(); if
+//     // //         false
+//     // //         {
+//     // //             let ret_val_str = format! ("{}", ret_val.maybe_print());
+//     // //             callee_logger.set_ret_val(ret_val_str);
+//     // //         } ret_val
+//     // //     }); ret_val
+//     // // }
+// }
+

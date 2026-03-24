@@ -5,11 +5,12 @@ use fcl_proc_macros::loggable;
 use crate::common::*;
 
 mod call_params;
+mod closure_coords;
 
 #[test]
 fn closure_coords() {
     let log = substitute_log_writer!();
-    
+
     // skip_closure_coords/{No arg}
     {
         #[loggable(skip_closure_coords)]
