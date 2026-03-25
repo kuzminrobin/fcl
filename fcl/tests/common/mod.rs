@@ -51,8 +51,10 @@ macro_rules! get_coords_slice {
             $end.len() <= $log_contents.len(),
             concat!(
                 "The log is shorter than the expected end:\n",
-                "actual log  : \"{}\"\n",
-                "expected end: \"{}\"\n",
+                "actual log:\n",
+                "\"{}\"\n",
+                "expected end:\n",
+                "\"{}\"\n",
             ),
             $log_contents,
             $end
@@ -123,8 +125,10 @@ macro_rules! assert_begin_coords_end {
             log_contents.starts_with($beginning),
             concat!(
                 "The log starts with an unexpected contents:\n",
-                "log contents      : \"{}\"\n",
-                "expected beginning: \"{}\"\n",
+                "log contents:\n", 
+                "\"{}\"\n",
+                "expected beginning:\n",
+                "\"{}\"\n",
             ),
             log_contents,
             $beginning
@@ -133,8 +137,10 @@ macro_rules! assert_begin_coords_end {
             log_contents.ends_with($end),
             concat!(
                 "The log ends with an unexpected contents:\n",
-                "log contents: \"{}\"\n",
-                "expected end: \"{}\"\n",
+                "log contents:\n",
+                "\"{}\"\n",
+                "expected end:\n",
+                "\"{}\"\n",
             ),
             log_contents,
             $end
