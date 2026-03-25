@@ -260,7 +260,8 @@ fn in_mod() {
     mod test_mod {
         pub fn loggable_fn() {}
 
-        #[super::non_loggable]
+        #[fcl_proc_macros::non_loggable]
+        // #[super::non_loggable]
         pub fn non_loggable_fn() {}
     }
     // Mock log writer creation and substitution of the default one:

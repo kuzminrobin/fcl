@@ -1,5 +1,5 @@
 #![feature(c_variadic)]
-#![feature(stmt_expr_attributes)] // Loggable closures.
+//#![feature(stmt_expr_attributes)] // Loggable closures.
 #![feature(proc_macro_hygiene)] // Loggable closures.
 // #![feature(min_specialization)]
 
@@ -203,8 +203,11 @@ fn calls() {
 
         f();
     }
+
     #[loggable]
-    {
+    fn f() {
+        // #[loggable]     //#![feature(stmt_expr_attributes)] // Loggable closures.
+        // {
         fn z() {}
         fn x() {
             z();
@@ -227,7 +230,7 @@ fn calls() {
 fn thread_func() {
     // fcl::set_logging_is_on!(true);
     // fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(false)); // Turn logging on.
-    
+
     // fcl::set_thread_indent!(String::from(
     //     "                                                  "
     // ));
@@ -256,18 +259,18 @@ fn thread_func() {
     // let _ = _s.method();
 
     thread::sleep(Duration::from_millis(1));
-    let _b = Some(true).map(
-        #[loggable]
-        move |b| -> bool {
-            Some(b)
-                .map(
-                    #[loggable]
-                    |v| !v,
-                )
-                .unwrap()
-        },
-    );
-    // assert_eq!(Some(false), _b);
+    // let _b = Some(true).map(
+    //     #[loggable] // #![feature(stmt_expr_attributes)]
+    //     move |b| -> bool {
+    //         Some(b)
+    //             .map(
+    //                 #[loggable] // #![feature(stmt_expr_attributes)]
+    //                 |v| !v,
+    //             )
+    //             .unwrap()
+    //     },
+    // );
+    // // assert_eq!(Some(false), _b);
 
     {
         struct MyStruct;
@@ -463,8 +466,9 @@ fn thread_func() {
             // println!("_b: {}", _b.maybe_print());
             fun()
         }
+        #[loggable]
         f_with_f(
-            #[loggable]
+            // #[loggable]  // #![feature(stmt_expr_attributes)]
             || (),
             true,
         );
@@ -477,7 +481,9 @@ fn thread_func() {
     // println!("thread_func() ends");
 
     #[loggable]
-    {
+    fn f() {
+    // #[loggable]     // #![feature(stmt_expr_attributes)]
+    // {
         fn f(i: u8) {
             g(i);
         }
@@ -515,6 +521,8 @@ fn thread_func() {
         }
         g(20);
     }
+    f();
+    
     #[loggable]
     fn ff() {
         thread::sleep(Duration::from_millis(1));
