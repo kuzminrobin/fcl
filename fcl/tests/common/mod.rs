@@ -1,11 +1,14 @@
 #![allow(dead_code)]
 
+use std::cell::RefCell;
+use std::rc::Rc;
 #[cfg(feature = "singlethreaded")]
 use fcl::CallLogger;
 use fcl::call_log_infra::instances::THREAD_LOGGER;
 
 // TODO: Doc-comment.
-pub(crate) const COORDS_RE_SLICE: &str = r"^\d+,\d+:\d+,\d+$";
+pub(crate) const COORDS_ONLY_RE_SLICE: &str = r"^\d+,\d+:\d+,\d+$";
+pub(crate) const COORDS_RE_SLICE: &str = r"\d+,\d+:\d+,\d+";
 
 // TODO: Use everywhere.
 macro_rules! substitute_log_writer {
@@ -20,6 +23,20 @@ macro_rules! substitute_log_writer {
     }};
 }
 pub(crate) use substitute_log_writer;
+
+// TODO: Consider coverting to a macro to preserve the error coordinates in `panic`.
+pub(crate) fn zero_out_closure_coords(log: Rc<RefCell<Vec<u8>>>) -> String {
+    let log_contents = unsafe { String::from(std::str::from_utf8_unchecked(&*log.borrow())) };
+    let coords_regex = match regex::Regex::new(COORDS_RE_SLICE) {
+        Result::Ok(coords_regex) => coords_regex,
+        Result::Err(error) => panic!(
+            "Test Crate Internal Error: Failed to create Regex from \"{}\", error: \"{}\"",
+            COORDS_RE_SLICE, error),
+    };
+    let output = coords_regex.replace_all(&log_contents, "0,0:0,0");
+    output.to_string()
+}
+
 
 // TODO: Use everywhere.
 // TODO:
@@ -85,11 +102,11 @@ macro_rules! assert_coords_slice {
     ($coords_slice:expr) => {{
         // NOTE: Failed to make the var below a global const (non-const init function?):
         // Compiler Error: "cycle detected when checking if `common::coords_regex` is a trivial const".
-        let coords_regex = match regex::Regex::new(COORDS_RE_SLICE) {
+        let coords_regex = match regex::Regex::new(COORDS_ONLY_RE_SLICE) {
             Result::Ok(coords_regex) => coords_regex,
             Result::Err(error) => panic!(
                 "Test Crate Internal Error: Failed to create Regex from \"{}\", error: \"{}\"",
-                COORDS_RE_SLICE, error),
+                COORDS_ONLY_RE_SLICE, error),
         };
 
         let optional_coords_re_match = coords_regex.find($coords_slice);
@@ -100,7 +117,7 @@ macro_rules! assert_coords_slice {
                 "expected regex: \"{}\"\n",
             ),
             $coords_slice,
-            COORDS_RE_SLICE
+            COORDS_ONLY_RE_SLICE
         );
     }}
 }

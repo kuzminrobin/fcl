@@ -138,6 +138,7 @@
 
 
 # Unsorted
+* TODO: To docs: NOTE: The unused fn parameter becomes "used" with `#[loggable]` (the warning is suppressed).
 * TODO: Consider fcl\tests\proc_macros\{proc_macro_args.rs -> loggable_args.rs}.
 * TODO: Split `traversed_block_from_sig`
 * TODO: trait IsTraverseStopper -> ..
