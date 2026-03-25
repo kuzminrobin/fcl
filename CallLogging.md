@@ -44,6 +44,7 @@
     * fcl/algo_tests_add_ret.rs
     * fcl/algo_tests_add_loopbody_start.rs
     * fcl/algo_tests_add_loopbody_end.rs
+  * fn/fn: {skip|log}_params, {skip|log}_closure_coords
 >
   * prefix, {skip|log}_params, {skip|log}_closure_coords
     * Implement everywhere (items, exprs, ..).

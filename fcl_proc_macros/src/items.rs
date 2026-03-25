@@ -349,7 +349,7 @@ fn quote_as_item_fn(
     } = item_fn;
     // println!("{:?} {{", sig.ident);
 
-    let mut new_fn_attrs = vec![];
+    let mut new_attrs = vec![];
     let mut has_loggable = false;
 
     // println!("attrs.len(): {}", attrs.len());
@@ -365,7 +365,7 @@ fn quote_as_item_fn(
             // println!("}} {:?} // non_loggable", sig.ident);
             return quote! { #item_fn };
         }
-        new_fn_attrs.push(get_loggable_attr_params(
+        new_attrs.push(get_loggable_attr_params(
             attr,
             &mut has_loggable,
             enclosing_item_attr_args,
@@ -393,9 +393,9 @@ fn quote_as_item_fn(
 
     // // let attrs = if new_attrs.is_empty() { attrs } else { &new_attrs };
     // let block = traversed_block_from_sig(block, sig, attr_args);
-    let ret_val = quote! { #(#new_fn_attrs)* #vis #sig #block };
+    let ret_token_stream = quote! { #(#new_attrs)* #vis #sig #block };
     // println!("quote_as_item_fn()::ret_val: {}", ret_val);
-    ret_val
+    ret_token_stream
     // quote! { #(#new_attrs)* #vis #sig #block }
     // quote! { #(#attrs)* #vis #sig #block }
 }
@@ -509,7 +509,8 @@ fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_m
 //     // let ItemMacro {} = item_macro;
 //     quote!{ #item_macro }
 // }
-fn quote_as_item_mod(item_mod: &syn::ItemMod, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+
+fn quote_as_item_mod(item_mod: &syn::ItemMod, enclosing_item_attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ItemMod {
         attrs,     //: Vec<Attribute>,
         vis,       //: Visibility,
@@ -520,32 +521,71 @@ fn quote_as_item_mod(item_mod: &syn::ItemMod, attr_args: &AttrArgs) -> proc_macr
         semi,      //: Option<Semi>,
     } = item_mod;
 
+    let mut new_attrs = vec![];
+    let mut has_loggable = false;
+
     for attr in attrs {
-        if attr.is_traverse_stopper() {
+        if attr.is_non_loggable() {
+        // if attr.is_traverse_stopper() {
             return quote! { #item_mod };
         }
+        new_attrs.push(get_loggable_attr_params(
+            attr,
+            &mut has_loggable,
+            enclosing_item_attr_args,
+        ));
     }
 
-    let attr_args = AttrArgs {
-        prefix: if attr_args.prefix.is_empty() {
-            quote! { #ident }
-        } else {
-            let prefix = &attr_args.prefix;
-            quote! { #prefix::#ident }
-        },
-        ..*attr_args
-    };
+    let content = if has_loggable {
+        // // NOTE: The impl below deosn't compile since either a trait or a type have to be locally defined.
+        // impl quote::ToTokens for (syn::token::Brace, Vec<syn::Item>) {
+        //     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        //         let (.., items) = self;
+        //         let mut tokenized_items = quote! {};
+        //         for item in items {
+        //             tokenized_items = quote! { #tokenized_items #item };
+        //         }
+        //         *tokens = quote! { { #tokenized_items } }
+        //     }
+        // }
+        // 
+        // quote! { #content }
 
-    let content = content.as_ref().map(|(_brace, items)| {
-        let mut traversed_items = quote! {};
-        for item in items {
-            let item = quote_as_item(item, &attr_args);
-            traversed_items = quote! { #traversed_items #item };
-        }
-        quote! { { #traversed_items } }
-    });
-    quote! { #(#attrs)* #vis #unsafety #mod_token #ident #content #semi }
+        // No item traversing. The items are passed as they are.
+        let content = content.as_ref().map(|(_brace, items)| {
+            let mut tokenized_items = quote! {};
+            for item in items {
+                tokenized_items = quote! { #tokenized_items #item };
+            }
+            quote! { { #tokenized_items } }
+        });
+        content
+    } else {
+        let attr_args = AttrArgs {
+            prefix: if enclosing_item_attr_args.prefix.is_empty() {
+                quote! { #ident }
+            } else {
+                let prefix = &enclosing_item_attr_args.prefix;
+                quote! { #prefix::#ident }
+            },
+            ..*enclosing_item_attr_args
+        };
+
+        // Traverse the items:
+        let content = content.as_ref().map(|(_brace, items)| {
+            let mut traversed_items = quote! {};
+            for item in items {
+                let item = quote_as_item(item, &attr_args);
+                traversed_items = quote! { #traversed_items #item };
+            }
+            quote! { { #traversed_items } }
+        });
+        content
+    };
+    quote! { #(#new_attrs)* #vis #unsafety #mod_token #ident #content #semi }
+    // quote! { #(#attrs)* #vis #unsafety #mod_token #ident #content #semi }
 }
+
 fn quote_as_item_static(
     item_static: &syn::ItemStatic,
     attr_args: &AttrArgs,
