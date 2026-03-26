@@ -3,10 +3,11 @@ use std::rc::Rc;
 use fcl_proc_macros::loggable;
 use crate::common::*;
 
+// TODO: Consider merging this file with "fn_fn_closure_coords.rs" by example of "mod_fn.rs".
 //
 // #[loggable] | TestCases
 // Attribute   | (outer (enclosing) function, inner (local) function)
-// Values      | G: Written by ChatGPT/Codex.                               |   Notes
+// Values      | +: Written mannually. G: Written by ChatGPT/Codex.         |   Notes
 //-------------|------------------------------------------------------------|-------------
 // Absent      |++|+ |+ |+ |   | +|  |  |  |   | G|  |  |  |    | G|  |  |  |   // ``
 // NoArgs      |  | +|  |  |   |+ |++|+ |+ |   |  | +|  |  |    |  | G|  |  |   // `#[loggable]`

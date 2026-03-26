@@ -61,3 +61,4 @@ mod fn_fn_call_params;
 mod fn_fn_closure_coords;
 mod mod_fn;
 // fn_mod
+mod trait_fn;

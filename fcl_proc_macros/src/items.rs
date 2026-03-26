@@ -1,5 +1,6 @@
 use crate::{
-    AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging, exprs::{quote_as_block, quote_as_expr},
+    AttrArgs, IsTraverseStopper, LoggableAttrInfo, ParamsLogging,
+    exprs::{quote_as_block, quote_as_expr},
     remove_spaces, update_param_data_from_pat,
 };
 use quote::quote;
@@ -142,9 +143,7 @@ fn get_loggable_attr_params(
                 }),
                 syn::Meta::Path(path) => syn::Meta::List(syn::MetaList {
                     path: path.clone(),
-                    delimiter: syn::MacroDelimiter::Paren(
-                        Default::default()
-                    ),
+                    delimiter: syn::MacroDelimiter::Paren(Default::default()),
                     tokens: {
                         get_loggable_attr_params_meta_tokens(
                             &user_provided_attr_info,
@@ -510,7 +509,10 @@ fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_m
 //     quote!{ #item_macro }
 // }
 
-fn quote_as_item_mod(item_mod: &syn::ItemMod, enclosing_item_attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+fn quote_as_item_mod(
+    item_mod: &syn::ItemMod,
+    enclosing_item_attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
     let syn::ItemMod {
         attrs,     //: Vec<Attribute>,
         vis,       //: Visibility,
@@ -526,7 +528,6 @@ fn quote_as_item_mod(item_mod: &syn::ItemMod, enclosing_item_attr_args: &AttrArg
 
     for attr in attrs {
         if attr.is_non_loggable() {
-        // if attr.is_traverse_stopper() {
             return quote! { #item_mod };
         }
         new_attrs.push(get_loggable_attr_params(
@@ -548,16 +549,16 @@ fn quote_as_item_mod(item_mod: &syn::ItemMod, enclosing_item_attr_args: &AttrArg
         //         *tokens = quote! { { #tokenized_items } }
         //     }
         // }
-        // 
+        //
         // quote! { #content }
 
         // No item traversing. The items are passed as they are.
         let content = content.as_ref().map(|(_brace, items)| {
-            let mut tokenized_items = quote! {};
+            let mut copied_items = quote! {};
             for item in items {
-                tokenized_items = quote! { #tokenized_items #item };
+                copied_items = quote! { #copied_items #item };
             }
-            quote! { { #tokenized_items } }
+            quote! { { #copied_items } }
         });
         content
     } else {
@@ -583,7 +584,6 @@ fn quote_as_item_mod(item_mod: &syn::ItemMod, enclosing_item_attr_args: &AttrArg
         content
     };
     quote! { #(#new_attrs)* #vis #unsafety #mod_token #ident #content #semi }
-    // quote! { #(#attrs)* #vis #unsafety #mod_token #ident #content #semi }
 }
 
 fn quote_as_item_static(
@@ -680,7 +680,7 @@ fn quote_as_trait_item_const(
 }
 fn quote_as_trait_item_fn(
     trait_item_fn: &syn::TraitItemFn,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::TraitItemFn {
         attrs,      //: Vec<Attribute>,
@@ -689,15 +689,28 @@ fn quote_as_trait_item_fn(
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
 
+    let mut new_attrs = vec![];
+    let mut has_loggable = false;
     for attr in attrs {
-        if attr.is_traverse_stopper() {
+        if attr.is_non_loggable() {
+            // if attr.is_traverse_stopper() {
             return quote! { #trait_item_fn };
         }
+        new_attrs.push(get_loggable_attr_params(
+            attr,
+            &mut has_loggable,
+            enclosing_item_attr_args,
+        ));
     }
-    let default = default
-        .as_ref()
-        .map(|block| traversed_block_from_sig(block, sig, attr_args));
-    quote! { #(#attrs)* #sig #default #semi_token }
+    let default = default.as_ref().map(|block| {
+        if has_loggable {
+            quote! { #block }
+        } else {
+            traversed_block_from_sig(block, sig, enclosing_item_attr_args)
+        }
+    });
+    quote! { #(#new_attrs)* #sig #default #semi_token }
+    // quote! { #(#attrs)* #sig #default #semi_token }
 }
 fn quote_as_trait_item(item: &syn::TraitItem, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match item {
@@ -717,14 +730,14 @@ fn quote_as_trait_item(item: &syn::TraitItem, attr_args: &AttrArgs) -> proc_macr
 }
 fn quote_as_item_trait(
     item_trait: &syn::ItemTrait,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ItemTrait {
         attrs, //: Vec<Attribute>,
         vis, //: Visibility,
         unsafety, //: Option<Unsafe>,
         auto_token, //: Option<Auto>,
-        // restriction, //: Option<ImplRestriction>,
+        // restriction, //: Option<ImplRestriction>,    // Unused, but reserved for RFC 3323 restrictions. Available on *crate feature* `full` only.
         trait_token, //: Trait,
         ident, //: Ident,
         generics, //: Generics,
@@ -735,10 +748,19 @@ fn quote_as_item_trait(
         .. // restriction, brace_token
     } = item_trait;
 
+    let mut new_attrs = vec![];
+    let mut has_loggable = false;
+
     for attr in attrs {
-        if attr.is_traverse_stopper() {
+        if attr.is_non_loggable() {
+            // if attr.is_traverse_stopper() {
             return quote! { #item_trait };
         }
+        new_attrs.push(get_loggable_attr_params(
+            attr,
+            &mut has_loggable,
+            enclosing_item_attr_args,
+        ));
     }
 
     // // Likely not applicable for instrumenting the run time functions and
@@ -763,15 +785,23 @@ fn quote_as_item_trait(
     // when the actual generic arguments are not known yet
     // (and whether the trait will be used at all).
     // That's why we cannot expand the traits' `#generics` when extending the prefix.
-    let items = {
+    let items = if has_loggable {
+        // quote! { #items }   // Compiler Error: the trait `quote::ToTokens` is not implemented for `Vec<TraitItem>`
+        // Workaround:
+        let mut copied_items = quote! {};
+        for item in items {
+            copied_items = quote! { #copied_items #item };
+        }
+        copied_items
+    } else {
         let attr_args = AttrArgs {
-            prefix: if attr_args.prefix.is_empty() {
+            prefix: if enclosing_item_attr_args.prefix.is_empty() {
                 quote! { #ident #generics }
             } else {
-                let prefix = &attr_args.prefix;
+                let prefix = &enclosing_item_attr_args.prefix;
                 quote! { #prefix::#ident #generics }
             },
-            ..*attr_args
+            ..*enclosing_item_attr_args
         };
         let mut traversed_items = quote! {};
         for item in items {
@@ -780,7 +810,8 @@ fn quote_as_item_trait(
         }
         traversed_items
     };
-    quote! { #(#attrs)* #vis #unsafety #auto_token // #restriction
+    quote! { #(#new_attrs)* #vis #unsafety #auto_token // #restriction
+    // quote! { #(#attrs)* #vis #unsafety #auto_token // #restriction
     #trait_token #ident #generics #colon_token #supertraits { #items } }
 }
 

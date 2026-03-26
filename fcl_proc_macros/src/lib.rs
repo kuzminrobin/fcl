@@ -323,6 +323,7 @@ impl IsTraverseStopper for syn::Attribute {
     //     IsTraverseStopper::is_fcl_attribute(self, "loggable")
     // }
 
+    // TODO: Remove when stopped using it.
     fn is_traverse_stopper(&self) -> bool {
         let path = match &self.meta {
             syn::Meta::Path(path) => path,
