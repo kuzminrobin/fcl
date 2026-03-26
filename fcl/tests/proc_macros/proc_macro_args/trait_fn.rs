@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use fcl_proc_macros::loggable;
 use crate::common::*;
 //
@@ -23,8 +21,8 @@ use crate::common::*;
 //         Some(2).map(|y| y);
 //     }
 // }
+// 
 // impl Tr for i8 {}
-
 // i8::af(1);   // Call associated function.
 // 1.m();       // Call method.
 
@@ -44,8 +42,8 @@ macro_rules! trait_fn_calls {
     }
 }
 #[test]
-fn trit_fn() {
-    let log = substitute_log_writer!();
+fn trait_fn() {
+    let log = substitute_log_writer();
 
     {
         // Absent

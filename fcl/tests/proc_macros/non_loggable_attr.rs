@@ -49,7 +49,7 @@ fn in_static() {
         // TODO: `#[non_loggable] static S..`
     }
 
-    let log = substitute_log_writer!();
+    let log = substitute_log_writer();
 
     // Generate some log:
     instrumenter();
@@ -112,7 +112,7 @@ fn in_fn() {
         LoggingNeutralStruct {}.non_loggable_impl_struct_self_fn();
     }
 
-    let log = substitute_log_writer!();
+    let log = substitute_log_writer();
 
     // Generate some log:
     instrumenter();
@@ -174,7 +174,7 @@ fn in_impl() {
         ));
     }
 
-    let log = substitute_log_writer!();
+    let log = substitute_log_writer();
 
     prefixing_test(log.clone());
 

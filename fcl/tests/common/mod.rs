@@ -10,19 +10,15 @@ use fcl::call_log_infra::instances::THREAD_LOGGER;
 pub(crate) const COORDS_ONLY_RE_SLICE: &str = r"^\d+,\d+:\d+,\d+$";
 pub(crate) const COORDS_RE_SLICE: &str = r"\d+,\d+:\d+,\d+";
 
-// TODO: Use everywhere.
-macro_rules! substitute_log_writer {
-    () => {{
-        // Create the mock log writer and substitute the default one with it:
-        let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
+pub(crate) fn substitute_log_writer() -> Rc<RefCell<Vec<u8>>> {
+    // Create the mock log writer and substitute the default one with it:
+    let log = Rc::new(RefCell::new(Vec::with_capacity(1024)));
 
-        fcl::call_log_infra::instances::THREAD_DECORATOR
-            .with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
+    fcl::call_log_infra::instances::THREAD_DECORATOR
+        .with(|decorator| decorator.borrow_mut().set_writer(log.clone()));
 
-        log
-    }};
+    log
 }
-pub(crate) use substitute_log_writer;
 
 // TODO: Consider coverting to a macro to preserve the error coordinates in `panic`.
 pub(crate) fn zero_out_closure_coords(log: Rc<RefCell<Vec<u8>>>) -> String {
@@ -130,7 +126,7 @@ pub(crate) use assert_coords_slice;
 ///
 /// ### Parameters
 /// * The log to search for `beginning` and `end` in.
-///   Is expected to be the one created with `substitute_log_writer!()`.
+///   Is expected to be the one created with `substitute_log_writer()`.
 /// * The substring the log is expected to start with.
 /// * The substring the log is expected to end with.
 // TODO: Rename assert_except_closure_coords
@@ -176,7 +172,7 @@ pub(crate) use assert_begin_coords_end;
 ///
 /// ### Parameters
 /// * The log to search for `beginning` and `end` in.
-///   Expected to be the one created with `substitute_log_writer!()`.
+///   Expected to be the one created with `substitute_log_writer()`.
 /// * The substring the log is expected to start with.
 /// * The substring the log is expected to end with.
 // TODO: Consider renaming.

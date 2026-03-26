@@ -6,8 +6,6 @@ use fcl_proc_macros::loggable;
 // crates.io
 
 // std
-use std::cell::RefCell;
-use std::rc::Rc;
 
 //
 // #[loggable]         | TestCases
@@ -21,7 +19,7 @@ use std::rc::Rc;
 
 #[test]
 fn closure_coords() {
-    let log = substitute_log_writer!();
+    let log = substitute_log_writer();
 
     // Absent/Absent
     {

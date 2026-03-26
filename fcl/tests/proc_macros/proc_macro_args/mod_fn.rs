@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use fcl_proc_macros::loggable;
 use crate::common::*;
 
@@ -23,7 +21,7 @@ use crate::common::*;
 
 #[test]
 fn mod_fn() {
-    let log = substitute_log_writer!();
+    let log = substitute_log_writer();
 
     {
         // Absent
