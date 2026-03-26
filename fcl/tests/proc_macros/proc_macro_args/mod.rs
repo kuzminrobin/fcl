@@ -10,7 +10,7 @@
 //   V      inner -> | mod | trait | impl | struct | impl trait | fn             | static
 // ------------------------------------------------------------------------      ----------------
 // mod               |     |       |      |        |            | both           |       |      mod/fn
-// trait             |     |       |      |        |            |                |       |
+// trait             |     |       |      |        |            | both           |       |      trait/fn
 // impl struct       |     |       |      |        |            |                |       | 
 // impl trait        |     |       |      |        |            |                |       |
 // fn                |     |       |      |        |            | both           |       |      fn/fn

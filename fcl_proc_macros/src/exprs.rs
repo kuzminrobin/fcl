@@ -713,6 +713,23 @@ pub fn quote_as_macro(
     maybe_flush_invocation: &mut proc_macro2::TokenStream,
     _attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
+    // NOTE: 
+    // The Chat-GPT-5.2-Codex said that the expansion of the macro invocation 
+    // named `macro_` (in order to instrument the result of the expansion) cannot be acquired at this point
+    // since the declarative (`macro_rules`) macro expansion is done at a later compilation stage
+    // (than the currently running procedural macro expansion),
+    // and 'there is no stable API to "ask the compiler to expand this macro for me."'
+    // TODO: Consider generating at this point such a code where `macro_` is passed as an arg 
+    // to my other declarative macro that parses and instruments its input 
+    // at that later compilation stage. For example, instead of `quote! { #macro_ }` 
+    // return the following
+    // ```
+    //  quote! { 
+    //      declarative_loggable!( #macro_, (prefix=MyTrait, skip_params, log_closure_coords))
+    //  }
+    // ```
+    // where `declarative_loggable` gets the result of the `macro_` expansion 
+    // (and promises to turn into another huge parsing and instrumenting macro, comparable to `fn loggable()`).
     let syn::Macro {
         path, //: Path,
         // bang_token, //: Not,

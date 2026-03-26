@@ -25,9 +25,24 @@ use crate::common::*;
 // }
 // impl Tr for i8 {}
 
-// i8::af(1);
-// 1.m();
+// i8::af(1);   // Call associated function.
+// 1.m();       // Call method.
 
+macro_rules! trait_fn_calls {
+    () => {
+        // Associated functions.
+        i8::absent_af(1);
+        i8::noargs_af(1);
+        i8::skip_af(1);
+        i8::log_af(1);
+
+        // Methods.
+        1.absent_m();
+        1.noargs_m();
+        1.skip_m();
+        1.log_m();
+    }
+}
 #[test]
 fn trit_fn() {
     let log = substitute_log_writer!();
@@ -72,20 +87,20 @@ fn trit_fn() {
             fn log_m(&self) {
                 Some(2).map(|y| y);
             }
-
         }
         impl Tr for i8 {}
 
         // Generate log.
-        i8::absent_af(1); //    -
-        i8::noargs_af(1); //    noargs_af(_p: 1) { noargs_af::closure{<coords>}(x: 0) {} -> 0 }
-        i8::skip_af(1); //      skip  _af(..   ) { skip  _af::closure{..      }(..  ) {} -> 0 }
-        i8::log_af(1); //       log   _af(_p: 1) { log   _af::closure{<coords>}(x: 0) {} -> 0 }
+        trait_fn_calls!();
+        // i8::absent_af(1); //    -
+        // i8::noargs_af(1); //    noargs_af(_p: 1) { noargs_af::closure{<coords>}(x: 0) {} -> 0 }
+        // i8::skip_af(1); //      skip  _af(..   ) { skip  _af::closure{..      }(..  ) {} -> 0 }
+        // i8::log_af(1); //       log   _af(_p: 1) { log   _af::closure{<coords>}(x: 0) {} -> 0 }
 
-        1.absent_m(); //        -
-        1.noargs_m(); //        noargs_m (self: &1) { noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
-        1.skip_m(); //          skip  _m (..      ) { skip  _m ::closure{..      }(..  ) {} -> 2 }
-        1.log_m(); //           noargs_m (self: &1) { noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.absent_m(); //        -
+        // 1.noargs_m(); //        noargs_m (self: &1) { noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.skip_m(); //          skip  _m (..      ) { skip  _m ::closure{..      }(..  ) {} -> 2 }
+        // 1.log_m(); //           noargs_m (self: &1) { noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
 
         flush_log();
         let log_contents = zero_out_closure_coords(log.clone());
@@ -119,6 +134,12 @@ fn trit_fn() {
     {
         #[loggable] // NoArgs
         trait Tr {
+            // The contents of the trait cannot be extracted into a macro
+            // since the trait's `#[loggable]` cannot 
+            // {penetrate into the macro invocation 
+            // and instrument the result of the macro expansion}.
+            // See details in `quote_as_macro()`.
+
             // Absent
             fn absent_af(_p: u8) {
                 Some(0).map(|x| x);
@@ -156,20 +177,20 @@ fn trit_fn() {
             fn log_m(&self) {
                 Some(2).map(|y| y);
             }
-
         }
         impl Tr for i8 {}
 
         // Generate log.
-        i8::absent_af(1); //    Tr::absent_af(_p: 1) { Tr::absent_af::closure{<coords>}(x: 0) {} -> 0 }
-        i8::noargs_af(1); //    Tr::noargs_af(_p: 1) { Tr::noargs_af::closure{<coords>}(x: 0) {} -> 0 }
-        i8::skip_af(1); //      Tr::skip  _af(..   ) { Tr::skip  _af::closure{..      }(..  ) {} -> 0 }
-        i8::log_af(1); //       Tr::log   _af(_p: 1) { Tr::log   _af::closure{<coords>}(x: 0) {} -> 0 }
+        trait_fn_calls!();
+        // i8::absent_af(1); //    Tr::absent_af(_p: 1) { Tr::absent_af::closure{<coords>}(x: 0) {} -> 0 }
+        // i8::noargs_af(1); //    Tr::noargs_af(_p: 1) { Tr::noargs_af::closure{<coords>}(x: 0) {} -> 0 }
+        // i8::skip_af(1); //      Tr::skip  _af(..   ) { Tr::skip  _af::closure{..      }(..  ) {} -> 0 }
+        // i8::log_af(1); //       Tr::log   _af(_p: 1) { Tr::log   _af::closure{<coords>}(x: 0) {} -> 0 }
 
-        1.absent_m(); //        Tr::absent_m (self: &1) { Tr::absent_m ::closure{<coords>}(y: 2) {} -> 2 }
-        1.noargs_m(); //        Tr::noargs_m (self: &1) { Tr::noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
-        1.skip_m(); //          Tr::skip  _m (..      ) { Tr::skip  _m ::closure{..      }(..  ) {} -> 2 }
-        1.log_m(); //           Tr::log   _m (self: &1) { Tr::log   _m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.absent_m(); //        Tr::absent_m (self: &1) { Tr::absent_m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.noargs_m(); //        Tr::noargs_m (self: &1) { Tr::noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.skip_m(); //          Tr::skip  _m (..      ) { Tr::skip  _m ::closure{..      }(..  ) {} -> 2 }
+        // 1.log_m(); //           Tr::log   _m (self: &1) { Tr::log   _m ::closure{<coords>}(y: 2) {} -> 2 }
 
         flush_log();
         let log_contents = zero_out_closure_coords(log.clone());
@@ -250,15 +271,16 @@ fn trit_fn() {
         impl Tr for i8 {}
 
         // Generate log.
-        i8::absent_af(1); //    Tr::absent_af(..   ) { Tr::absent_af::closure{..      }(..  ) {} -> 0 }
-        i8::noargs_af(1); //    Tr::noargs_af(..   ) { Tr::noargs_af::closure{..      }(..  ) {} -> 0 }
-        i8::skip_af(1); //      Tr::skip  _af(..   ) { Tr::skip  _af::closure{..      }(..  ) {} -> 0 }
-        i8::log_af(1); //       Tr::log   _af(_p: 1) { Tr::log   _af::closure{<coords>}(x: 0) {} -> 0 }
+        trait_fn_calls!();
+        // i8::absent_af(1); //    Tr::absent_af(..   ) { Tr::absent_af::closure{..      }(..  ) {} -> 0 }
+        // i8::noargs_af(1); //    Tr::noargs_af(..   ) { Tr::noargs_af::closure{..      }(..  ) {} -> 0 }
+        // i8::skip_af(1); //      Tr::skip  _af(..   ) { Tr::skip  _af::closure{..      }(..  ) {} -> 0 }
+        // i8::log_af(1); //       Tr::log   _af(_p: 1) { Tr::log   _af::closure{<coords>}(x: 0) {} -> 0 }
 
-        1.absent_m(); //        Tr::absent_m (..      ) { Tr::absent_m ::closure{..      }(..  ) {} -> 2 }
-        1.noargs_m(); //        Tr::noargs_m (..      ) { Tr::noargs_m ::closure{..      }(..  ) {} -> 2 }
-        1.skip_m(); //          Tr::skip  _m (..      ) { Tr::skip  _m ::closure{..      }(..  ) {} -> 2 }
-        1.log_m(); //           Tr::log   _m (self: &1) { Tr::log   _m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.absent_m(); //        Tr::absent_m (..      ) { Tr::absent_m ::closure{..      }(..  ) {} -> 2 }
+        // 1.noargs_m(); //        Tr::noargs_m (..      ) { Tr::noargs_m ::closure{..      }(..  ) {} -> 2 }
+        // 1.skip_m(); //          Tr::skip  _m (..      ) { Tr::skip  _m ::closure{..      }(..  ) {} -> 2 }
+        // 1.log_m(); //           Tr::log   _m (self: &1) { Tr::log   _m ::closure{<coords>}(y: 2) {} -> 2 }
 
         flush_log();
         let log_contents = zero_out_closure_coords(log.clone());
@@ -335,20 +357,20 @@ fn trit_fn() {
             fn log_m(&self) {
                 Some(2).map(|y| y);
             }
-
         }
         impl Tr for i8 {}
 
         // Generate log.
-        i8::absent_af(1); //    Tr::absent_af(_p: 1) { Tr::absent_af::closure{<coords>}(x: 0) {} -> 0 }
-        i8::noargs_af(1); //    Tr::noargs_af(_p: 1) { Tr::noargs_af::closure{<coords>}(x: 0) {} -> 0 }
-        i8::skip_af(1); //      Tr::skip  _af(..   ) { Tr::skip  _af::closure{..      }(..  ) {} -> 0 }
-        i8::log_af(1); //       Tr::log   _af(_p: 1) { Tr::log   _af::closure{<coords>}(x: 0) {} -> 0 }
+        trait_fn_calls!();
+        // i8::absent_af(1); //    Tr::absent_af(_p: 1) { Tr::absent_af::closure{<coords>}(x: 0) {} -> 0 }
+        // i8::noargs_af(1); //    Tr::noargs_af(_p: 1) { Tr::noargs_af::closure{<coords>}(x: 0) {} -> 0 }
+        // i8::skip_af(1); //      Tr::skip  _af(..   ) { Tr::skip  _af::closure{..      }(..  ) {} -> 0 }
+        // i8::log_af(1); //       Tr::log   _af(_p: 1) { Tr::log   _af::closure{<coords>}(x: 0) {} -> 0 }
 
-        1.absent_m(); //        Tr::absent_m (self: &1) { Tr::absent_m ::closure{<coords>}(y: 2) {} -> 2 }
-        1.noargs_m(); //        Tr::noargs_m (self: &1) { Tr::noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
-        1.skip_m(); //          Tr::skip  _m (..      ) { Tr::skip  _m ::closure{..      }(..  ) {} -> 2 }
-        1.log_m(); //           Tr::log   _m (self: &1) { Tr::log   _m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.absent_m(); //        Tr::absent_m (self: &1) { Tr::absent_m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.noargs_m(); //        Tr::noargs_m (self: &1) { Tr::noargs_m ::closure{<coords>}(y: 2) {} -> 2 }
+        // 1.skip_m(); //          Tr::skip  _m (..      ) { Tr::skip  _m ::closure{..      }(..  ) {} -> 2 }
+        // 1.log_m(); //           Tr::log   _m (self: &1) { Tr::log   _m ::closure{<coords>}(y: 2) {} -> 2 }
 
         flush_log();
         let log_contents = zero_out_closure_coords(log.clone());
@@ -384,205 +406,5 @@ fn trit_fn() {
         );
         log.borrow_mut().clear();
     }
-
-    
-
-/*
-    {
-        // Absent
-        mod m {
-            use super::*;
-
-            pub fn absent(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable]
-            pub fn noargs(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(skip_params, skip_closure_coords)]
-            pub fn skip(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(log_params, log_closure_coords)]
-            pub fn log(_p: u8) {
-                Some(0).map(|x| x);
-            }
-        }
-
-        m::absent(1); //   -
-        m::noargs(1); //   noargs(_p: 1) { noargs::closure{<coords>}(x: 0) -> 0 {}}
-        m::skip(1); //     skip  (..   ) { skip  ::closure{..      }(..  ) -> 0 {}}
-        m::log(1); //      log   (_p: 1) { log   ::closure{<coords>}(x: 0) -> 0 {}}
-
-        flush_log();
-        let log_contents = zero_out_closure_coords(log.clone());
-        assert_eq!(
-            log_contents,
-            concat!(
-                "noargs(_p: 1) {\n",
-                "  noargs::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // noargs().\n",
-                "skip(..) {\n",
-                "  skip::closure{..}(..) {} -> 0\n",
-                "} // skip().\n",
-                "log(_p: 1) {\n",
-                "  log::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // log().\n",
-            )
-        );
-        log.borrow_mut().clear();
-    }
-
-    {
-        #[loggable] // NoArgs
-        mod m {
-            use super::*;
-
-            pub fn absent(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable]
-            pub fn noargs(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(skip_params, skip_closure_coords)]
-            pub fn skip(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(log_params, log_closure_coords)]
-            pub fn log(_p: u8) {
-                Some(0).map(|x| x);
-            }
-        }
-
-        m::absent(1); //   m::absent(_p: 1) { m::absent::closure{<coords>}(x: 0) -> 0 {}}
-        m::noargs(1); //   m::noargs(_p: 1) { m::noargs::closure{<coords>}(x: 0) -> 0 {}}
-        m::skip(1); //     m::skip  (..   ) { m::skip  ::closure{..      }(..  ) -> 0 {}}
-        m::log(1); //      m::log   (_p: 1) { m::log   ::closure{<coords>}(x: 0) -> 0 {}}
-
-        flush_log();
-        let log_contents = zero_out_closure_coords(log.clone());
-
-        assert_eq!(
-            log_contents,
-            concat!(
-                "m::absent(_p: 1) {\n",
-                "  m::absent::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::absent().\n",
-                "m::noargs(_p: 1) {\n",
-                "  m::noargs::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::noargs().\n",
-                "m::skip(..) {\n",
-                "  m::skip::closure{..}(..) {} -> 0\n",
-                "} // m::skip().\n",
-                "m::log(_p: 1) {\n",
-                "  m::log::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::log().\n",
-            )
-        );
-        log.borrow_mut().clear();
-    }
-
-    {
-        #[loggable(skip_params, skip_closure_coords)] // skip_*
-        mod m {
-            use super::*;
-
-            pub fn absent(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable]
-            pub fn noargs(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(skip_params, skip_closure_coords)]
-            pub fn skip(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(log_params, log_closure_coords)]
-            pub fn log(_p: u8) {
-                Some(0).map(|x| x);
-            }
-        }
-
-        m::absent(1); //   m::absent(..   ) { m::absent::closure{..      }(..  ) -> 0 {}}
-        m::noargs(1); //   m::noargs(..   ) { m::noargs::closure{..      }(..  ) -> 0 {}}
-        m::skip(1); //     m::skip  (..   ) { m::skip  ::closure{..      }(..  ) -> 0 {}}
-        m::log(1); //      m::log   (_p: 1) { m::log   ::closure{<coords>}(x: 0) -> 0 {}}
-
-        flush_log();
-        let log_contents = zero_out_closure_coords(log.clone());
-
-        assert_eq!(
-            log_contents,
-            concat!(
-                "m::absent(..) {\n",
-                "  m::absent::closure{..}(..) {} -> 0\n",
-                "} // m::absent().\n",
-                "m::noargs(..) {\n",
-                "  m::noargs::closure{..}(..) {} -> 0\n",
-                "} // m::noargs().\n",
-                "m::skip(..) {\n",
-                "  m::skip::closure{..}(..) {} -> 0\n",
-                "} // m::skip().\n",
-                "m::log(_p: 1) {\n",
-                "  m::log::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::log().\n",
-            )
-        );
-        log.borrow_mut().clear();
-    }
-
-    {
-        #[loggable(log_params, log_closure_coords)] // log_*
-        mod m {
-            use super::*;
-
-            pub fn absent(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable]
-            pub fn noargs(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(skip_params, skip_closure_coords)]
-            pub fn skip(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(log_params, log_closure_coords)]
-            pub fn log(_p: u8) {
-                Some(0).map(|x| x);
-            }
-        }
-
-        m::absent(1); //   m::absent(_p: 1) { m::absent::closure{<coords>}(x: 0) -> 0 {}}
-        m::noargs(1); //   m::noargs(_p: 1) { m::noargs::closure{<coords>}(x: 0) -> 0 {}}
-        m::skip(1); //     m::skip  (..   ) { m::skip  ::closure{..      }(..  ) -> 0 {}}
-        m::log(1); //      m::log   (_p: 1) { m::log   ::closure{<coords>}(x: 0) -> 0 {}}
-
-        flush_log();
-        let log_contents = zero_out_closure_coords(log.clone());
-
-        assert_eq!(
-            log_contents,
-            concat!(
-                "m::absent(_p: 1) {\n",
-                "  m::absent::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::absent().\n",
-                "m::noargs(_p: 1) {\n",
-                "  m::noargs::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::noargs().\n",
-                "m::skip(..) {\n",
-                "  m::skip::closure{..}(..) {} -> 0\n",
-                "} // m::skip().\n",
-                "m::log(_p: 1) {\n",
-                "  m::log::closure{0,0:0,0}(x: 0) {} -> 0\n",
-                "} // m::log().\n",
-            )
-        );
-        log.borrow_mut().clear();
-    }
-*/
 }
 
