@@ -138,6 +138,11 @@
 
 
 # Unsorted
+* (Double-check that it's still applicable. There's a plan to work around it) TODO: 
+  To docs: `#[loggable]` cannot penetrate into the macro invocation and traverse the result of the macro-expansion
+  since the declarative macro expansion is done at a later macro expansion stage than the procedural macro expansion
+  and no stable API for the procedural macro expansion to ask compiler to expand the declarative macro invocation.
+  (Myself: See doc comments "penetrate")
 * TODO: To docs:
   ```rs
   #[fcl_proc_macros::non_loggable]  // Stops the recursion.

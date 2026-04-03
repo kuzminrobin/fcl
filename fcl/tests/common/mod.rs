@@ -20,6 +20,8 @@ pub(crate) fn substitute_log_writer() -> Rc<RefCell<Vec<u8>>> {
     log
 }
 
+/// Replaces in the passed argument the closure coordiantes in the [`COORDS_RE_SLICE`] format 
+/// with the `"0,0:0,0"`, returns the result as a `String`.
 // TODO: Consider coverting to a macro to preserve the error coordinates in `panic`.
 pub(crate) fn zero_out_closure_coords(log: Rc<RefCell<Vec<u8>>>) -> String {
     let log_contents = unsafe { String::from(std::str::from_utf8_unchecked(&*log.borrow())) };

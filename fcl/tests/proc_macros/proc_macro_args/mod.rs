@@ -9,11 +9,11 @@
 //   |               | 
 //   V      inner -> | mod | trait | impl | struct | impl trait | fn             | static
 // ------------------------------------------------------------------------      ----------------
-// mod               |     |       |      |        |            | both           |       |      mod/fn
-// trait             |     |       |      |        |            | both           |       |      trait/fn
-// impl struct       |     |       |      |        |            | .              |       | 
-// impl trait        |     |       |      |        |            |                |       |
-// fn                |     |       |      |        |            | both           |       |      fn/fn
+// mod               |     |       |      |        |            | mod_fn         |       |      
+// trait             |     |       |      |        |            | trait_fn       |       |      
+// impl struct       |     |       |      |        |            |                |       |       
+// impl trait        |     |       |      |        |            |                |       |      
+// fn                |     |       |      |        |            | fn_fn_*        |       |      
 // static            |     |       |      |        |            |                |       |
 // -----------------------------------------------------------------------------------------------
 // Array             |     |       |      |        |            |                |       |
@@ -62,3 +62,4 @@ mod fn_fn_closure_coords;
 mod mod_fn;
 // fn_mod
 mod trait_fn;
+mod impl_struct_fn;

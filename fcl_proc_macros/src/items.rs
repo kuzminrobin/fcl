@@ -119,7 +119,18 @@ fn get_loggable_attr_params(
 ) -> syn::Attribute {
     // fn get_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, enclosing_item_attr_args: &AttrArgs, new_attrs: &mut Vec<syn::Attribute>) {
     if let Some(user_provided_attr_info) = attr.get_loggable_attr_info() {
+
+        // The `attr` is the `#[loggable..]` attribute. In other words
+        // the fact that the `#[loggable..]` attribute is among the attributes of (is found by) the caller of this function
+        // means that the caller of this function has been called as part of the recursive traverse 
+        // (as opposed to a separate macro-expansion of its own `#[loggable..]` attribute).
+        // That is, the caller of this function must not recursively traverese its internals, 
+        // it must just retain its `#[loggable..]` attribute (and leave the internals as they are).
+        // That `#[loggable..]` attribute will be macro-expanded as a separate invocation of `fn fcl_proc_macros::loggable()`;
+        // that's when that `#[loggable..]` attribute will not be among the attributes of (will not be found by) the caller of this function,
+        // and that's when the internals (of the caller of this function) will be traversed and instrumented recursively.
         *has_loggable = true;
+
         let new_attr = syn::Attribute {
             pound_token: attr.pound_token,
             style: attr.style,
@@ -432,29 +443,38 @@ fn quote_as_impl_item(impl_item: &syn::ImplItem, attr_args: &AttrArgs) -> proc_m
         // // closures (as opposed to compile time const functions and closures).
         // syn::ImplItem::Const(impl_item_const) => quote_as_impl_item_const(impl_item_const, attr_args),
         // syn::ImplItem::Type(impl_item_type) => quote_as_impl_item_type(impl_item_type, attr_args),
-        // syn::ImplItem::Macro(impl_item_macro) => quote_as_impl_item_macro(impl_item_macro, attr_args),
+        // syn::ImplItem::Macro(impl_item_macro) => quote_as_impl_item_macro(impl_item_macro, attr_args),   // A macro invocation within an impl block.
         // syn::ImplItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, attr_args),
         other => quote! { #other },
     }
 }
-fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+fn quote_as_item_impl(item_impl: &syn::ItemImpl, enclosing_item_attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::ItemImpl {
         attrs, //: Vec<Attribute>,
         defaultness, //: Option<Default>,
         unsafety, //: Option<Unsafe>,
         impl_token, //: Impl,
         generics, //: Generics,
-        trait_, //: Option<(Option<Not>, Path, For)>,
-        self_ty, //: Box<Type>,
+        trait_, //: Option<(Option<Not>, Path, For)>,   // E.g., `[[!]MyTrait for]`.
+        self_ty, //: Box<Type>, // E.g., `MyStruct`.
         // brace_token, //: Brace,
         items, //: Vec<ImplItem>,
         .. // brace_token
     } = item_impl;
 
+    let mut new_attrs = vec![];
+    let mut has_loggable = false;
+
     for attr in attrs {
-        if attr.is_traverse_stopper() {
+        if attr.is_non_loggable() {
+        // if attr.is_traverse_stopper() {
             return quote! { #item_impl };
         }
+        new_attrs.push(get_loggable_attr_params(
+            attr,
+            &mut has_loggable,
+            enclosing_item_attr_args,
+        ));
     }
 
     // // Likely not applicable for instrumenting the run time functions and
@@ -467,8 +487,8 @@ fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_m
         // struct impl
         None => quote! { #self_ty },
     };
-    // Workaround for:
-    // the trait bound `(Option<syn::token::Not>, syn::Path, For): quote::ToTokens` is not satisfied
+    // Workaround for
+    // "the trait bound `(Option<syn::token::Not>, syn::Path, For): quote::ToTokens` is not satisfied":
     let trait_ = trait_.as_ref().map(|(opt_not, path, for_token)| {
         quote! { #opt_not #path #for_token }
     });
@@ -480,17 +500,26 @@ fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_m
     // });
     // let self_ty = quote_as_type(&**self_ty, attr_args);
 
-    let items = {
+    let items = if has_loggable {
+        // Intention:
+        // quote!{ #items } // Compiler Error: "the trait bound `Vec<ImplItem>: quote::ToTokens` is not satisfied".
+        // Workaround:
+        let mut copied_items = quote! {};
+        for item in items {
+            copied_items = quote! { #copied_items #item };
+        }
+        copied_items
+    } else {
         // Add the impl type to the prefix
         // (to pass such an updated prefix to the nested items):
         let attr_args = AttrArgs {
-            prefix: if attr_args.prefix.is_empty() {
+            prefix: if enclosing_item_attr_args.prefix.is_empty() {
                 quote! { #prefix_extender }
             } else {
-                let prefix = &attr_args.prefix;
+                let prefix = &enclosing_item_attr_args.prefix;
                 quote! { #prefix::#prefix_extender }
             },
-            ..*attr_args
+            ..*enclosing_item_attr_args
         };
 
         let mut traversed_impl_items = quote! {};
@@ -500,7 +529,9 @@ fn quote_as_item_impl(item_impl: &syn::ItemImpl, attr_args: &AttrArgs) -> proc_m
         }
         traversed_impl_items
     };
-    quote! { #(#attrs)* #defaultness #unsafety #impl_token #generics #trait_ #self_ty { #items } }
+    
+    quote! { #(#new_attrs)* #defaultness #unsafety #impl_token #generics #trait_ #self_ty { #items } }
+    // quote! { #(#attrs)* #defaultness #unsafety #impl_token #generics #trait_ #self_ty { #items } }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -722,7 +753,7 @@ fn quote_as_trait_item(item: &syn::TraitItem, attr_args: &AttrArgs) -> proc_macr
         // // Likely not applicable for instrumenting the run time functions and
         // // closures (as opposed to compile time const functions and closures).
         // syn::TraitItem::Type(trait_item_type) => quote_as_trait_item_type(trait_item_type, attr_args),
-        // syn::TraitItem::Macro(trait_item_macro) => quote_as_trait_item_macro(trait_item_macro, attr_args),
+        // syn::TraitItem::Macro(trait_item_macro) => quote_as_trait_item_macro(trait_item_macro, attr_args),   // A macro invocation within the definition of a trait.
 
         // syn::TraitItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, attr_args),
         other => quote! { #other },
@@ -753,7 +784,6 @@ fn quote_as_item_trait(
 
     for attr in attrs {
         if attr.is_non_loggable() {
-            // if attr.is_traverse_stopper() {
             return quote! { #item_trait };
         }
         new_attrs.push(get_loggable_attr_params(
@@ -786,6 +816,7 @@ fn quote_as_item_trait(
     // (and whether the trait will be used at all).
     // That's why we cannot expand the traits' `#generics` when extending the prefix.
     let items = if has_loggable {
+        // Intention:
         // quote! { #items }   // Compiler Error: the trait `quote::ToTokens` is not implemented for `Vec<TraitItem>`
         // Workaround:
         let mut copied_items = quote! {};
@@ -811,7 +842,6 @@ fn quote_as_item_trait(
         traversed_items
     };
     quote! { #(#new_attrs)* #vis #unsafety #auto_token // #restriction
-    // quote! { #(#attrs)* #vis #unsafety #auto_token // #restriction
     #trait_token #ident #generics #colon_token #supertraits { #items } }
 }
 
@@ -910,7 +940,7 @@ pub fn quote_as_item(item: &syn::Item, attr_args: &AttrArgs) -> proc_macro2::Tok
         syn::Item::Fn(item_fn) => quote_as_item_fn(item_fn, attr_args),
         // syn::Item::ForeignMod(item_foreign_mod) => quote_as_item_foreign_mod(item_foreign_mod, attr_args),
         syn::Item::Impl(item_impl) => quote_as_item_impl(item_impl, attr_args),
-        // syn::Item::Macro(item_macro) => quote_as_item_macro(item_macro, attr_args),
+        // syn::Item::Macro(item_macro) => quote_as_item_macro(item_macro, attr_args),  // A macro invocation, which includes `macro_rules!` definitions.
         syn::Item::Mod(item_mod) => quote_as_item_mod(item_mod, attr_args),
         syn::Item::Static(item_static) => quote_as_item_static(item_static, attr_args),
         // // Likely not applicable for instrumenting the run time functions and
