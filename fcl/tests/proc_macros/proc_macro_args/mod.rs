@@ -63,3 +63,4 @@ mod mod_fn;
 // fn_mod
 mod trait_fn;
 mod impl_struct_fn;
+mod trait_macro;
