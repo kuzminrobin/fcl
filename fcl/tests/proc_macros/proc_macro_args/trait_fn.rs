@@ -1,8 +1,7 @@
 use fcl_proc_macros::loggable;
-// use fcl_proc_macros::loggable_block_contents;
 
 use crate::common::*;
-//
+/////////////////////////////////////////////
 // #[loggable]         | TestCases
 // Attribute           | (trait, fn)
 // Values              | G: Written by ChatGPT/Codex.   +: Written mannually.       |   Notes
@@ -12,6 +11,8 @@ use crate::common::*;
 // skip_*              |  |  | +|  |   |  |  | G|  |   |G |G |GG|G |    |  |  | G|  |   // `#[loggable(skip_params, skip_closure_coords)]`
 // log_*               |  |  |  | +|   |  |  |  | G|   |  |  |  | G|    |G |G |G |GG|   // `#[loggable(log_params, log_closure_coords)]`
 
+// Test code that is to generate the FCL log:
+// 
 // // Absent, NoArgs, {skip,log}_{params,closure_coords}
 // trait Tr {
 //     // Absent, NoArgs, {skip,log}_{params,closure_coords}
@@ -27,6 +28,7 @@ use crate::common::*;
 // impl Tr for i8 {}
 // i8::af(1);   // Call associated function.
 // 1.m();       // Call method.
+/////////////////////////////////////////////
 
 // NOTE: Cannot be converted to a `fn` since uses the local `trait` and `impl`.
 macro_rules! trait_fn_calls {
@@ -45,97 +47,6 @@ macro_rules! trait_fn_calls {
     }
 }
 
-// // TODO: Consider and document the other attrs before and after.
-// // TODO: macro_rules definition inside of an enclosing entity, prefix passing.
-// // Other attrs before. 
-// #[loggable]
-// // Other attrs after.
-// macro_rules! trait_contents {
-//     () => {
-//         // Absent
-//         fn absent_af(_p: u8) {
-//             Some(0).map(|x| x);
-//         }
-//         fn absent_m(&self) {
-//             Some(2).map(|y| y);
-//         }
-
-//         // NoArgs
-//         #[loggable]
-//         fn noargs_af(_p: u8) {
-//             Some(0).map(|x| x);
-//         }
-//         #[loggable]
-//         fn noargs_m(&self) {
-//             Some(2).map(|y| y);
-//         }
-
-//         // skip_*
-//         #[loggable(skip_params, skip_closure_coords)]
-//         fn skip_af(_p: u8) {
-//             Some(0).map(|x| x);
-//         }
-//         #[loggable(skip_params, skip_closure_coords)]
-//         fn skip_m(&self) {
-//             Some(2).map(|y| y);
-//         }
-
-//         // log_*
-//         #[loggable(log_params, log_closure_coords)]
-//         fn log_af(_p: u8) {
-//             Some(0).map(|x| x);
-//         }
-//         #[loggable(log_params, log_closure_coords)]
-//         fn log_m(&self) {
-//             Some(2).map(|y| y);
-//         }
-//     }
-// }
-
-
-// /*
-// // Other attrs before.
-// // Other attrs after.
-// macro_rules! loggable_macro_trait_contents {
-//     ($prefix:path, $params_setting:ident, $closure_coords_setting:ident,) => {
-//         // No any other attrs.
-//         #[loggable_block_contents(prefix =  $prefix, $params_setting, $closure_coords_setting)]
-//         // No any other attrs.
-//         mod loggable_block_contents {
-//             fn absent_af(_p: u8) {
-//                 Some(0).map(|x| x);
-//             }
-//             fn absent_m(&self) {
-//                 Some(2).map(|y| y);
-//             }
-//             #[loggable]
-//             fn noargs_af(_p: u8) {
-//                 Some(0).map(|x| x);
-//             }
-//             #[loggable]
-//             fn noargs_m(&self) {
-//                 Some(2).map(|y| y);
-//             }
-//             #[loggable(skip_params, skip_closure_coords)]
-//             fn skip_af(_p: u8) {
-//                 Some(0).map(|x| x);
-//             }
-//             #[loggable(skip_params, skip_closure_coords)]
-//             fn skip_m(&self) {
-//                 Some(2).map(|y| y);
-//             }
-//             #[loggable(log_params, log_closure_coords)]
-//             fn log_af(_p: u8) {
-//                 Some(0).map(|x| x);
-//             }
-//             #[loggable(log_params, log_closure_coords)]
-//             fn log_m(&self) {
-//                 Some(2).map(|y| y);
-//             }
-//         }
-//     };
-// }
-// */
 #[test]
 fn trait_fn() {
     let log = substitute_log_writer();
@@ -227,6 +138,9 @@ fn trait_fn() {
     {
         #[loggable] // NoArgs
         trait Tr {
+            // NOTE: The scenario when the trait contents below is extracted to a macro 
+            // is tested in "fcl\tests\proc_macros\proc_macro_args\trait_macro.rs".
+
             // Absent
             fn absent_af(_p: u8) {
                 Some(0).map(|x| x);
