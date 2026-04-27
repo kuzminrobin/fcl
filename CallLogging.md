@@ -1,20 +1,10 @@
-# Need ASAP
-* Implement params spreading for {skope/fn}:
-  ```rs
-  #[loggable]
-  {
-      #[loggable]
-      fn g(i: u8) {
-  ```
-
-# Must
-
-# Need
-* TODO: Consider preserving the prefix in the nested/inner `#[loggable]`:
+# Workgin On
+* The Declarative Macros that are (marked as) `#[loggable]`.
+* TODO (working on): Consider preserving the prefix in the nested/inner `#[loggable]`:
   ```rs
   #[loggable] // Gives the prefix "m::" to the internals.
   mod m {
-    #[loggable(skip_params)]  // Clears the prefix "m::" for `f()` and its internals (but is not expected to).
+    #[loggable(skip_params)]  // Currently clears the prefix "m::" for `f()` and its internals (but is not expected to).
     fn f() {}
   }
   ```
@@ -28,6 +18,20 @@
     }
     ```
   * Same for closure coords.
+
+# Need ASAP
+* Implement params spreading for {skope/fn}:
+  ```rs
+  #[loggable]
+  {
+      #[loggable]
+      fn g(i: u8) {
+  ```
+
+# Must
+* File of consts.
+
+# Need
 
 # Next
 * Tests

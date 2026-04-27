@@ -1,4 +1,6 @@
 use fcl_proc_macros::loggable;
+// use fcl_proc_macros::loggable_block_contents;
+
 use crate::common::*;
 //
 // #[loggable]         | TestCases
@@ -42,22 +44,71 @@ macro_rules! trait_fn_calls {
         1.log_m();
     }
 }
-#[test]
-fn trait_fn() {
-    let log = substitute_log_writer();
 
-    {
+// TODO: Extract the macros nested in the traits to a separate test file "trait_macro.rs".
+
+// TODO: Consider and document the other attrs before and after.
+// Other attrs before. 
+#[loggable]
+// Other attrs after.
+macro_rules! trait_contents {
+    () => {
         // Absent
-        trait Tr {
-            // Absent
+        fn absent_af(_p: u8) {
+            Some(0).map(|x| x);
+        }
+        fn absent_m(&self) {
+            Some(2).map(|y| y);
+        }
+
+        // NoArgs
+        #[loggable]
+        fn noargs_af(_p: u8) {
+            Some(0).map(|x| x);
+        }
+        #[loggable]
+        fn noargs_m(&self) {
+            Some(2).map(|y| y);
+        }
+
+        // skip_*
+        #[loggable(skip_params, skip_closure_coords)]
+        fn skip_af(_p: u8) {
+            Some(0).map(|x| x);
+        }
+        #[loggable(skip_params, skip_closure_coords)]
+        fn skip_m(&self) {
+            Some(2).map(|y| y);
+        }
+
+        // log_*
+        #[loggable(log_params, log_closure_coords)]
+        fn log_af(_p: u8) {
+            Some(0).map(|x| x);
+        }
+        #[loggable(log_params, log_closure_coords)]
+        fn log_m(&self) {
+            Some(2).map(|y| y);
+        }
+    }
+}
+
+
+/*
+// Other attrs before.
+// Other attrs after.
+macro_rules! loggable_macro_trait_contents {
+    ($prefix:path, $params_setting:ident, $closure_coords_setting:ident,) => {
+        // No any other attrs.
+        #[loggable_block_contents(prefix =  $prefix, $params_setting, $closure_coords_setting)]
+        // No any other attrs.
+        mod loggable_block_contents {
             fn absent_af(_p: u8) {
                 Some(0).map(|x| x);
             }
             fn absent_m(&self) {
                 Some(2).map(|y| y);
             }
-
-            // NoArgs
             #[loggable]
             fn noargs_af(_p: u8) {
                 Some(0).map(|x| x);
@@ -66,8 +117,6 @@ fn trait_fn() {
             fn noargs_m(&self) {
                 Some(2).map(|y| y);
             }
-
-            // skip_*
             #[loggable(skip_params, skip_closure_coords)]
             fn skip_af(_p: u8) {
                 Some(0).map(|x| x);
@@ -76,8 +125,6 @@ fn trait_fn() {
             fn skip_m(&self) {
                 Some(2).map(|y| y);
             }
-
-            // log_*
             #[loggable(log_params, log_closure_coords)]
             fn log_af(_p: u8) {
                 Some(0).map(|x| x);
@@ -86,6 +133,130 @@ fn trait_fn() {
             fn log_m(&self) {
                 Some(2).map(|y| y);
             }
+        }
+    };
+}
+*/
+#[test]
+fn trait_fn() {
+    let log = substitute_log_writer();
+
+    {
+        // Absent
+        trait Tr {
+            // #[loggable_block_contents(prefix =  :: ,log_params,log_closure_coords)]
+            // mod loggable_block_contents {
+            //     fn absent_af(_p: u8) {
+            //         Some(0).map(|x| x);
+            //     }
+            //     fn absent_m(&self) {
+            //         Some(2).map(|y| y);
+            //     }
+            //     #[loggable]
+            //     fn noargs_af(_p: u8) {
+            //         Some(0).map(|x| x);
+            //     }
+            //     #[loggable]
+            //     fn noargs_m(&self) {
+            //         Some(2).map(|y| y);
+            //     }
+            //     #[loggable(skip_params, skip_closure_coords)]
+            //     fn skip_af(_p: u8) {
+            //         Some(0).map(|x| x);
+            //     }
+            //     #[loggable(skip_params, skip_closure_coords)]
+            //     fn skip_m(&self) {
+            //         Some(2).map(|y| y);
+            //     }
+            //     #[loggable(log_params, log_closure_coords)]
+            //     fn log_af(_p: u8) {
+            //         Some(0).map(|x| x);
+            //     }
+            //     #[loggable(log_params, log_closure_coords)]
+            //     fn log_m(&self) {
+            //         Some(2).map(|y| y);
+            //     }
+            // }            
+
+            // #[fcl_proc_macros::loggable_block_contents(prefix = ::trait_contents, log_params,log_closure_coords)]fn loggable_block_contents(){
+            //     fn absent_af(_p:u8){
+            //         Some(0).map(|x|x);
+            //     }fn absent_m(&self){
+            //         Some(2).map(|y|y);
+            //     }#[loggable]fn noargs_af(_p:u8){
+            //         Some(0).map(|x|x);
+            //     }#[loggable]fn noargs_m(&self){
+            //         Some(2).map(|y|y);
+            //     }#[loggable(skip_params,skip_closure_coords)]fn skip_af(_p:u8){
+            //         Some(0).map(|x|x);
+            //     }#[loggable(skip_params,skip_closure_coords)]fn skip_m(&self){
+            //         Some(2).map(|y|y);
+            //     }#[loggable(log_params,log_closure_coords)]fn log_af(_p:u8){
+            //         Some(0).map(|x|x);
+            //     }#[loggable(log_params,log_closure_coords)]fn log_m(&self){
+            //         Some(2).map(|y|y);
+            //     }
+            // }
+
+            // TODO: Document this {
+            // Other attrs before. // They are considered handled before the `#[loggable` below (and they are absent when expanding `#[loggable` below). 
+            #[loggable] // Instruments/prepends the macro name and adds 3 macro args. Retains the `Other attrs after` below.
+            // Other attrs after. // They get the instrumented/prepended macro name with 3 extra macro args.
+            trait_contents!{}   // Expands to:
+            /*
+            // No any other attrs.
+            #[loggable_block_contents(prefix =  :: ,log_params,log_closure_coords)]
+            // No any other attrs.
+            mod loggable_block_contents {
+                fn absent_af(_p: u8) {
+                    Some(0).map(|x| x);
+                }
+                . . .
+            */            
+            // } // TODO: Document this.
+
+
+
+
+
+
+            // // Absent
+            // fn absent_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // fn absent_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
+
+            // // NoArgs
+            // #[loggable]
+            // fn noargs_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // #[loggable]
+            // fn noargs_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
+
+            // // skip_*
+            // #[loggable(skip_params, skip_closure_coords)]
+            // fn skip_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // #[loggable(skip_params, skip_closure_coords)]
+            // fn skip_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
+
+            // // log_*
+            // #[loggable(log_params, log_closure_coords)]
+            // fn log_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // #[loggable(log_params, log_closure_coords)]
+            // fn log_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
         }
         impl Tr for i8 {}
 
@@ -133,49 +304,51 @@ fn trait_fn() {
     {
         #[loggable] // NoArgs
         trait Tr {
-            // The contents of the trait cannot be extracted into a macro
-            // since the trait's `#[loggable]` cannot 
-            // {penetrate into the macro invocation 
-            // and instrument the result of the macro expansion}.
-            // See details in `quote_as_macro()`.
-
-            // Absent
-            fn absent_af(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            fn absent_m(&self) {
-                Some(2).map(|y| y);
-            }
-
-            // NoArgs
             #[loggable]
-            fn noargs_af(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable]
-            fn noargs_m(&self) {
-                Some(2).map(|y| y);
-            }
+            trait_contents!{}
+            // // The contents of the trait cannot be extracted into a macro
+            // // since the trait's `#[loggable]` cannot 
+            // // {penetrate into the macro invocation 
+            // // and instrument the result of the macro expansion}.
+            // // See details in `quote_as_macro()`.
 
-            // skip_*
-            #[loggable(skip_params, skip_closure_coords)]
-            fn skip_af(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(skip_params, skip_closure_coords)]
-            fn skip_m(&self) {
-                Some(2).map(|y| y);
-            }
+            // // Absent
+            // fn absent_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // fn absent_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
 
-            // log_*
-            #[loggable(log_params, log_closure_coords)]
-            fn log_af(_p: u8) {
-                Some(0).map(|x| x);
-            }
-            #[loggable(log_params, log_closure_coords)]
-            fn log_m(&self) {
-                Some(2).map(|y| y);
-            }
+            // // NoArgs
+            // #[loggable]
+            // fn noargs_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // #[loggable]
+            // fn noargs_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
+
+            // // skip_*
+            // #[loggable(skip_params, skip_closure_coords)]
+            // fn skip_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // #[loggable(skip_params, skip_closure_coords)]
+            // fn skip_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
+
+            // // log_*
+            // #[loggable(log_params, log_closure_coords)]
+            // fn log_af(_p: u8) {
+            //     Some(0).map(|x| x);
+            // }
+            // #[loggable(log_params, log_closure_coords)]
+            // fn log_m(&self) {
+            //     Some(2).map(|y| y);
+            // }
         }
         impl Tr for i8 {}
 

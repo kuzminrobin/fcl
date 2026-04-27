@@ -435,9 +435,6 @@ binary crates of the workspace, and with the feature off for the other binary cr
 # Parsing
 The `syn` developers have done an incredible job.
 
-# Traversing a Module
-# Traversing an `impl` Block
-# Advanced  
 ## Traversing a Function
 
 A function can have local functions and closures. E.g.
@@ -504,13 +501,728 @@ I also didn't know that a function or a closure can be defined (and/or called) i
 
 In case you agree with the proverb "If you want to study a programming language then write a compiler for it", then this section is a step in that direction.
 
+## Traversing a Module
+## Traversing an `impl` Block
+## Advanced
+### The Declarative (`macro_rules`) Macros That Are `#[loggable]`
+Let's imagine the following.
+* The user has a number of items, like `mod`, `trait`, `impl`, that contain function definitions and have something in common,
+  for brevity we'll consider traits;
+  ```rs
+  trait UsersTraitA {
+    // The common part {
+    f() {}
+    g() {}
+    // } the common part.
+    // . . .
+  }
+  trait UsersTraitB {
+    // . . .
+    // The common part {
+    f() {}
+    g() {}
+    // } the common part.
+  }
+  ```  
+  (For this particular discussion we don't consider the mechanism 
+  of [supertraits](https://rust-book.cs.brown.edu/ch20-02-advanced-traits.html#using-supertraits), 
+  since the common part can be shared not only among the traits, but also among `mod` and `trait`, `trait` and `impl`, etc.).
+* The user decides to extract tho common part into a declarative macro.
+  ```rs
+  macro_rules! users_macro {
+    () => {
+      // The common part {
+      f() {}
+      g() {}
+      // } the common part.
+    }
+  }
+  ```
+* The user uses that macro in traits.
+  ```rs
+  trait UsersTraitA {
+    users_macro!{} // Unrelated note: The use of `()` instead of `{}` after `!` causes the compilation error
+                   // "macros that expand to items must be delimited with braces or followed by a semicolon".
+    // . . .
+  }
+  trait UsersTraitB {
+    // . . .
+    users_macro!{}
+  }
+  ```
+Then the user decides to annotate the traits with `#[loggable]`.
+```rs
+#[loggable]
+trait UsersTraitA {
+  users_macro!{}
+  // . . .
+}
+#[loggable]
+trait UsersTraitB {
+  // . . .
+  users_macro!{}
+}
+
+macro_rules! users_macro { // Is just repeated for clarity.
+  () => {
+    f() {}
+    g() {}
+  }
+}
+```
+By defautl the user expects that the functions `f()` and `g()` 
+* inside of the `trait UsersTraitA` are prefixed with `UsersTraitA::` during logging,
+* and those inside of the `trait UsersTraitB` - with `UsersTraitB::`.
+
+The same is applicable to the arguments passed to `#[loggable]`. For example, if `trait UsersTraitA` is annotated with 
+`#[loggable(skip_closure_coords)]` then the user would expect the `f()` and `g()`  
+of `trait UsersTraitA` to skip the closure coordinates during logging,  
+and to not skip for `UsersTraitB`.
+
+But such a prefixing (with `UsersTraitA::`) and `#[loggable]` arguments passing from a `trait` (like `UsersTraitA`) 
+to its internals (`f()` and `g()`) does not happen by default. And annotating `f()` and `g()` with `#[loggable]` 
+does not help:
+```rs
+macro_rules! users_macro {
+  () => {
+    #[loggable]
+    f() {}
+    #[loggable]
+    g() {}
+  }
+}
+```
+That's because during the expansion of `#[loggable]` in the trait
+```rs
+#[loggable]
+trait UsersTraitA {
+  users_macro!{}
+  // . . .
+}
+```
+the expanding code sees `users_macro!{}` _invocation_ rather than the result of its expansion shown below
+```rs
+  // Optional `#[loggable]`.
+  f() {}
+  // Optional `#[loggable]`.
+  g() {}
+```
+In the end of the day the `f()` and `g()` don't get anything from the enclosing trait's `#[loggable]`, 
+neither the prefix (like `UsersTraitA::`), nor the arguments (like `skip_closure_coords`).  
+And if those are explicitly specified in a macro
+```rs
+macro_rules! users_macro {
+  () => {
+    #[loggable(prefix = UsersTraitA, skip_closure_coords)]
+    f() {}
+```
+then they will be applicable to all the invocations of that macro. That is, the `f()` of the `trait UsersTraitB` 
+will be prefixed with the wrong trait name `UsersTraitA::`, 
+and in both traits the `f()` will skip the closure coordinates during logging, which is undesirable for `UsersTraitB`.
+
+Below is the explanation of how to pass the prefix and the arguments of `#[loggable]` from a trait 
+to the common part (`f()` and `g()`) extracted into a macro (`users_macro`).
+
+The terminology gets somewhat confusing when macros handle macros. 
+* The handling macro is the attribute procedural macro `#[loggable]`.
+* The macro being handled is the user's declarative (i.e. `macro_rules`) macro that can be 
+  * either a macro definition (`macro_rules! users_macro { <rules> }}`)
+  * or a macro invocation (`users_macro!{<args>}`).
+
+**NOTE: Do not spend time on any further explanation until the proof of concept.**
+
+  ```rs
+  pub fn quote_as_macro(
+      macro_: &syn::Macro,
+      maybe_flush_invocation: &mut proc_macro2::TokenStream,
+      _attr_args: &AttrArgs,
+  ) -> proc_macro2::TokenStream {
+  // NOTE:
+  // TODO: { 
+  //    (Outdated? See above) (In docs) Describe the original problem history in detail:
+  //    I was testing a `trait` with different args to `#[loggable(...)]` but identical <internals> 
+  //    (the same name was reused for the trait but in different scopes
+  //      // TODO: Not considered scenario: The whole trait is extracted to a macro, not just <internals>.
+  //    ):
+  //    ```rs
+  //    #[loggable(...)]
+  //    trait MyTrait {
+  //      f() {}  // <internals>
+  //    }
+  //    ```
+  //    Listing A (immediately above).
+  //
+  //    I extracted the <internals> into a decalrative macro 
+  //      macro_rules! my_macro {
+  //        () => {
+  //          f() {}  // <internals>
+  //        }
+  //      }
+  //    And inisde of the `trait` I replaced the `<internals>` with that decalrative macro invocation
+  //    #[loggable(...)]
+  //    trait MyTrait {
+  //      my_macro!{} // The <internals> are replaced with the macro invocation.
+  //    }
+  //    Before the `<internals>` extraction into a macro (see Lising A above), 
+  //    the functions of the `<internals>` were prefixed with `MyTrait::` in the FCL log.
+  //    I expected the same prefixing to happen after the extraction, but the prefixing didn't happen. 
+  //    That's because the expansion of the `#[loggable(...)]` happens before the expansion of `my_macro!()`.
+  //    I.e. the code of `#[loggable(...)]` sees the invocation `my_macro!()` rather than the result (expansion) 
+  //    of that invocation (`f() {}`).
+  //
+  //    In other words the  
+  //    (in `fcl_proc_macros::loggable()`) that expands the `my_macro!()`,
+  // } // TODO.
+
+  // The Chat-GPT-5.2-Codex said that the expansion of {the macro invocation
+  // passed as the parameter `macro_`}, in order to instrument the result of the expansion,
+  // cannot be acquired at this point
+  // since the declarative (`macro_rules`) macro expansion is done at a later compilation stage
+  // (than the currently running procedural macro expansion),
+  // and 'there is no stable API to "ask the compiler to expand this macro for me."'
+  // TODO: Consider the following.
+  // * See (1) below.
+  // * (Dead end, doesn't work) See (2) below.
+  // * (Doesn't work, the macros are expanded left-to-right/outer-to-inner) 
+  //   Generating at this point such a code where `macro_` is passed as an arg 
+  //   to my other declarative macro that parses and instruments its input 
+  //   at that later compilation stage. For example, instead of `quote! { #macro_ }` 
+  //   return the following
+  //   ```
+  //    quote! { 
+  //        declarative_loggable!( #macro_, (prefix=MyTrait, skip_params, log_closure_coords))
+  //    }
+  //   ```
+  //   where `declarative_loggable` gets the result of the `macro_` expansion 
+  //   (and promises to turn into another huge parsing and instrumenting macro, comparable to `fn loggable()` :-D).
+  // * Documenting (in the documentation) the use of procedural macro insted of declarative one
+  //   (the users will hardly do that :-D. Test it)
+  // 
+  // (2)
+  // User's macro:
+  // ```
+  // macro_rules! block_items {
+  //      (<params_alpha>) => {
+  //          fn f() {}  // Items of a block. They use <params_alpha>.
+  //      }
+  //      (<params_beta>) => {
+  //          fn g() {}  // Items of a block. They use <params_beta>.
+  //      }
+  // }
+  // ```
+  // Invocation:
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      block_items!(<args_alpha>)
+  // }
+  // trait Tr2 {
+  //      block_items!(<args_beta>)
+  //      . . .
+  // }
+  // ```
+  // User annotates:
+  // ```
+  // #[loggable]
+  // trait Tr1 {
+  //      . . .
+  //      #[loggable]
+  //      block_items!(<args_alpha>)
+  // }
+  // #[loggable]
+  // trait Tr2 {
+  //      #[loggable]
+  //      block_items!(<args_beta>)
+  //      . . .
+  // }
+  // ```
+  // Procedural macro expansion result, phase 1:
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      #[loggable(prefix=Tr1,log_params,log_closure_coords)]
+  //      block_items!(<args_alpha>)
+  // }
+  // trait Tr2 {
+  //      #[loggable(prefix=Tr2,log_params,log_closure_coords)]
+  //      block_items!(<args_beta>)
+  //      . . .
+  // }
+  // ```
+  // Phase 2.
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      fcl::loggable_macro!(Tr1, log_params, log_closure_coords, block_items!(<args_alpha>))
+  // }
+  // trait Tr2 {
+  //      fcl::loggable_macro!(Tr2, log_params, log_closure_coords, block_items!(<args_beta>))
+  //      . . .
+  // }
+  // ```
+  // The declarative macro is defined like this:
+  // ```
+  // macro_rules! fcl::loggable_macro {
+  //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., $users_macro:$tt) => {
+  //          #[fcl_proc_macros::loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+  //          {
+  //              $users_macro
+  //          }
+  //      }
+  // }
+  // Declarative macro expansion result:
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      #[fcl_proc_macros::loggable_block_contents(prefix=Tr1, log_params, log_closure_coords)]
+  //      {
+  //          block_items!(<args_alpha>)
+  //      }
+  // ```
+  // Dead End: The proc macro (`#[loggable_block_contents]`) gets expanded first, 
+  // and it gets the non-expanded decl macro (`block_items!(<args_alpha>)`). Same as at step 0.
+  // (2) does not work.
+
+  // (1)
+  // There's a chance that the procedural macro expansion and the declarative macro expansion 
+  // belong to the same body of a loop, 
+  // i.e. they can interleave iteratively until everything is expanded. If that's the case then
+  // the procedural macro expansion can generate the declarative macro {invocation and/or definition},
+  // then the expansion of a declarative macro invocation can generate the procedural macro invocation,
+  // and repeat.
+  // 
+  // Let's imagine that the user has the following macro that expands to the items of a block (items of a trait/impl):
+  // ```rs
+  // macro_rules! block_items {
+  //      (<macro_params_alpha>) => {
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  //      (<macro_params_beta>) => {
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  // }
+  // ```
+  // And the user uses that macro like this:
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      block_items!{<args>}
+  // }
+  // trait Tr2 {
+  //      block_items!{<args>}
+  //      . . .
+  // }
+  // ```
+  // And the user wants to use FCL to make everything in `Tr1` and `Tr2` loggable with the prefix `Tr1::` and `Tr2::` correpondingly 
+  // (and with corresponging `{skip,log}_{params,closure_coords}`).
+  // 
+  // To achieve that the user can do the following at the macro invocation site.
+  // * Mark the traits, e.g.: `#[loggable(skip_params)] trait Tr1 {`.
+  // * Mark the macro invocation, e.g.: `#[loggable] block_items!{<args>}` // NOTE: it is supported/allowed in Rust. Checked.
+  //   (to distinguish the macro invocations that need to be instrumented (shown above) from those that don't (shown as `. . .`)
+  //   and to pass the FCL arguments (prefix, `{skip,log}_{params,closure_coords}`) form `trait` to trait internals).
+  // During the trait traverse (`#[loggable(skip_params)] trait Tr1 {`) the declarative macro (`block_items!{<args>}`) 
+  // invocation's attribute `#[loggable]` will be updated, e.g.: 
+  // `#[loggable(prefix=Tr1, skip_params, log_closure_coords)] block_items!(<args>)`.
+  // 
+  // During the macro invocation's traverse the macro invocation will be replaced with the FCL's declarative macro invocation 
+  // `loggable_macro_block_items!(Tr1, skip_params, log_closure_coords, <args>)`. In particular
+  // // `loggable_macro_block_items!(Tr1, skip_params, log_closure_coords, block_items!(<args>))`. In particular
+  // // * the original macro invocation will be passed as the (first or last) arg to the FCL's macro,
+  // * the FCL's macro name (`loggable_macro_block_items`) will contain the origincal macro name (`block_items`) 
+  //   (to enable annotating/instrumenting multiple user's macros)
+  //   (TODO: Consider multiple user's macros `block_items_a`, `block_items_b`, invocation of `a`, `b`, both; 
+  //   to illustrate multiplicity)
+  //   (adding the prefix `loggable_macro_` forces to annotate with `#[loggable]` either everything or nothing, 
+  //   i.e. either {the definition and all the invocations} or nothing)
+  //   (TODO: Instead of `loggable_macro_` consider a prefix that is less likely to conflict with the user's code, 
+  //   e.g. GUID-based prefix or non-alnum-prefix like `$`, non-latin letters,
+  //   unreasonably long prefix `prefix_thats_expected_to_not_conflict_with_the_users_code_`);
+  // * the FCL's declarative macro invocation will also have the FCL's arguments for prefix and `{skip,log}_{params,closure_coords}`: 
+  //   `Tr1, skip_params, log_closure_coords`.
+  // 
+  // The user will also do the following at the macro definition site.
+  // * Annotate the macro definition, e.g.: `#[loggable] macro_rules! block_items`. // NOTE: It is supported/allowed in Rust. Checked.
+  // During the `#[loggable]` macro expansion the `macro_rules!` macro definition will be replaced with the FCL's macro definition
+  // ```rs
+  // macro_rules! loggable_macro_block_items {
+  //      ($prefix:?$path?, $params_setting:$id, $closure_coords_setting:$id, <macro_params_alpha>) => {
+  //      //($prefix:.., $params_setting:.., $closure_coords_setting:.., $users_macro:$tt) => {
+  //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]    
+  //          mod loggable_block_contents{_{<GUID>|<Number>}?}   // (b.) NOTE: Workaround: added `mod ..` before `{`. // (c.) TODO: Consider `fn`, `struct`, `trait`, ...
+  //          {                                       // (a.) NOTE: Dead end. Compiler error: "expected item after attributes".
+  //              fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //              // $users_macro
+  //          }
+  //      }
+  //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <macro_params_beta>) => {
+  //      //($prefix:.., $params_setting:.., $closure_coords_setting:.., $users_macro:$tt) => {
+  //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+  //          mod loggable_block_contents{_{<GUID>|<Number>}?}
+  //          {
+  //              fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //          }
+  //      }
+  // ```
+  // * the FCL's macro definition name `loggable_macro_block_items` will have the user's macro name `block_items` 
+  //   (to distinguish between multiple `#[loggable]`-annotated user's macros),
+  // * the expansion part will gain the attribute macro 
+  //   `#[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]`
+  //   and the item for it - `mod loggable_block_contents{_{<GUID>|<Number>}?} {}`.
+  // During traverse of an item annotated with `#[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]`
+  // the functions will be instrumented recursively, 
+  // the item (`mod .. { fn f() {} }`) will be replaced with its internals (`fn f() {} }`).
+  // 
+  // In addition to all that the `f()` and `g()` (in the `block_items` macro definition) can also be annotated with `#[loggable..]`,
+  // e.g. if the user wants to change the defaults for a specific function (`f()` and/or `g()`).
+  // ```rs
+  // #[loggable]
+  // macro_rules! block_items {
+  //      (<macro_params_alpha>) => {
+  //          #[loggable(skip_params)] // Skip the function parameters logging for `f()` in all the traits.
+  //          fn f() {}
+  //      }
+  //      (<macro_params_beta>) => {
+  //          #[loggable(skip_closure_coords)] // Skip the closure coordinates logging in all the traits.
+  //          fn g() {}
+  //      }
+  // }
+  // ```
+  // 
+  // Summary:
+  // ========
+  // The user's code:
+  // ```
+  // macro_rules! block_items {
+  //      (<macro_params_alpha>) => {
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  //      (<macro_params_beta>) => {
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  // }
+  // trait Tr1 {
+  //      . . .
+  //      block_items!(<macro_args_alpha>)
+  // }
+  // trait Tr2 {
+  //      block_items!(<macro_args_beta>)
+  //      . . .
+  // }
+  // trait Tr3 {
+  //      block_items!(<macro_args_beta>)
+  //      . . .
+  //      block_items!(<macro_args_alpha>)
+  // }
+  // ```
+  // 
+  // User annotates:
+  // ```
+  // #[loggable]
+  // macro_rules! block_items {
+  //      (<macro_params_alpha>) => {
+  //          // User can also optionally annotate each `fn` and other items here.
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  //      (<macro_params_beta>) => {
+  //          // User can also optionally annotate each `fn` and other items here.
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  // }
+  // #[loggable]
+  // trait Tr1 {
+  //      . . .
+  //      #[loggable]
+  //      block_items!(<macro_args_alpha>)
+  // }
+  // #[loggable]
+  // trait Tr2 {
+  //      #[loggable]
+  //      block_items!(<macro_args_beta>)
+  //      . . .
+  // }
+  // #[loggable]
+  // trait Tr3 {
+  //      #[loggable]
+  //      block_items!(<macro_args_beta>)
+  //      . . .
+  //      #[loggable]
+  //      block_items!(<macro_args_alpha>)
+  // }
+  // ```
+  // 
+  // Procedural macro expansion result.
+  // Phase 1:
+  // ```
+  // macro_rules! loggable_macro_block_items {
+  //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <macro_params_alpha>) => {
+  //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+  //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //              fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //          }
+  //      }
+  //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <macro_params_beta>) => {
+  //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+  //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //              fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //          }
+  //      }
+  // }
+  // trait Tr1 {
+  //      . . .
+  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      block_items!(<macro_args_alpha>)
+  // }
+  // trait Tr2 {
+  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      block_items!(<macro_args_beta>)
+  //      . . .
+  // }
+  // trait Tr3 {
+  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      block_items!(<macro_args_beta>)
+  //      . . .
+  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      block_items!(<macro_args_alpha>)
+  // }
+  // ```
+  // Phase 2:
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      loggable_macro_block_items!(Tr1, log_params, log_closure_coords, <macro_args_alpha>)
+  // }
+  // trait Tr2 {
+  //      loggable_macro_block_items!(Tr2, log_params, log_closure_coords, <macro_args_beta>)
+  //      . . .
+  // }
+  // trait Tr3 {
+  //      loggable_macro_block_items!(Tr3, log_params, log_closure_coords, <macro_args_beta>)
+  //      . . .
+  //      loggable_macro_block_items!(Tr3, log_params, log_closure_coords, <macro_args_alpha>)
+  // }
+  // ```
+  // 
+  // All the procedural macros are expanded.
+  // Decl macro expansion:
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      #[loggable_block_contents(prefix=Tr1, log_params, log_closure_coords)]
+  //      mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  // }
+  // trait Tr2 {
+  //      #[loggable_block_contents(prefix=Tr2, log_params, log_closure_coords)]
+  //      mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  //      . . .
+  // }
+  // trait Tr3 {
+  //      #[loggable_block_contents(prefix=Tr3, log_params, log_closure_coords)]
+  //      mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  //      . . .
+  //      #[loggable_block_contents(prefix=Tr3, log_params, log_closure_coords)]
+  //      mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  // }
+  // ```
+  // All the decl macros are expanded.
+  // Proc macro expansion again.
+  // ```
+  // trait Tr1 {
+  //      . . .
+  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  // }
+  // trait Tr2 {
+  //      #[loggable(prefix=Tr2, log_params, log_closure_coords)]
+  //      fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      . . .
+  // }
+  // trait Tr3 {
+  //      #[loggable(prefix=Tr3, log_params, log_closure_coords)]
+  //      fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      . . .
+  //      #[loggable(prefix=Tr3, log_params, log_closure_coords)]
+  //      fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  // }
+  // ```
+  // The next step is trivial - ordinary instrumentation of the functions `f()` and `g()`.
+  // 
+  // 
+  // Implementation Detials
+  // 
+  // The tricky part (details below) is the conversion from
+  // ```rs
+  // #[loggable]
+  // macro_rules! block_items {
+  //      (<macro_params_alpha>) => {
+  //          // User can also optionally annotate each `fn` and other items here.
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  //      (<macro_params_beta>) => {
+  //          // User can also optionally annotate each `fn` and other items here.
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  // }
+  // ```
+  // to
+  // ```rs
+  // macro_rules! loggable_macro_block_items {
+  //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <macro_params_alpha>) => {
+  //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+  //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //              fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //          }
+  //      }
+  //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <macro_params_beta>) => {
+  //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+  //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
+  //              fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //          }
+  //      }
+  // }
+  // ```
+  // 
+  // Details:
+  // https://doc.rust-lang.org/reference/macros-by-example.html
+  // https://doc.rust-lang.org/reference/macros.html#grammar-DelimTokenTree
+  // ```rs
+  // macro_rules! block_items {
+  //      (<macro_params_alpha>) => {
+  //          // User can also optionally annotate each `fn` and other items here.
+  //          fn f() {}  // Items of a block. They use <macro_params_alpha>.
+  //      }
+  //      (<macro_params_beta>) => {
+  //          // User can also optionally annotate each `fn` and other items here.
+  //          fn g() {}  // Items of a block. They use <macro_params_beta>.
+  //      }
+  // }
+  // pub struct ItemMacro {
+  //     pub attrs: Vec<Attribute>,          // -
+  //     pub ident: Option<Ident>,           // `block_items`. `ident` field is mandatory for macro definition 
+  //                                         // and `None` for invocation?
+  //     pub mac: Macro {
+  //         pub path: Path,                 // `macro_rules` for definition and <macro_name> for invocation?
+  //         pub bang_token: Not,            // `!`
+  //         pub delimiter: MacroDelimiter,  // `{` for definition and either `(` or `{` or `[` for invocation?
+  //         pub tokens: TokenStream {       // The rules for definition and arguments for invocation?
+  //                                         // { // Loop throug the MacroRulesDef (https://doc.rust-lang.org/reference/macros-by-example.html)
+  //             TokenTree: Group {          //      (<macro_params_alpha>)
+  //                 TokenStream             //          <macro_params_alpha>  // quoted as is during `#[loggable]` macro expansion.
+  //             }         
+  //             TokenTree                   //      =
+  //             TokenTree                   //      >
+  //             TokenTree: Group {          //      { fn f() {} }
+  //                 TokenStream             //          fn f() {}       // quoted as is during `#[loggable]` macro expansion.
+  //             }
+  //             TokenTree                   //      [`;` or other delimiter]
+  //                                         // } // Loop
+  //         },        
+  //     },
+  //     pub semi_token: Option<Semi>,       // None for definition and optional `;` for invocation?
+  // }
+  // ```
+  //////////////////////////////////
+  ```
+// TODO: (1): Coinsider a case when the user's macro 
+* is defined as a single identifier (`my_macro`)
+* but is invoked as a path (`path::my_macro`).
+Either document it as a limitation: The invocation must be with a single identifier;
+or the implementation must prefix the last path segment only, such that the definition identifier is prefixed
+and the invocation last path segment is prefixed.
+
+Only the user's decl macros that are annotated with `#[loggable]` need to be transformed (during the annotated `trait` traverse). 
+Those that aren't, must not be transformed even if they are reached during a recursive traverse.
+
+If the user's decl macro def-n is `#[loggable]` then all the invocations need to be `#[loggable]` too 
+(the prefix `loggable_macro_` added to the definition name guarantees that). 
+And vice versa, if at least one invocation is `#[loggable]` then the def-n must be `#[loggable]` too, which obliges all other invocations to be also `#[loggable]` (the prefix `loggable_macro_`, added to the first invocation, guarantees that, if unique enough).  
+
+To summarize,  
+either both the definition and all the invocations need to be `#[loggable]`,  
+or none.
+
+The user's macro definition can be 
+* non-loggable (not annotated or `#[non_loggable]`-annotated)
+* `#[loggable..]`.
+
+In both cases the user's macro definition can be 
+* in non-loggable context,  
+  i.e., inside of the entities that are not annotated or `#[non_loggable]`,  
+  the recursive traverse will not reach such macros;
+* in the loggable context,  
+  i.e., inside of the `#[loggable]` entities, the recursive traverse will reach such macros.
+
+If non-annotated user's macro 
+* is in the non-loggable context then it is to be left as is  
+  (not entered);
+* is in the loggable context then during the recursive traverse it is to be left as is  
+  (either not entered or upon entry `quote`d as is)  
+  (when entered, the #[loggable] is **not present**);  
+  it is more consistent to not enter, the `#[loggable]`-checking logic is in one place - `quote_as_item()`;
+  in `quote_as_item()` if the #[loggable] is not present and not top-level (not individual macro-expansion but a recursive traverse) then leave as is.
+
+If `#[loggable]`-annotated user's macro
+* is in the non-loggable context then it will be `#[loggable]`-macro-expanded _individually_, nothing special is needed  
+  (when entered, the `#[loggable]` is **not present**); 
+  in `quote_as_item()` if `#[loggable]` is not present and top-level (individual macro-expansion) then expand.
+* is in the loggable context then during the recursive traverse it is to be left as is for the subsequent _individual_ macro-expansion  
+  (when entered, the `#[loggable]` is present - leave as is);  
+  (it is easier to not enter.  
+  No, it is entered from the same place in `quote_as_item()` both during the individual macro-expansion and recursive traverse. 
+  Actually yes, if `#[loggable]` is present then do not enter. Otherwise, if top-level then enter.
+
+To summarse, in `quote_as_item()` 
+* enter for top-level only, 
+* otherwise leave as is (all in loggable context) 
+  * both the anotated one (i.e. the attr is present)
+  * and non-annotated one.
+
+If there are arguments to `#[loggable]` at the user's macro definition site
+```rs
+  // #[loggable(prefix=users::prefix, skip_params, skip_closure_coords)]
+  // macro_rules! block_items {
+```
+then, 
+* upon recursive traverse (of an annotated enclosing entity, like `mod`) the `#[loggable]` attribute 
+  and its args are to be left as they are;  
+* and upon individual `#[loggable(...)]` macro expansion  
+  (i.e., the enclosing entities, if any, are not annotated, or `#[non_loggable]`-annotated,
+  or have already been `#[loggable]`-expanded in a previous sentence)  
+  the args are, not decided yet,
+  * either to be ignored (which means that the arguments are passed during the invocation, not set during definition),
+  * or are used in the internals (which means that the `#[loggable]` arguments specified explicitly at the definition site override 
+    those passed during invocations, similar to how the local varaibles in the nested scope override those 
+    defined in the enclosing scope).
+
+# Rare Cases
+## The Arbitrary Cobination of `#[non_loggable]` and `#[loggable]`, Conflicting Arguments
+TODO: 
+Consider 
+* the arbitrary combination of loggable and non_loggable. Consider what behavior the user expects, wants, as opposed to what actually happens.
+* for multiple loggables, if allowed, the different (conflicting) args. 
+```rs
+#[non_loggable] // Causes the code below to be `quote`d as is, including the subsequent `#[loggable]` and `#[non_logable]`? The same effect as being ignored?
+#[loggable] // When analyzing the susequent attributes, 
+// * if finds `#[non_loggable]` then quotes the items as is, including `#[non_loggable]`;
+// * if finds another loggable, then TODO: document.  
+item
+```
+
 # Unresolved/Known Issues
 ```rs
 MyTrait<T, U>::my_func::<char, u8>() {     // `<T, U>` are not resolved with the actual generic args.
     MyTrait<T, U>::my_func<T, U>()::closure{1,2:4,5} {}
 ```
 
-# Synchronizing With `panic!()`
+# The Standard Output Synchronization (and Synchronizing With `panic!()` ?)
 Let's imagine again that in our thread function we haved a function `f()` that calls funtion `g()` 10 times in a loop. And during iteration 8 the function `g()` panics (or calls something that panics).
 ```rs
 fn f() {
@@ -710,7 +1422,7 @@ And I will _hospitably_ reply: "For that case I have an excellent solution below
 **Reader Pracice.**  
 You understand what I mean... what should happen to C and C++ code... ;-DDD
 
-## The Architecture
+# The Architecture
 
 The default architecture is shown on the chart below.
 
@@ -735,7 +1447,7 @@ The full architecture is supposed to work for all the cases but
 
 all of which is described below.
 
-### The Single-Threaded Optimization
+## The Single-Threaded Optimization
 
 If the user's program is single-threaded then the full architecture can be minimized down to the 
 _single-threaded_ architecture shown on the chart below (includes the red blocks and arrows but does 
@@ -755,7 +1467,7 @@ This optimizaton is chosen if the feature `"singlethreaded"` is on for both `fcl
 TODO: What if `fcl`'s one is on, but `fcl_proc_macros`' one is not? And vice versa.
 
 
-### The Minimal Writer Optimization
+## The Minimal Writer Optimization
 
 If the user's program is single-threaded and does not use `stdout`/`stderr` output 
 then the output synchronization mechanism, see the red blocks and arrows, can be excluded from the FCL architecture, and the decorator (`CodeLikeDecorator` on the chart) can have 
@@ -772,7 +1484,7 @@ This optimizaton is chosen if
 
 TODO: What if `fcl`'s `"minimal_writer"` is on, but `fcl_proc_macros`' `"singlethreaded"` is not?
 
-## How the Logging Works
+# How the Logging Works
 
 Just in case I'll remind that if in the user's Rust code the attribute `#[fcl_proc_macros::loggable]`
 has been added to an item (module, trait implementation, function, etc.) then before compilation 
@@ -967,12 +1679,12 @@ provide to the ThreadGatekeeper/CallLoggerArbiter the cached updates of the Call
 (n, n + 2, n + 4), such that 
 the ThreadGatekeeper/CallLoggerArbiter asks for the updates (n + 1, n + 3) from all other CallLogInfra instances, but does not access the mutex of CallLogInfra 0 while that mutex is already locked.
 
-## Testing
+# Testing
 
 By default the different tests run in different threads in parallel. This causes at least two issues.
 But before talking about the issues I need to tell a bit about the approach used.
 
-### The Approach
+## The Approach
 
 To test the Function Call Logger the typical test has a group of functions
 marked with the `#[loggable]` attribute. The test replaces the default log writer (that writes to `stdout`) with the vector of bytes `Vec<u8>` (that also implements the `Write` trait). Then the test calls the `#[loggable]` functions, 
@@ -1008,7 +1720,7 @@ fn basics() {
 The different tests have different sets of the `#[loggable]` functions, and test the different parts 
 of the Function Call Logger.
 
-### The Issues
+## The Issues
 Since the tests run in parallel threads the following issues are observed. 
 
 The first issue is that **the tests interrupt each other**. As a result, during some of the runs 
@@ -1125,14 +1837,14 @@ Of course, it is possible to write a "more sophisticated" log parser that will f
 of the log in all possible cases, and make sure it is correct. But that's not really what I would 
 like to focus on.
 
-### Current conclusion
+## Current conclusion
 
 The defalt test execution 
 `cargo test [-p fcl]`
 fails at the moment. In order to succeed, the tests need to be run with the non-default command
 `cargo test [-p fcl] -- --test-threads=1`.
 
-### Notes for the Future. Multithreaded Tests
+## Notes for the Future. Multithreaded Tests
 TODO: At the moment of writing the thoughts about testing the actual (desired) multithreaded output,
 combined with `--test-threads=1`, will require the explicit thread spawning in a test, 
 and intercepting the log output at the `THREAD_SHARED_WRITER` stage (where more than one thread's output ends up in one place).  

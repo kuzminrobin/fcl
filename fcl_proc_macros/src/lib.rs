@@ -154,10 +154,11 @@ pub fn loggable(
     let attr_args = syn::parse_macro_input!(attr_args_ts as AttrArgs); // Handles the compilation errors appropriately (checked).
     let output = {
         if let Ok(item) = syn::parse::<syn::Item>(attributed_item.clone()) {
-            items::quote_as_item(&item, &attr_args)
+            items::quote_as_item(&item, &attr_args, true)
         } else if let Ok(expr) = syn::parse::<syn::Expr>(attributed_item.clone()) {
             exprs::quote_as_expr(&expr, None, &attr_args)
         } else {
+            // TODO: Is it still applicable? Explain.
             let closure_w_opt_comma =
                 syn::parse_macro_input!(attributed_item as ExprClosureWOptComma); // Handles the compilation errors appropriately.
             exprs::quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
@@ -166,6 +167,150 @@ pub fn loggable(
     output.into()
 }
 
+#[proc_macro_attribute]
+pub fn loggable_block_contents(
+    attr_args_ts: proc_macro::TokenStream,
+    attributed_item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let attr_args = syn::parse_macro_input!(attr_args_ts as AttrArgs); // NOTE: Handles the compilation errors appropriately (checked).
+    let item_fn = syn::parse_macro_input!(attributed_item as syn::ItemFn);
+    // let item_mod = syn::parse_macro_input!(attributed_item as syn::ItemMod);
+    items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args/*, true */).into()
+    // items::quote_as_item_mod_loggable_block_contents(&item_fn, &attr_args/*, true */).into()
+
+    // let syn::ItemMod {
+    //     attrs,     // : Vec<Attribute>,
+    //     vis,       // : Visibility,
+    //     unsafety,  // : Option<Unsafe>,
+    //     mod_token, // : Mod,
+    //     ident,     // : Ident,
+    //     content,   // : Option<(Brace, Vec<Item>)>,
+    //     semi,      // : Option<Semi>,
+    // } = item_mod;
+
+    // if ident.to_string() != "loggable_block_contents" {
+    //     return syn::Error::new(
+    //         ident.span(),
+    //         format!("expected `{}`", "loggable_block_contents"), // TODO: loggable_block_contents to consts file.
+    //     )
+    //     .into_compile_error()
+    //     .into();
+    //     // syn::Error::into_compile_error()
+    // }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+
+    // for attr in attrs {
+    //     if attr.is_non_loggable() { // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
+    //         return quote! { #item_mod }.into();
+    //     }
+    //     new_attrs.push(items::get_loggable_attr_params(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
+
+    // /*
+    //     let content = if has_loggable {
+    //         // // NOTE: The impl below deosn't compile since either a trait or a type have to be locally defined.
+    //         // impl quote::ToTokens for (syn::token::Brace, Vec<syn::Item>) {
+    //         //     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    //         //         let (.., items) = self;
+    //         //         let mut tokenized_items = quote! {};
+    //         //         for item in items {
+    //         //             tokenized_items = quote! { #tokenized_items #item };
+    //         //         }
+    //         //         *tokens = quote! { { #tokenized_items } }
+    //         //     }
+    //         // }
+    //         //
+    //         // quote! { #content }
+
+    //         // No item traversing. The items are passed as they are.
+    //         let content = content.as_ref().map(|(_brace, items)| {
+    //             quote! { { #(#items)* } }
+    //             // let mut copied_items = quote! {};
+    //             // for item in items {
+    //             //     copied_items = quote! { #copied_items #item };
+    //             // }
+    //             // quote! { { #copied_items } }
+    //         });
+    //         content
+    //     } else {
+    //         let attr_args = AttrArgs {
+    //             prefix: if enclosing_item_attr_args.prefix.is_empty() {
+    //                 quote! { #ident }
+    //             } else {
+    //                 let prefix = &enclosing_item_attr_args.prefix;
+    //                 quote! { #prefix::#ident }
+    //             },
+    //             ..*enclosing_item_attr_args
+    //         };
+
+    //         // Traverse the items:
+    //         let content = content.as_ref().map(|(_brace, items)| {
+    //             let mut traversed_items = quote! {};
+    //             for item in items {
+    //                 let item = quote_as_item(item, &attr_args, false);
+    //                 traversed_items = quote! { #traversed_items #item };
+    //             }
+    //             quote! { { #traversed_items } }
+    //         });
+    //         content
+    //     };
+    //     quote! { #(#new_attrs)* #vis #unsafety #mod_token #ident #content #semi }
+    // */
+    // /*
+    // fn quote_as_item_mod(
+    //     item_mod: &syn::ItemMod,
+    //     enclosing_item_attr_args: &AttrArgs,
+    // ) -> proc_macro2::TokenStream {
+    //     let syn::ItemMod {
+    //         attrs,     //: Vec<Attribute>,
+    //         vis,       //: Visibility,
+    //         unsafety,  //: Option<Unsafe>,
+    //         mod_token, //: Mod,
+    //         ident,     //: Ident,
+    //         content,   //: Option<(Brace, Vec<Item>)>,
+    //         semi,      //: Option<Semi>,
+    //     } = item_mod;
+
+
+    // }
+
+    // */
+    // quote! {}.into()
+
+    // match syn::parse::<syn::Item/*::Mod*/>(attributed_item) {
+    //     Ok(item) => {
+    //         match item {
+    //             syn::Item::Mod(item_mod) =>
+    //                 items::quote_as_item_mod_loggable_block_contents(&item, &attr_args/*, true */).into()
+    //                 // quote_as_item_mod(item_mod, enclosing_item_attr_args)
+    //                 ,
+    //             _ => proc_macro::TokenStream::from(err.to_compile_error())
+    //         }
+
+    //     },
+    //     Err(err) => return proc_macro::TokenStream::from(err.to_compile_error()),
+    // }
+
+    // let output = {
+    //     if let Ok(item) = syn::parse::<syn::Item>(attributed_item.clone()) {
+    //         items::quote_as_item(&item, &attr_args, true)
+    //     } else if let Ok(expr) = syn::parse::<syn::Expr>(attributed_item.clone()) {
+    //         exprs::quote_as_expr(&expr, None, &attr_args)
+    //     } else {
+    //         let closure_w_opt_comma =
+    //             syn::parse_macro_input!(attributed_item as ExprClosureWOptComma); // NOTE: Handles the compilation errors appropriately.
+    //         exprs::quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
+    //     }
+    // };
+    // output.into()
+}
+
+// TODO: Consider deduping the `LoggableAttrInfo` and `LoggableAttrArgsOpt` or explaining why not.
 struct LoggableAttrInfo {
     prefix: Option<proc_macro2::TokenStream>, //Option<String>,
     params_logging: Option<ParamsLogging>,
@@ -178,6 +323,17 @@ struct LoggableAttrArgsOpt {
     log_closure_coords: Option<bool>,
 }
 impl syn::parse::Parse for LoggableAttrArgsOpt {
+    /// Upon successful parsing returns `syn::Result::ok(Self)`, where in `Self`
+    /// * `prefix` is `Some(<Path>)` if the `input` contains `prefix=Path`, otherwise `None`;
+    /// * `params_logging`  
+    ///   * is `Some(ParamsLogging::Skip)` if the `input` contains `skip_params`,
+    ///   * is `Some(ParamsLogging::Log)` if the `input` contains `log_params`,
+    ///   * is `None` otherwise;
+    /// * `log_closure_coords`
+    ///   * is `Some(false)` if the `input` contains `skip_closure_coords`,
+    ///   * is `Some(true)` if the `input` contains `log_closure_coords`,
+    ///   * is `None` otherwise.
+    /// Otherwise returns `syn::Result::err(e)`.
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut args = LoggableAttrArgsOpt {
             prefix: None,
@@ -200,11 +356,12 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
             } else if lookahead.peek(kw::prefix) {
                 input.parse::<kw::prefix>()?;
                 input.parse::<syn::Token![=]>()?;
-                let optional_prefix = input.parse::<QSelfOrPath>()?;
+                let optional_prefix = input.parse::<QSelfOrPath>()?; // TODO: Consider the case `#[loggable(prefix = )]` (cledaring the prefix).
                 if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
                     let prefix_ts = match q_self_or_path {
                         LogPrefix::QSelf(qself) => quote! { #qself },
                         LogPrefix::Path(path) => quote! { #path },
+                        // LogPrefix::Empty => quote! {},   // (cledaring the prefix)
                     };
                     args.prefix = Some(prefix_ts); //Some(remove_spaces(&prefix_ts.to_string()));
                 }
@@ -228,37 +385,71 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
         Ok(args)
     }
 }
-// TODO: Rename the trait.
-trait IsTraverseStopper {
+
+// fn is_fcl_attribute(attr: &syn::Attribute, attr_name: &str) -> bool {
+//     let path = match &attr.meta {
+//         syn::Meta::Path(path) => path,
+//         syn::Meta::List(syn::MetaList { path, .. }) => path,
+//         _ => return false,
+//     };
+//     // If the last path segment equals `attr_name` // e.g. "non_loggable"
+//     //      && preceeding path segment is None or is "fcl_proc_macros"
+//     // then
+//     //      return true // is `non_loggable`
+//     // return false // is not `non_loggable` or is user's own `non_loggable` (`<user's_path>::non_loggable`).
+//     if let Some(last_path_segment) = path.segments.last()
+//         && last_path_segment.ident.to_string() == attr_name
+//         && (path.segments.len() < 2 || {
+//             let prev_segment_idx = path.segments.len() - 2;
+//             path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"  // TODO: "fcl_proc_macros" to a file of consts.
+//         })
+//     {
+//         return true;
+//     }
+//     return false;
+// }
+
+/* TODO: -> ExtendedAttribute? */
+trait FclAttribute {
     fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo>;
 
-    fn is_fcl_attribute(attr: &syn::Attribute, attr_name: &str) -> bool {
-        let path = match &attr.meta {
+    fn is_fcl_attribute(&self, attr_name: &str) -> bool;
+
+    fn is_traverse_stopper(&self) -> bool;
+    fn is_non_loggable(&self) -> bool;
+    // fn is_loggable(&self) -> bool;
+}
+impl FclAttribute for syn::Attribute {
+    /// Returns
+    /// * `true` if `self` { is `<attr_name>` or ends with `fcl_proc_macros::<attr_name>` },
+    /// * `false` otherwise.
+    // NOTE: Contains/assumes "fcl_proc_macros". Not to be renamed to `is()`.
+    fn is_fcl_attribute(&self, attr_name: &str) -> bool {
+        // fn is_fcl_attribute(attr: &syn::Attribute, attr_name: &str) -> bool {
+        let path = match &self.meta {
+            // let path = match &attr.meta {
             syn::Meta::Path(path) => path,
             syn::Meta::List(syn::MetaList { path, .. }) => path,
             _ => return false,
         };
-        // If the last path segment equals `attr_name` // e.g. "non_loggable"
-        //      && preceeding path segment is None or is "fcl_proc_macros"
-        // then
-        //      return true // is `non_loggable`
-        // return false // is not `non_loggable` or is user's own `non_loggable` (`<user's_path>::non_loggable`).
+
         if let Some(last_path_segment) = path.segments.last()
             && last_path_segment.ident.to_string() == attr_name
             && (path.segments.len() < 2 || {
                 let prev_segment_idx = path.segments.len() - 2;
-                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
+                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros" // TODO: "fcl_proc_macros" to a file of consts.
             })
         {
             return true;
         }
         return false;
     }
-    fn is_traverse_stopper(&self) -> bool;
-    fn is_non_loggable(&self) -> bool;
-    // fn is_loggable(&self) -> bool;
-}
-impl IsTraverseStopper for syn::Attribute {
+
+    /// Returns `None` if `self` is not `[fcl_proc_macros::]loggable`.
+    /// Otherwise returns `Some(LoggableAttrInfo)` where the fields are
+    /// * the same as in `LoggableAttrArgsOpt` upon successful parsing
+    ///   (see comments for `fcl_proc_macros::LoggableAttrArgsOpt::parse()`),
+    /// * all `None` otherwise (at the moment of writing; TODO: Review in details and resolve the parsing failure case).
     fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo> {
         let (path, optional_tokens) = match &self.meta {
             syn::Meta::Path(path) => (path, None),
@@ -283,7 +474,7 @@ impl IsTraverseStopper for syn::Attribute {
             ret_val = Some(LoggableAttrInfo {
                 prefix: None,             // Option<String>,
                 params_logging: None,     // Option<ParamsLogging>,
-                log_closure_coords: None, //Option<bool>,
+                log_closure_coords: None, // Option<bool>,
             });
             if let Some(tokens) = optional_tokens {
                 // println!("optional_tokens: {:?}", optional_tokens);
@@ -294,6 +485,7 @@ impl IsTraverseStopper for syn::Attribute {
                         log_closure_coords: parsed.log_closure_coords,
                     });
                 }
+                // TODO: `else`? Silently ignore the parsing error?
             }
         }
         return ret_val;
@@ -317,7 +509,8 @@ impl IsTraverseStopper for syn::Attribute {
     }
 
     fn is_non_loggable(&self) -> bool {
-        <syn::Attribute as IsTraverseStopper>::is_fcl_attribute(self, "non_loggable")
+        self.is_fcl_attribute("non_loggable")
+        // <syn::Attribute as IsTraverseStopper>::is_fcl_attribute(self, "non_loggable")
     }
     // fn is_loggable(&self) -> bool {
     //     IsTraverseStopper::is_fcl_attribute(self, "loggable")
@@ -843,12 +1036,13 @@ impl syn::parse::Parse for FclQSelf {
 enum LogPrefix {
     QSelf(FclQSelf),
     Path(syn::Path),
+    // Empty    // `#[loggable(prefix=)]` (clearing the prefix).
 }
 struct QSelfOrPath(Option<LogPrefix>);
 
 impl syn::parse::Parse for QSelfOrPath {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut result = Self(None);
+        let mut result = Self(None); // TODO: Consider `Self(Some(LogPrefix::Empty))`.
         if input.is_empty() {
             Ok(result)
         } else {
