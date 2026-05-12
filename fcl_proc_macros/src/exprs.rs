@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use crate::{
-    AttrArgs, FclAttribute, ParamsLogging, items::quote_as_item, remove_spaces, update_param_data_from_pat
+    AttrArgs, FclAttribute, ParamsLogging, items::quote_as_item, remove_spaces,
+    update_param_data_from_pat,
 };
 use quote::quote;
 use syn::spanned::Spanned;
@@ -71,6 +72,7 @@ fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::To
     quote! { #eq_token #expr #diverge }
 }
 
+/// Handles the local `let` binding.
 fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::Local {
         attrs,      //: Vec<Attribute>,
@@ -117,6 +119,14 @@ fn quote_as_stmt_macro(
     ret_val
 }
 
+/// Handles the statements during the recursive traverse.
+/// 
+/// At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
+/// ```ignore
+/// custom attributes cannot be applied to statements
+/// see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
+/// add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
+/// ```
 fn quote_as_stmt(stmt: &syn::Stmt, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match stmt {
         syn::Stmt::Local(local) => quote_as_local(local, attr_args),
@@ -129,7 +139,10 @@ fn quote_as_stmt(stmt: &syn::Stmt, attr_args: &AttrArgs) -> proc_macro2::TokenSt
     }
 }
 
-pub(crate) fn quote_as_block_statements(stmts: &Vec<syn::Stmt>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+pub(crate) fn quote_as_block_statements(
+    stmts: &Vec<syn::Stmt>,
+    attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
     let stmts = {
         let mut traversed_stmts = quote! {};
         for stmt in stmts {
@@ -150,14 +163,6 @@ pub fn quote_as_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2::
     } = block;
 
     let stmts = quote_as_block_statements(stmts, attr_args);
-    // let stmts = {
-    //     let mut traversed_stmts = quote! {};
-    //     for stmt in stmts {
-    //         let traversed_stmt = quote_as_stmt(stmt, attr_args);
-    //         traversed_stmts = quote! { #traversed_stmts #traversed_stmt }
-    //     }
-    //     traversed_stmts
-    // };
     quote! { { #stmts } }
 }
 
@@ -615,7 +620,7 @@ fn quote_as_expr_group(
     }
     let expr = quote_as_expr(&**expr, None, attr_args);
     // NOTE:
-    // Intention: `quote! { { #(#attrs)* #group_token #expr } }` 
+    // Intention: `quote! { { #(#attrs)* #group_token #expr } }`
     // Issue: the trait bound `syn::token::Group: quote::ToTokens` is not satisfied
     // Workaround:
     quote! { { #(#attrs)* #expr } }
@@ -730,7 +735,6 @@ pub fn quote_as_macro(
     maybe_flush_invocation: &mut proc_macro2::TokenStream,
     _attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
-
     let syn::Macro {
         path, //: Path,
         // bang_token, //: Not,

@@ -1,5 +1,7 @@
 # Workgin On
 * The Declarative Macros that are (marked as) `#[loggable]`.
+  * in traits.
+    * `// TODO: What about combining `attrs`?` in `fn quote_as_item_macro_rules_invocation()`
 * TODO (working on): Consider preserving the prefix in the nested/inner `#[loggable]`:
   ```rs
   #[loggable] // Gives the prefix "m::" to the internals.
@@ -34,6 +36,7 @@
 # Need
 
 # Next
+(See `>`)
 * Tests
   * code_commons\src\call_graph.rs (the tests are in fcl)
     * add_loopbody_end.rs
@@ -52,6 +55,8 @@
 >
   * prefix, {skip|log}_params, {skip|log}_closure_coords
     * Implement everywhere (items, exprs, ..).
+  * The Declarative Macros that are (marked as) `#[loggable]`.
+    * In items other than `trait`.
   * Language constructs
     * Items
       * Functions
@@ -142,6 +147,7 @@
 
 
 # Unsorted
+* TODO: The whole item (e.g. trait) is in the macro (is a result of the macro expansion).
 * (Double-check that it's still applicable. There's a plan to work around it) TODO: 
   To docs: `#[loggable]` cannot penetrate into the macro invocation and traverse the result of the macro-expansion
   since the declarative macro expansion is done at a later macro expansion stage than the procedural macro expansion

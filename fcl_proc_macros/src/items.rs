@@ -4,6 +4,7 @@ use crate::{
     remove_spaces, update_param_data_from_pat,
 };
 use quote::quote;
+use syn::spanned::Spanned;
 use syn::{ItemMacro, Macro};
 
 // // Likely not applicable for instrumenting the run time functions and
@@ -356,38 +357,10 @@ pub(crate) fn quote_as_item_fn_loggable_block_contents(
     let syn::ItemFn {
         // attrs, //: Vec<Attribute>,
         // vis,   //: Visibility,
-        sig,   //: Signature,
+        // sig,   //: Signature,
         block, //: Box<Block>,
         ..
     } = item_fn;
-    // println!("{:?} {{", sig.ident);
-
-    // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
-
-    // // println!("attrs.len(): {}", attrs.len());
-    // for attr in attrs {
-    //     // match &attr.meta {
-    //     //     Meta::Path(path) => println!("Path: {:?}", path.get_ident()),
-    //     //     Meta::List(metalist) => println!("Meta::List Path{:?}", metalist.path.get_ident()),
-    //     //     Meta::NameValue(meta_name_value) => println!("NameValue Path: {:?}", meta_name_value.path.get_ident()),
-    //     // }
-    //     // println!("attr: {:?}", attr.meta);
-
-    //     if attr.is_non_loggable() {
-    //         // println!("}} {:?} // non_loggable", sig.ident);
-    //         return quote! { #item_fn };
-    //     }
-    //     new_attrs.push(get_loggable_attr_params(
-    //         attr,
-    //         &mut has_loggable,
-    //         enclosing_item_attr_args,
-    //     ));
-
-    //     // if attr.is_traverse_stopper() {
-    //     //    return quote! { #item_fn };
-    //     //}
-    // }
 
     // TODO: Assert sig.ident.to_string() == "loggable_block_contents".
 
@@ -399,33 +372,6 @@ pub(crate) fn quote_as_item_fn_loggable_block_contents(
 
     let traversed_stmts = crate::exprs::quote_as_block_statements(stmts, enclosing_item_attr_args);
     quote! { #traversed_stmts }
-
-    // let block =
-    // // if has_loggable {
-    // //     // println!("not traversing");
-
-    // //     // After updating/adding the params of/to #[loggable(<params>)]
-    // //     // leave the fn body uninstrumented, so that a separate #[loggable(<params>)] macro invocation
-    // //     // will instrument the body.
-    // //     quote! { #block }
-    // //     // block
-    // // } else
-    // {
-    //     // println!("traversing");
-    //     traversed_block_from_sig(block, sig, enclosing_item_attr_args)
-    // };
-
-    // // println!("{:?} }} // end", sig.ident);
-
-    // quote! { #block }
-
-    // // // // let attrs = if new_attrs.is_empty() { attrs } else { &new_attrs };
-    // // // let block = traversed_block_from_sig(block, sig, attr_args);
-    // // let ret_token_stream = quote! { #(#new_attrs)* #vis #sig #block };
-    // // // println!("quote_as_item_fn()::ret_val: {}", ret_val);
-    // // ret_token_stream
-    // // // quote! { #(#new_attrs)* #vis #sig #block }
-    // // // quote! { #(#attrs)* #vis #sig #block }
 }
 
 fn quote_as_item_fn(
@@ -471,7 +417,7 @@ fn quote_as_item_fn(
         // println!("not traversing");
 
         // After updating/adding the params of/to #[loggable(<params>)]
-        // leave the fn body uninstrumented, so that a separate #[loggable(<params>)] macro invocation
+        // leave the fn body UNinstrumented, so that a separate #[loggable(<params>)] macro invocation
         // will instrument the body.
         quote! { #block }
         // block
@@ -586,16 +532,6 @@ fn quote_as_item_impl(
 
     let items = if has_loggable {
         quote! { #(#items)* }
-        // // Intention:
-        // // quote!{ #items } // Compiler Error: "the trait bound `Vec<ImplItem>: quote::ToTokens` is not satisfied".
-        // // Workaround:
-        // // (TODO: Consider
-        // // [Using the Newtype Pattern to Implement External Traits on External Types](https://rust-book.cs.brown.edu/ch20-02-advanced-traits.html#using-the-newtype-pattern-to-implement-external-traits-on-external-types))
-        // let mut copied_items = quote! {};
-        // for item in items {
-        //     copied_items = quote! { #copied_items #item };
-        // }
-        // copied_items
     } else {
         // Add the impl type to the prefix
         // (to pass such an updated prefix to the nested items):
@@ -622,7 +558,7 @@ fn quote_as_item_impl(
 }
 
 /// Handles the `macro_rules` definiton.
-/// 
+///
 /// Expects that it is only called for an individual `#[loggable]` macro expansion
 /// (rather than a recursive traverse of the enclosing entity)
 /// of the user's declarative (`macro_rules!`) macro definition.
@@ -638,12 +574,13 @@ fn quote_as_item_macro_rules_def(
     } = item_macro;
 
     let Some(ident) = ident else {
-        // TODO: Return error: https://docs.rs/syn/latest/syn/struct.Error.html
-        //     return syn::Error::new(
-        //         ident.span(),
-        //         format!("expected `{}`", "loggable_block_contents"), // TODO: loggable_block_contents to consts file.
-        //     )
-        panic!("FCL Internal Error: Expected `macro_rules` definition")
+        // Must never get here as long as this function is called after `if ident.is_some()`.
+        return syn::Error::new(
+            mac.span(),
+            "FCL Internal Error: Expected `macro_rules` definition",
+        )
+        .into_compile_error()
+        .into();
     };
 
     let Macro {
@@ -661,7 +598,6 @@ fn quote_as_item_macro_rules_def(
         macro_transcriber_token_tree: proc_macro2::TokenStream, // `TokenTree*` part of the MacroTranscriber
         macro_transcriber_delimiter: syn::MacroDelimiter,       // (), [], or {}
         semi: Option<syn::Token![;]>,
-        // macro_transcriber: proc_macro2::TokenStream, // full DelimTokenTree
     }
     struct MacroRulesParsed {
         rules: Vec<MacroRuleParts>,
@@ -696,14 +632,8 @@ fn quote_as_item_macro_rules_def(
 
                 input.parse::<syn::Token![=>]>()?;
 
-                // (TODO: Outdated comment. Remove) MacroTranscriber is a DelimTokenTree; keep it as TokenStream including delimiters.
                 let (macro_transcriber_delimiter, macro_transcriber_token_tree) =
                     parse_delimited(input)?;
-                // let macro_transcriber = match tr_delim {
-                //     syn::MacroDelimiter::Paren(_) => quote::quote! { ( #tr_token_tree ) },
-                //     syn::MacroDelimiter::Bracket(_) => quote::quote! { [ #tr_token_tree ] },
-                //     syn::MacroDelimiter::Brace(_) => quote::quote! { { #tr_token_tree } },
-                // };
 
                 let semi = if input.peek(syn::Token![;]) {
                     let semi = input.parse::<syn::Token![;]>()?;
@@ -718,7 +648,6 @@ fn quote_as_item_macro_rules_def(
                     macro_transcriber_token_tree,
                     macro_transcriber_delimiter,
                     semi,
-                    // macro_transcriber,
                 });
             }
 
@@ -747,7 +676,6 @@ fn quote_as_item_macro_rules_def(
             let instrumented_macro_match = {
                 let new_macro_match = quote! {
                     $prefix:tt, $params_setting:ident, $closure_coords_setting:ident, #macro_match
-                    // $prefix:path, $params_setting:ident, $closure_coords_setting:ident, #macro_match
                 };
                 match macro_match_delimiter {
                     syn::MacroDelimiter::Paren(_) => {
@@ -764,9 +692,8 @@ fn quote_as_item_macro_rules_def(
             let instrumented_macro_transcriber = {
                 let new_macro_transcriber = quote! {
                     #[fcl_proc_macros::loggable_block_contents(prefix = $prefix::#ident, $params_setting, $closure_coords_setting)]
-                    fn loggable_block_contents() {    // TODO: {_{global const <GUID>|<Number>}?}
+                    fn loggable_block_contents() { // NOTE: Likely N/A since `fn loggable_block_contents()` is one per macro transcriber: // TODO: {_{global const <GUID>|<Number>}?}
                         #macro_transcriber_token_tree   // fn f() {}  // Items of a block. They use <params_alpha>.
-                        // #macro_transcriber
                     }
                 };
                 match macro_transcriber_delimiter {
@@ -779,9 +706,10 @@ fn quote_as_item_macro_rules_def(
                 #instrumented_macro_rules
 
                 #instrumented_macro_match => #instrumented_macro_transcriber #semi
+                // E.g.:
                 // ($prefix:path, $params_setting:ident, $closure_coords_setting:ident, #macro_match) => {
-                //     #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
-                //     mod loggable_block_contents {
+                //     #[loggable_block_contents(prefix=$prefix::<macro_name>, $params_setting, $closure_coords_setting)]
+                //     fn loggable_block_contents() {
                 //         fn f() {}  // Items of a block. They use <params_alpha>.
                 //     }
                 // }
@@ -790,191 +718,26 @@ fn quote_as_item_macro_rules_def(
         instrumented_macro_rules
     };
 
-    // for token in tokens.clone().into_iter() {}
-
-    // Need to transform
-    //
-    // #[loggable]    // Not present.
-    // macro_rules! block_items {
-    //      // https://doc.rust-lang.org/reference/macros-by-example.html
-    //      // MacroMatcher `=>` MacroTranscriber
-    //      // MacroMatcher →
-    //      //     `(` MacroMatch* `)`
-    //      //   | `[` MacroMatch* `]`
-    //      //   | `{` MacroMatch* `}`
-    //      (<params_alpha>) => {
-    //          // User can also optionally annotate each `fn` and other items here.
-    //          fn f() {}  // Items of a block. They use <params_alpha>.
-    //      }
-    //      (<params_beta>) => {
-    //          // User can also optionally annotate each `fn` and other items here.
-    //          fn g() {}  // Items of a block. They use <params_beta>.
-    //      }
-    // }
-    //
-    // to
-    //
-    // macro_rules! loggable_macro_block_items {
-    //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <params_alpha>) => {
-    //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
-    //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
-    //              fn f() {}  // Items of a block. They use <params_alpha>.
-    //          }
-    //      }
-    //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <params_beta>) => {
-    //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
-    //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
-    //              fn g() {}  // Items of a block. They use <params_beta>.
-    //          }
-    //      }
-    // }
-
     let prefixed_macro_ident = quote::format_ident!(
         "loggable_macro_{}", // TODO: `loggable_macro_` to the file of consts.
         ident.to_string()
     );
 
-    // let new_macro_name = instrumented_macro_name_ts
-    // let new_macro_name = remove_spaces(&quote! { loggable_macro_ #ident }.to_string()); // TODO: `loggable_macro_` to the file of consts.
     let new_delimited_macro_rules = match delimiter {
         syn::MacroDelimiter::Paren(_) => quote! { ( #instrumented_macro_rules ) },
         syn::MacroDelimiter::Brace(_) => quote! { { #instrumented_macro_rules } },
         syn::MacroDelimiter::Bracket(_) => quote! { [ #instrumented_macro_rules ] },
     };
-    let ret_val = quote! {
+
+    quote! {
         #(#attrs)* // `#[...]` attributes
         #path   // `macro_rules`
         #bang_token // `!`
         #prefixed_macro_ident // `loggable_macro_<name>`
         #new_delimited_macro_rules // `{ (...) => {...} . . .  (...) => {...} }`
         #semi_token // [`;`]
-    };
-    ret_val
-
-    // // TMP:
-    // quote! { #item_macro }
+    }
 }
-
-// // TODO: Consider and document `// No any other attrs.`:
-// // // Other attrs before.
-// // // Other attrs after.
-// // macro_rules! loggable_macro_trait_contents {
-// //     ($prefix:path, $params_setting:ident, $closure_coords_setting:ident,) => {
-// //         // No any other attrs.
-// //         #[loggable_block_contents(prefix =  $prefix, $params_setting, $closure_coords_setting)]
-// //         // No any other attrs.
-// //         mod loggable_block_contents {
-// //             fn absent_af(_p: u8) {
-// //                 Some(0).map(|x| x);
-// //             }
-
-// // NOTE: Expanding `#[loggable_block_contents`.
-// pub(crate) fn quote_as_item_mod_loggable_block_contents(
-//     item_mod: &syn::ItemMod,
-//     enclosing_item_attr_args: &AttrArgs,
-// ) -> proc_macro2::TokenStream {
-//     let syn::ItemMod {
-//         // attrs, // : Vec<Attribute>,
-//         // vis,       // : Visibility,
-//         // unsafety,  // : Option<Unsafe>,
-//         // mod_token, // : Mod,
-//         ident, // : Ident,
-//         content, // : Option<(Brace, Vec<Item>)>,
-//                // semi,      // : Option<Semi>,
-//         ..
-//     } = item_mod;
-
-//     // TODO: "loggable_block_contents" to consts file.
-//     if ident.to_string() != "loggable_block_contents" {
-//         return syn::Error::new(
-//             ident.span(),
-//             format!("expected `{}`", "loggable_block_contents"),
-//         )
-//         .into_compile_error()
-//         .into();
-//         // syn::Error::into_compile_error()
-//     }
-
-//     // let mut new_attrs = vec![];
-//     // let mut has_loggable = false;
-//     //
-//     // for attr in attrs {
-//     //     if attr.is_non_loggable() {
-//     //         // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
-//     //         return quote! { #item_mod }.into();
-//     //     }
-//     //     new_attrs.push(get_loggable_attr_params(
-//     //         attr,
-//     //         &mut has_loggable,
-//     //         enclosing_item_attr_args,
-//     //     ));
-//     // }
-
-//     let content =
-//     // if has_loggable {
-//     //     // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
-//     //     // No item traversing. The items are passed as they are (for subsequent separate `#[loggable]` macro expansion).
-//     //     let content = content.as_ref().map(|(_brace, items)| {
-//     //         quote! { { #(#items)* } }
-//     //     });
-//     //     content
-//     // } else
-//     {
-//         let attr_args = AttrArgs {
-//             // NOTE: Diff from quote_as_item_mod():
-//             prefix: {
-//                 let prefix = &enclosing_item_attr_args.prefix;
-//                 if prefix.to_string() == "::" {
-//                     quote! { ::#ident }
-//                 } else {
-//                     quote! { #prefix::#ident }
-//                 }
-//             },
-//             ..*enclosing_item_attr_args
-//         };
-
-//         // Traverse the items:
-//         let content = content.as_ref().map(|(_brace, items)| {
-//             let mut traversed_items = quote! {};
-//             for item in items {
-//                 let item = quote_as_item(item, &attr_args, false); // TODO: Consider `false` arg in detail.
-//                 traversed_items = quote! { #traversed_items #item };
-//             }
-//             quote! { #traversed_items } // NOTE: Diff from quote_as_item_mod(): Non-braced content.
-//         });
-//         content
-//     };
-
-//     // NOTE: Diff from quote_as_item_mod(): Just #content and nothing else.
-//     quote! {
-//         // #(#new_attrs)* // No any other attrs are expected around `#[loggable_block_contents`.
-//         // #vis
-//         // #unsafety
-//         // #mod_token
-//         // #ident
-//         #content
-//         // #semi
-//     }
-//     /*
-//     fn quote_as_item_mod(
-//         item_mod: &syn::ItemMod,
-//         enclosing_item_attr_args: &AttrArgs,
-//     ) -> proc_macro2::TokenStream {
-//         let syn::ItemMod {
-//             attrs,     //: Vec<Attribute>,
-//             vis,       //: Visibility,
-//             unsafety,  //: Option<Unsafe>,
-//             mod_token, //: Mod,
-//             ident,     //: Ident,
-//             content,   //: Option<(Brace, Vec<Item>)>,
-//             semi,      //: Option<Semi>,
-//         } = item_mod;
-
-//     }
-
-//     */
-//     // quote! {}
-// }
 
 fn quote_as_item_mod(
     item_mod: &syn::ItemMod,
@@ -1005,28 +768,9 @@ fn quote_as_item_mod(
     }
 
     let content = if has_loggable {
-        // // NOTE: The impl below deosn't compile since either a trait or a type have to be locally defined.
-        // impl quote::ToTokens for (syn::token::Brace, Vec<syn::Item>) {
-        //     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        //         let (.., items) = self;
-        //         let mut tokenized_items = quote! {};
-        //         for item in items {
-        //             tokenized_items = quote! { #tokenized_items #item };
-        //         }
-        //         *tokens = quote! { { #tokenized_items } }
-        //     }
-        // }
-        //
-        // quote! { #content }
-
         // No item traversing. The items are passed as they are.
         let content = content.as_ref().map(|(_brace, items)| {
             quote! { { #(#items)* } }
-            // let mut copied_items = quote! {};
-            // for item in items {
-            //     copied_items = quote! { #copied_items #item };
-            // }
-            // quote! { { #copied_items } }
         });
         content
     } else {
@@ -1207,11 +951,11 @@ fn quote_as_trait_item_macro_rules_invocation(
         ));
     }
     if has_loggable {
-        // For the macro invocations with `#[loggable` combine 
-        // the enclosing entity's args of `#[loggable` 
-        // and the current item's args of `#[loggable` 
+        // For the macro invocations with `#[loggable` combine
+        // the enclosing entity's args of `#[loggable`
+        // and the current item's args of `#[loggable`
         // in `new_attrs`
-        // and leave the macro invocation as is for the subsequent individual macro-expansion 
+        // and leave the macro invocation as is for the subsequent individual macro-expansion
         // of `#[loggable` (with combined args) for this macro invocation.
         quote! { #(#new_attrs)* #mac #semi_token }
         // quote! { #trait_item_macro }
@@ -1310,16 +1054,6 @@ fn quote_as_item_trait(
     // That's why we cannot expand the traits' `#generics` when extending the prefix.
     let items = if has_loggable {
         quote! { #(#items)* }
-        // // Intention:
-        // // quote! { #items }   // Compiler Error: the trait `quote::ToTokens` is not implemented for `Vec<TraitItem>`
-        // // Workaround:
-        // // (TODO: Consider
-        // // [Using the Newtype Pattern to Implement External Traits on External Types](https://rust-book.cs.brown.edu/ch20-02-advanced-traits.html#using-the-newtype-pattern-to-implement-external-traits-on-external-types))
-        // let mut copied_items = quote! {};
-        // for item in items {
-        //     copied_items = quote! { #copied_items #item };
-        // }
-        // copied_items
     } else {
         let attr_args = AttrArgs {
             prefix: if enclosing_item_attr_args.prefix.is_empty() {
@@ -1438,11 +1172,11 @@ fn instrumented_macro_name_ts(macro_name: &syn::Path) -> proc_macro2::TokenStrea
         last_path_segment.ident.to_string()
     );
     let last_path_segment_args = &last_path_segment.arguments;
-    let mut result = quote! { #prefixed_last_path_segment_ident #last_path_segment_args };
+    let mut result = quote! { #prefixed_last_path_segment_ident #last_path_segment_args };  // [0]
     // NOTE: Right to left:
     for (index, path_segment) in macro_name.segments.iter().rev().enumerate() {
         if index != 0 {
-            result = quote! { #path_segment::#result };
+            result = quote! { #path_segment::#result }; // [1..]
         }
     }
     if let Some(leading_colon) = macro_name.leading_colon {
@@ -1450,49 +1184,10 @@ fn instrumented_macro_name_ts(macro_name: &syn::Path) -> proc_macro2::TokenStrea
     }
 
     result
-
-    // let count = macro_name.segments.len();
-    // for (index, path_segment) in macro_name.segments.iter().enumerate() {
-    //     if index != 0 {
-    //         result = quote!{ #result:: };
-    //     }
-
-    //     if index == count - 1 {
-    //     // if let Some(last) = macro_name.segments.last() {
-    //         if path_segment ==
-    //         // if path_segment == last {   // NOTE: features = "extra-traits"
-    //             let prefixed_name = quote::format_ident!(
-    //                 "loggable_macro_{}",    // TODO: `loggable_macro_` to the file of consts.
-    //                 path_segment.to_token_stream().to_string()
-    //                 // macro_name.to_token_stream().to_string()
-    //             );
-    //             result = quote!{ #result #prefixed_name };
-    //         } else {
-    //             result = quote!{ #result #path_segment };
-    //         }
-    //    } else {
-    //         // Must never get here (there must always be the last path segment in a macro name
-    //         // or the loop iteration must be entered).
-    //         debug_assert!(false, "FCL Internal Error: Unexpected state of a macro path segment");
-    //     }
-    // }
-    // // let last_segm: Option<&syn::PathSegment> = macro_name.segments.last();
-    // let new_name = quote::format_ident!(
-    //     "loggable_macro_{}",
-    //     macro_name.to_token_stream().to_string()
-    // );
-    // quote! { #new_name }
-    // // use syn::spanned::Spanned;
-    // // let concatenated = remove_spaces(&format!(
-    // //     "loggable_macro_{}",
-    // //     name.to_token_stream().to_string()
-    // // ));
-    // // let ident = syn::Ident::new(&concatenated, name.span());
-    // // quote! { #ident }
 }
 
 fn quote_as_item_macro_rules_invocation(
-    item_macro: &ItemMacro, /*mac: &Macro*/
+    item_macro: &ItemMacro,
     enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     // Invocation, e.g. in a `trait`.
@@ -1511,35 +1206,17 @@ fn quote_as_item_macro_rules_invocation(
                           // ..
     } = mac;
 
-    // Intention: `quote!{ #(#new_attrs)* }`:
-    // // TODO: Consder extracting to a separate  function.
-    // let mut quoted_attrs = quote! {};
-    // for attr in attrs {
-    //     quoted_attrs = quote! { #quoted_attrs #attr }
-    // }
+    // TODO: What about combining `attr_args`?
 
     let quoted_macro_name = instrumented_macro_name_ts(macro_name);
-    // {
-    //     let concatenated = remove_spaces(&format!(
-    //         "loggable_macro_{}",
-    //         macro_name.to_token_stream().to_string()
-    //     )); //.<&syn::Path as Into<String>>::into());//.to_string());
-    //     use syn::spanned::Spanned;
-    //     let ident = syn::Ident::new(&concatenated, macro_name.span());
-    //     quote! { #ident }
-    // };
-    // quote::format_ident!("loggable_macro_{}", macro_name);
-    // remove_spaces(&quote! { loggable_macro_ #macro_name }.to_string());
 
     let AttrArgs {
         prefix,             // : TokenStream,
         params_logging,     // : ParamsLogging,
         log_closure_coords, // : bool,
     } = enclosing_item_attr_args;
-    // TODO: Consider somthing better than `.to_string()` and `::`.
-    let prefix = if prefix.to_string() == quote! {}.to_string() {
+    let prefix = if prefix.is_empty() {
         quote! { __ } // TODO: `__` to file of consts. // TODO: Document it in the mdBook. 
-    // quote! { :: }
     } else {
         prefix.clone()
     };
@@ -1553,14 +1230,6 @@ fn quote_as_item_macro_rules_invocation(
         quote! { skip_closure_coords }
     };
     let quoted_delimited_macro_args = match delimiter {
-        // TODO: add macro invocation args: `$prefix:path, $params_setting:ident, $closure_coords_setting:ident`
-        // macro_rules! loggable_macro_trait_contents {
-        //     ($prefix:path, $params_setting:ident, $closure_coords_setting:ident,) => {
-        //         #[loggable_block_contents(prefix =  $prefix, $params_setting, $closure_coords_setting)]
-        //         mod loggable_block_contents {
-        //             fn absent_af(_p: u8) {
-        //                 Some(0).map(|x| x);
-        //             }
         syn::MacroDelimiter::Paren(_) => {
             quote! { ( #prefix, #params_logging, #log_closure_coords, #macro_args ) }
         }
@@ -1617,14 +1286,6 @@ fn quote_as_item_macro(
 
     // If `macro_rules` definition (rather than invocation):
     if ident.is_some() {
-        // for attr in attrs {
-        //     if attr.is_fcl_attribute("loggable") {
-        //         // The `#[loggable]` attr is present - we got here during the recursive traverse of an enclosing entity (like `mod`).
-        //         return quote! { #item_macro }; // Leave as is for the subsequent individual (`top_level`) expansion.
-        //         // return quote_as_item_macro(item_macro, enclosing_item_attr_args)   // Handle the annotated macro.
-        //     }
-        // }
-
         // The `#[loggable]` attr is absent -
         // either the top level (individual macro-expansion of the `#[loggable` annotation of the `macro_rules` definition),
         // or non-annotated macro_rules def-n.

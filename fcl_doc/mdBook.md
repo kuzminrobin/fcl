@@ -1202,6 +1202,169 @@ then,
     those passed during invocations, similar to how the local varaibles in the nested scope override those 
     defined in the enclosing scope).
 
+#### Likely Out-of-Date
+```rs
+    // Need to transform
+    //
+    // #[loggable]    // Not present.
+    // macro_rules! block_items {
+    //      // https://doc.rust-lang.org/reference/macros-by-example.html
+    //      // MacroMatcher `=>` MacroTranscriber
+    //      // MacroMatcher →
+    //      //     `(` MacroMatch* `)`
+    //      //   | `[` MacroMatch* `]`
+    //      //   | `{` MacroMatch* `}`
+    //      (<params_alpha>) => {
+    //          // User can also optionally annotate each `fn` and other items here.
+    //          fn f() {}  // Items of a block. They use <params_alpha>.
+    //      }
+    //      (<params_beta>) => {
+    //          // User can also optionally annotate each `fn` and other items here.
+    //          fn g() {}  // Items of a block. They use <params_beta>.
+    //      }
+    // }
+    //
+    // to
+    //
+    // macro_rules! loggable_macro_block_items {
+    //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <params_alpha>) => {
+    //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+    //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
+    //              fn f() {}  // Items of a block. They use <params_alpha>.
+    //          }
+    //      }
+    //      ($prefix:.., $params_setting:.., $closure_coords_setting:.., <params_beta>) => {
+    //          #[loggable_block_contents(prefix=$prefix, $params_setting, $closure_coords_setting)]
+    //          mod loggable_block_contents{_{<GUID>|<Number>}?} {
+    //              fn g() {}  // Items of a block. They use <params_beta>.
+    //          }
+    //      }
+    // }
+```    
+
+```rs
+// // TODO: Consider and document `// No any other attrs.`:
+// // // Other attrs before.
+// // // Other attrs after.
+// // macro_rules! loggable_macro_trait_contents {
+// //     ($prefix:path, $params_setting:ident, $closure_coords_setting:ident,) => {
+// //         // No any other attrs.
+// //         #[loggable_block_contents(prefix =  $prefix, $params_setting, $closure_coords_setting)]
+// //         // No any other attrs.
+// //         mod loggable_block_contents {
+// //             fn absent_af(_p: u8) {
+// //                 Some(0).map(|x| x);
+// //             }
+
+// // NOTE: Expanding `#[loggable_block_contents`.
+// pub(crate) fn quote_as_item_mod_loggable_block_contents(
+//     item_mod: &syn::ItemMod,
+//     enclosing_item_attr_args: &AttrArgs,
+// ) -> proc_macro2::TokenStream {
+//     let syn::ItemMod {
+//         // attrs, // : Vec<Attribute>,
+//         // vis,       // : Visibility,
+//         // unsafety,  // : Option<Unsafe>,
+//         // mod_token, // : Mod,
+//         ident, // : Ident,
+//         content, // : Option<(Brace, Vec<Item>)>,
+//                // semi,      // : Option<Semi>,
+//         ..
+//     } = item_mod;
+
+//     // TODO: "loggable_block_contents" to consts file.
+//     if ident.to_string() != "loggable_block_contents" {
+//         return syn::Error::new(
+//             ident.span(),
+//             format!("expected `{}`", "loggable_block_contents"),
+//         )
+//         .into_compile_error()
+//         .into();
+//         // syn::Error::into_compile_error()
+//     }
+
+//     // let mut new_attrs = vec![];
+//     // let mut has_loggable = false;
+//     //
+//     // for attr in attrs {
+//     //     if attr.is_non_loggable() {
+//     //         // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
+//     //         return quote! { #item_mod }.into();
+//     //     }
+//     //     new_attrs.push(get_loggable_attr_params(
+//     //         attr,
+//     //         &mut has_loggable,
+//     //         enclosing_item_attr_args,
+//     //     ));
+//     // }
+
+//     let content =
+//     // if has_loggable {
+//     //     // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
+//     //     // No item traversing. The items are passed as they are (for subsequent separate `#[loggable]` macro expansion).
+//     //     let content = content.as_ref().map(|(_brace, items)| {
+//     //         quote! { { #(#items)* } }
+//     //     });
+//     //     content
+//     // } else
+//     {
+//         let attr_args = AttrArgs {
+//             // NOTE: Diff from quote_as_item_mod():
+//             prefix: {
+//                 let prefix = &enclosing_item_attr_args.prefix;
+//                 if prefix.to_string() == "::" {
+//                     quote! { ::#ident }
+//                 } else {
+//                     quote! { #prefix::#ident }
+//                 }
+//             },
+//             ..*enclosing_item_attr_args
+//         };
+
+//         // Traverse the items:
+//         let content = content.as_ref().map(|(_brace, items)| {
+//             let mut traversed_items = quote! {};
+//             for item in items {
+//                 let item = quote_as_item(item, &attr_args, false); // TODO: Consider `false` arg in detail.
+//                 traversed_items = quote! { #traversed_items #item };
+//             }
+//             quote! { #traversed_items } // NOTE: Diff from quote_as_item_mod(): Non-braced content.
+//         });
+//         content
+//     };
+
+//     // NOTE: Diff from quote_as_item_mod(): Just #content and nothing else.
+//     quote! {
+//         // #(#new_attrs)* // No any other attrs are expected around `#[loggable_block_contents`.
+//         // #vis
+//         // #unsafety
+//         // #mod_token
+//         // #ident
+//         #content
+//         // #semi
+//     }
+//     /*
+//     fn quote_as_item_mod(
+//         item_mod: &syn::ItemMod,
+//         enclosing_item_attr_args: &AttrArgs,
+//     ) -> proc_macro2::TokenStream {
+//         let syn::ItemMod {
+//             attrs,     //: Vec<Attribute>,
+//             vis,       //: Visibility,
+//             unsafety,  //: Option<Unsafe>,
+//             mod_token, //: Mod,
+//             ident,     //: Ident,
+//             content,   //: Option<(Brace, Vec<Item>)>,
+//             semi,      //: Option<Semi>,
+//         } = item_mod;
+
+//     }
+
+//     */
+//     // quote! {}
+// }
+```
+
 # Rare Cases
 ## The Arbitrary Cobination of `#[non_loggable]` and `#[loggable]`, Conflicting Arguments
 TODO: 

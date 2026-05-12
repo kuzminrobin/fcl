@@ -421,7 +421,7 @@ trait FclAttribute {
 }
 impl FclAttribute for syn::Attribute {
     /// Returns
-    /// * `true` if `self` { is `<attr_name>` or ends with `fcl_proc_macros::<attr_name>` },
+    /// * `true` if `self` { equals `attr_name` parameter or ends with `fcl_proc_macros::<attr_name>` },
     /// * `false` otherwise.
     // NOTE: Contains/assumes "fcl_proc_macros". Not to be renamed to `is()`.
     fn is_fcl_attribute(&self, attr_name: &str) -> bool {

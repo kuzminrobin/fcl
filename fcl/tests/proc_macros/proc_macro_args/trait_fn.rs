@@ -407,5 +407,12 @@ fn trait_fn() {
         );
         log.borrow_mut().clear();
     }
+    // fn f() {
+    //     // custom attributes cannot be applied to statements
+    //     // see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
+    //     // add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
+    //     #[loggable]
+    //     let _i = 0;
+    // }
 }
 
