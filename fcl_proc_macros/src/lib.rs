@@ -517,21 +517,11 @@ impl FclAttribute for syn::Attribute {
     // }
 
     // TODO: Remove when stopped using it.
+    /// Returns 
+    /// * `true` if the attribute is { `non_loggable` or `loggable`, optionally prefixed with `fcl_proc_macros::` }
+    /// * `false` otherwise.
     fn is_traverse_stopper(&self) -> bool {
-        let path = match &self.meta {
-            syn::Meta::Path(path) => path,
-            syn::Meta::List(syn::MetaList { path, .. }) => path,
-            // syn::Meta::NameValue(MetaNameValue { path, .. }) => path,
-            _ => return false,
-        };
-        if let Some(last_path_segment) = path.segments.last() {
-            let last_path_segment_str = last_path_segment.ident.to_string();
-            last_path_segment_str == "loggable" // Will be handled in a separate pass
-            // of the preprocessor (otherwise causes a double instrumentation or smth. like that).
-            || last_path_segment_str == "non_loggable"
-        } else {
-            return false;
-        }
+        self.is_fcl_attribute("non_loggable") || self.is_fcl_attribute("loggable")
     }
 }
 

@@ -1721,7 +1721,10 @@ The same is applicable to the `main()` thread, whose data are shown above the up
 
 Upon program termination the middle layer (the global data) is destroyed.
 
-## The Log Distortion During the Thread Switch 
+## The Log Distortion
+The `#[loggable]` functions are hardly optimized out (inlined).
+
+### The Log Distortion During the Thread Switch 
 
 (Unsorted. Requires knowledge of the architecture, in particular the single mutex approach)
 
@@ -1743,7 +1746,7 @@ To summarize, the log can show that the thread switch happened later relative to
 
 How large is the distortion? Depends on the thread synchrinization approach of the operating system and on the code being logged. If there are lengthy fragments without loops and calls, then the distortion is minimal. But the more often the code execution passes through the starts and ends of the loops, functions, and closures the larger is the distortion (and the slow-down because of logging. TODO: explain the slow-down in the Performance Impact chapter).
 
-### Minimizing the Log Distortion
+#### Minimizing the Log Distortion
 (Raw, draft)  
 Consider placing the thread synchronization mechanism (ThreadGatekeeper and CallLoggerArbiter)
 after the CallLogInfra, such that the threads can access their own CallLogInfra in parallel.

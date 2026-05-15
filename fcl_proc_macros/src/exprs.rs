@@ -59,6 +59,23 @@ fn quote_as_expr_assign(
 fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     // `LocalInit` represents `= s.parse()?` in `let x: u64 = s.parse()?` and
     // `= r else { return }` in `let Ok(x) = r else { return }`.
+    //
+    // `LocalInit` can also be  like this
+    // `
+    // #[loggable]
+    // fn f() {}
+    //
+    // ... 
+    // =        // `LocalInit` starts.
+    //   f()    // This expression has limitaions, see https://doc.rust-lang.org/reference/statements.html#grammar-LetStatement
+    // [else { 
+    //   #[loggable]
+    //   g() {}
+    //   return g();
+    // } ]`
+    // where nested `#[loggable]`s are handled in the `quote_as_expr()` below, 
+    // where their `attr_arg`s are combined with those of the enclosing entity.
+    // In other words combining the `attr_args` is not applicable here in this fn, is done deeper in the recursion.
     let syn::LocalInit {
         eq_token, //: Eq,
         expr,     //: Box<Expr>,
@@ -72,7 +89,14 @@ fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::To
     quote! { #eq_token #expr #diverge }
 }
 
-/// Handles the local `let` binding.
+/// Handles the local `let` binding during the recursive traverse.
+/// 
+/// At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
+/// ```txt
+/// custom attributes cannot be applied to statements
+/// see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
+/// add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
+/// ```
 fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     let syn::Local {
         attrs,      //: Vec<Attribute>,
@@ -82,11 +106,22 @@ fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::Toke
         semi_token, //: Semi,
     } = local;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #local };
-        }
-    }
+    // At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
+    // ```txt
+    // custom attributes cannot be applied to statements
+    // see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
+    // add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
+    // ```
+    // In other words the `let` binding cannot be `#[loggable]`.
+    // 
+    // That is why combining the `#[loggable]` `attr_args` here and those of the enclosing entity is not applicable.
+    // If revised then full combining needs to be implemented insted of the outdated code below.
+    // Out-of-date:
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #local };
+    //     }
+    // }
 
     let init = init.as_ref().map(|init| quote_as_init(init, attr_args));
 
@@ -122,7 +157,7 @@ fn quote_as_stmt_macro(
 /// Handles the statements during the recursive traverse.
 /// 
 /// At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
-/// ```ignore
+/// ```txt
 /// custom attributes cannot be applied to statements
 /// see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
 /// add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable

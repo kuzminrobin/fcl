@@ -1,5 +1,7 @@
 
 /*
+Find `is_traverse_stopper()` to see all the places to combine the `attr_args`.
+
 // Attr Args Combining
 quote_as_item                                   N/A
     quote_as_item_fn                            OK  fn_fn_*
@@ -7,11 +9,11 @@ quote_as_item                                   N/A
             quote_as_block                      N/A
                 quote_as_block_statements       N/A
                     quote_as_stmt               N/A
-                        quote_as_local          TODO
+                        quote_as_local          N/A
+                            quote_as_init       N/A
 >                        
-                            quote_as_init
-                        quote_as_item   ^
-                        quote_as_expr   v
+                        quote_as_item           ^ - see above
+                        quote_as_expr           v - see below
                         quote_as_stmt_macro
                             quote_as_macro
     quote_as_item_impl
@@ -35,6 +37,7 @@ quote_as_expr
 // impl struct       |     |       |      |        |            |                |       |       
 // impl trait        |     |       |      |        |            |                |       |      
 // fn                |     |       |      |        |            | fn_fn_*        |       |      
+//                   |     |       |      |        |            | fn_init_fn     |       |
 // static            |     |       |      |        |            |                |       |
 // -----------------------------------------------------------------------------------------------
 // Array             |     |       |      |        |            |                |       |
@@ -85,3 +88,4 @@ mod mod_fn;
 mod trait_fn;
 mod impl_struct_fn;
 mod trait_macro;
+mod fn_init_fn;
