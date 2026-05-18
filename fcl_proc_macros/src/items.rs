@@ -7,6 +7,33 @@ use quote::quote;
 use syn::spanned::Spanned;
 use syn::{ItemMacro, Macro};
 
+/// Combines the enclosing entity's attr_args with the current entity's attr_args,
+/// returns a tuple of
+/// * `true`, if the current entity has no `#[non_loggable]` attribute (the update succeeded),
+///   `false` otherwise (the update failed, in which case the other parts of the tuple should be ignored);
+/// * the vector of combined attributes (where the `#[loggable]` attribute arguments are combined);
+/// * `true`, if the current entity has `#[loggable]` (with or without arguments) among its attributes,
+///   `false` otherwise.
+fn updated_attr_args( // TODO: Apply wherever applicable.
+    current_attrs: &Vec<syn::Attribute>,
+    enclosing_item_attr_args: &AttrArgs,
+) -> (bool, Vec<syn::Attribute>, bool) {
+    let mut new_attrs = vec![];
+    let mut has_loggable = false;
+
+    for attr in current_attrs {
+        if attr.is_non_loggable() {
+            return (false, new_attrs, has_loggable); //quote! { #impl_item_fn };
+        }
+        new_attrs.push(get_loggable_attr_params(
+            attr,
+            &mut has_loggable,
+            enclosing_item_attr_args,
+        ));
+    }
+    (true, new_attrs, has_loggable)
+}
+
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
 // fn quote_as_item_const(item_const: &ItemConst, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
@@ -407,10 +434,6 @@ fn quote_as_item_fn(
             &mut has_loggable,
             enclosing_item_attr_args,
         ));
-
-        // if attr.is_traverse_stopper() {
-        //    return quote! { #item_fn };
-        //}
     }
 
     let block = if has_loggable {
@@ -445,7 +468,7 @@ fn quote_as_item_fn(
 // }
 fn quote_as_impl_item_fn(
     impl_item_fn: &syn::ImplItemFn,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ImplItemFn {
         attrs,       //: Vec<Attribute>,
@@ -455,13 +478,28 @@ fn quote_as_impl_item_fn(
         block,       //: Block,
     } = impl_item_fn;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #impl_item_fn };
-        }
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #impl_item_fn };
     }
-    let block = traversed_block_from_sig(block, sig, attr_args);
-    quote! { #(#attrs)* #vis #defaultness #sig #block }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #impl_item_fn };
+    //     }
+    // }
+
+    let block = if has_loggable {
+        // After updating/adding the params of/to #[loggable(<params>)]
+        // leave the fn body UNinstrumented, so that a separate #[loggable(<params>)] macro invocation
+        // will instrument the body.
+        quote! { #block } // TODO: Test.
+    } else {
+        traversed_block_from_sig(block, sig, enclosing_item_attr_args) // TODO: Test.
+    };
+    // let block = traversed_block_from_sig(block, sig, enclosing_item_attr_args);
+    quote! { #(#new_attrs)* #vis #defaultness #sig #block } // TODO: Test.
+    // quote! { #(#attrs)* #vis #defaultness #sig #block }
 }
 fn quote_as_impl_item(impl_item: &syn::ImplItem, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match impl_item {
@@ -1171,7 +1209,7 @@ fn instrumented_macro_name_ts(macro_name: &syn::Path) -> proc_macro2::TokenStrea
         last_path_segment.ident.to_string()
     );
     let last_path_segment_args = &last_path_segment.arguments;
-    let mut result = quote! { #prefixed_last_path_segment_ident #last_path_segment_args };  // [0]
+    let mut result = quote! { #prefixed_last_path_segment_ident #last_path_segment_args }; // [0]
     // NOTE: Right to left:
     for (index, path_segment) in macro_name.segments.iter().rev().enumerate() {
         if index != 0 {
