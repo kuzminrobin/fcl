@@ -128,6 +128,9 @@ fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::Toke
     quote! { #(#attrs)* #let_token #pat #init #semi_token }
 }
 
+/// Handles a macro invocation as a statement. 
+/// * Prepends the invocation with `maybe_flush()`, if the macro is `[e]print[ln]`;
+/// * Surrounds with `{}` the `maybe_flush()` followed by the invocation in case of prepending.
 fn quote_as_stmt_macro(
     stmt_macro: &syn::StmtMacro,
     attr_args: &AttrArgs,
@@ -137,6 +140,21 @@ fn quote_as_stmt_macro(
         mac,        //: Macro,
         semi_token, //: Option<Semi>,
     } = stmt_macro;
+
+    // At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
+    // ```txt
+    // custom attributes cannot be applied to statements
+    // see issue #54727 <https://github.com/rust-lang/rust/issues/54727> for more information
+    // add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
+    // ```
+    // In other words the macro invocation as a statement cannot be `#[loggable]`.
+    // 
+    // So, the `attr_args` combining is not applicable here.
+    // 
+    // TODO: What if the user has `#![feature(proc_macro_hygiene)]` (see a few lines above)
+    // and still tries to use `#[loggable]` for statements? Consider in detail what must and what will happen[, document it].
+    // Maybe just implement the `attr_args` combining? (It will be dead code by default, but will work as expected with 
+    // `#![feature(proc_macro_hygiene)]` + {`#[loggable]` on statements}).
 
     let mut maybe_flush_invocation = quote! {};
     let mac = quote_as_macro(&mac, &mut maybe_flush_invocation, attr_args);
@@ -765,6 +783,10 @@ fn quote_as_expr_loop(expr_loop: &syn::ExprLoop, attr_args: &AttrArgs) -> proc_m
         }
     }
 }
+
+/// * Assigns `quote { logger.borrow_mut()[.borrow_mut()].maybe_flush(); }` to the parameter `maybe_flush_invocation`,
+///   if the macro name is "\[e]print\[ln]".
+/// * Quotes (`quote{}`) the macro as is. Ignores the `_attr_args` parameter.
 pub fn quote_as_macro(
     macro_: &syn::Macro,
     maybe_flush_invocation: &mut proc_macro2::TokenStream,
@@ -783,6 +805,11 @@ pub fn quote_as_macro(
             || &macro_name.ident.to_string() == &"eprintln"
             || &macro_name.ident.to_string() == &"eprint"
         {
+            // TODO: Assert the optional last-but-one path segment is "std" 
+            // (and no more path segments, 
+            // or their simplified/canonical form ends up in `std`, e.g., `std::something_unrelated::..` is equivalent to `std`, 
+            // if `..` is supported in the paths).
+
             #[cfg(feature = "singlethreaded")]
             let thread_logger_access = quote! {
                 fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
@@ -803,6 +830,8 @@ pub fn quote_as_macro(
     }
     quote! { #macro_ }
 }
+
+/// Handles a macro invocation as an expression.
 fn quote_as_expr_macro(
     expr_macro: &syn::ExprMacro,
     attr_args: &AttrArgs,

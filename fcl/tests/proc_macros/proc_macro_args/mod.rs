@@ -2,21 +2,24 @@
 /*
 Find `is_traverse_stopper()` to see all the places to combine the `attr_args`.
 
-// Attr Args Combining
+//                                            | Attr Args Combining
+//--------------------------------------------+-----------------------
 quote_as_item                                   N/A
     quote_as_item_fn                            OK  fn_fn_*
         traversed_block_from_sig                N/A
             quote_as_block                      N/A
                 quote_as_block_statements       N/A
                     quote_as_stmt               N/A
-                        quote_as_local          N/A
+                        quote_as_local          N/A (w TODO, see below)
                             quote_as_init       N/A
->                        
                         quote_as_item           ^ - see above
                         quote_as_expr           v - see below
-                        quote_as_stmt_macro
-                            quote_as_macro
-    quote_as_item_impl
+                        quote_as_stmt_macro     N/A (w TODO "What if the user has `#![feature(proc_macro_hygiene)]`")
+                            quote_as_macro      N/A, ignores `attr_args`.
+>                        
+    quote_as_item_impl                          OK. TODO: Tests
+        quote_as_impl_item
+            quote_as_impl_item_fn               TODO: Test, Fail, Implement, Succeed (TDD).
     quote_as_item_macro
     quote_as_item_mod
     quote_as_item_static

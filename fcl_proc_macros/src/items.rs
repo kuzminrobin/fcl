@@ -470,7 +470,7 @@ fn quote_as_impl_item(impl_item: &syn::ImplItem, attr_args: &AttrArgs) -> proc_m
         // // closures (as opposed to compile time const functions and closures).
         // syn::ImplItem::Const(impl_item_const) => quote_as_impl_item_const(impl_item_const, attr_args),
         // syn::ImplItem::Type(impl_item_type) => quote_as_impl_item_type(impl_item_type, attr_args),
-        // syn::ImplItem::Macro(impl_item_macro) => quote_as_impl_item_macro(impl_item_macro, attr_args),   // A macro invocation within an impl block.
+        // syn::ImplItem::Macro(impl_item_macro) => quote_as_impl_item_macro(impl_item_macro, attr_args),   // A macro invocation within an impl block.  // TODO.
         // syn::ImplItem::Verbatim(token_stream) => quote_as_token_stream(token_stream, attr_args),
         other => quote! { #other },
     }
@@ -497,7 +497,6 @@ fn quote_as_item_impl(
 
     for attr in attrs {
         if attr.is_non_loggable() {
-            // if attr.is_traverse_stopper() {
             return quote! { #item_impl };
         }
         new_attrs.push(get_loggable_attr_params(
