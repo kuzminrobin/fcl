@@ -2,14 +2,14 @@ use std::str::FromStr;
 
 use crate::{
     AttrArgs, FclAttribute, ParamsLogging, items::quote_as_item, remove_spaces,
-    update_param_data_from_pat,
+    update_param_data_from_pat, updated_attr_args,
 };
 use quote::quote;
 use syn::spanned::Spanned;
 
 fn quote_as_expr_array(
     expr_array: &syn::ExprArray,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprArray { // [a, b, c, d]
         attrs, //: Vec<Attribute>,
@@ -17,26 +17,47 @@ fn quote_as_expr_array(
         elems, //: Punctuated<Expr, Comma>,
         .. // bracket_token
     } = expr_array;
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_array };
-        }
+
+    // TODO:
+    // * Consider `update_passed` -> `attrs_have_non_loggable` | `non_loggable_found`.
+    // *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_array };
     }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_array };
+    //     }
+    // }
     let elems = {
-        let mut traversed_elems = quote! {};
-        for elem in elems {
-            let traversed_elem = quote_as_expr(elem, None, attr_args);
-            traversed_elems = quote! { #traversed_elems #traversed_elem , };
+        if has_loggable {
+            quote! { #elems } // TODO: Test.
+        } else {
+            let mut traversed_elems = quote! {};
+            for elem in elems {
+                let traversed_elem = quote_as_expr(elem, None, enclosing_item_attr_args);
+                traversed_elems = quote! { #traversed_elems #traversed_elem , };
+            }
+            traversed_elems
         }
-        traversed_elems
+
+        // let mut traversed_elems = quote! {};
+        // for elem in elems {
+        //     let traversed_elem = quote_as_expr(elem, None, attr_args);
+        //     traversed_elems = quote! { #traversed_elems #traversed_elem , };
+        // }
+        // traversed_elems
     };
 
-    quote! { #(#attrs)* [ #elems ] }
+    quote! { #(#new_attrs)* [ #elems ] }
+    // quote! { #(#attrs)* [ #elems ] }
 }
 
 fn quote_as_expr_assign(
     expr_assign: &syn::ExprAssign,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     // a = compute()
     let syn::ExprAssign {
@@ -46,14 +67,30 @@ fn quote_as_expr_assign(
         right,    //: Box<Expr>,
     } = expr_assign;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_assign };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_assign };
     }
-    let left = quote_as_expr(left, None, attr_args);
-    let right = quote_as_expr(right, None, attr_args);
-    quote! { #(#attrs)* #left #eq_token #right }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_assign };
+    //     }
+    // }
+
+    let (left, right) = if has_loggable {
+        (quote! { #left }, quote! { #right }) // TODO: Test.
+    } else {
+        (
+            quote_as_expr(left, None, enclosing_item_attr_args), // TODO: Test.
+            quote_as_expr(right, None, enclosing_item_attr_args), // TODO: Test.
+        )
+    };
+    // let left = quote_as_expr(left, None, enclosing_item_attr_args);
+    // let right = quote_as_expr(right, None, enclosing_item_attr_args);
+
+    quote! { #(#new_attrs)* #left #eq_token #right }
+    // quote! { #(#attrs)* #left #eq_token #right }
 }
 
 fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
@@ -65,15 +102,15 @@ fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::To
     // #[loggable]
     // fn f() {}
     //
-    // ... 
+    // ...
     // =        // `LocalInit` starts.
     //   f()    // This expression has limitaions, see https://doc.rust-lang.org/reference/statements.html#grammar-LetStatement
-    // [else { 
+    // [else {
     //   #[loggable]
     //   g() {}
     //   return g();
     // } ]`
-    // where nested `#[loggable]`s are handled in the `quote_as_expr()` below, 
+    // where nested `#[loggable]`s are handled in the `quote_as_expr()` below,
     // where their `attr_arg`s are combined with those of the enclosing entity.
     // In other words combining the `attr_args` is not applicable here in this fn, is done deeper in the recursion.
     let syn::LocalInit {
@@ -90,7 +127,7 @@ fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::To
 }
 
 /// Handles the local `let` binding during the recursive traverse.
-/// 
+///
 /// At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
 /// ```txt
 /// custom attributes cannot be applied to statements
@@ -113,7 +150,7 @@ fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::Toke
     // add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
     // ```
     // In other words the `let` binding cannot be `#[loggable]`.
-    // 
+    //
     // That is why combining the `#[loggable]` `attr_args` here and those of the enclosing entity is not applicable.
     // If revised then full combining needs to be implemented insted of the outdated code below.
     // Out-of-date:
@@ -128,7 +165,7 @@ fn quote_as_local(local: &syn::Local, attr_args: &AttrArgs) -> proc_macro2::Toke
     quote! { #(#attrs)* #let_token #pat #init #semi_token }
 }
 
-/// Handles a macro invocation as a statement. 
+/// Handles a macro invocation as a statement.
 /// * Prepends the invocation with `maybe_flush()`, if the macro is `[e]print[ln]`;
 /// * Surrounds with `{}` the `maybe_flush()` followed by the invocation in case of prepending.
 fn quote_as_stmt_macro(
@@ -148,12 +185,12 @@ fn quote_as_stmt_macro(
     // add `#![feature(proc_macro_hygiene)]` to the crate attributes to enable
     // ```
     // In other words the macro invocation as a statement cannot be `#[loggable]`.
-    // 
+    //
     // So, the `attr_args` combining is not applicable here.
-    // 
+    //
     // TODO: What if the user has `#![feature(proc_macro_hygiene)]` (see a few lines above)
     // and still tries to use `#[loggable]` for statements? Consider in detail what must and what will happen[, document it].
-    // Maybe just implement the `attr_args` combining? (It will be dead code by default, but will work as expected with 
+    // Maybe just implement the `attr_args` combining? (It will be dead code by default, but will work as expected with
     // `#![feature(proc_macro_hygiene)]` + {`#[loggable]` on statements}).
 
     let mut maybe_flush_invocation = quote! {};
@@ -173,7 +210,7 @@ fn quote_as_stmt_macro(
 }
 
 /// Handles the statements during the recursive traverse.
-/// 
+///
 /// At the moment of writing it is assumed that this fn can only be called as a part of the recursive traverse since
 /// ```txt
 /// custom attributes cannot be applied to statements
@@ -221,7 +258,7 @@ pub fn quote_as_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2::
 
 fn quote_as_expr_async(
     expr_async: &syn::ExprAsync,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprAsync {
         // async { ... }
@@ -231,17 +268,31 @@ fn quote_as_expr_async(
         block,       //: Block,
     } = expr_async;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_async };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_async };
     }
-    let block = quote_as_block(block, attr_args);
-    quote! { #(#attrs)* #async_token #capture #block }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_async };
+    //     }
+    // }
+
+    let block = if has_loggable {
+        quote! { #block } // TODO: Test.
+    } else {
+        quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
+    };
+    // let block = quote_as_block(block, enclosing_item_attr_args);
+
+    quote! { #(#new_attrs)* #async_token #capture #block } // TODO: Test.
+    // quote! { #(#attrs)* #async_token #capture #block }
 }
+
 fn quote_as_expr_await(
     expr_await: &syn::ExprAwait,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprAwait {
         // fut.await
@@ -251,17 +302,32 @@ fn quote_as_expr_await(
         await_token, //: Await,
     } = expr_await;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_await };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_await };
     }
-    let base = quote_as_expr(base, None, attr_args);
-    quote! { #(#attrs)* #base #dot_token #await_token }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_await };
+    //     }
+    // }
+
+    let base = if has_loggable {
+        quote! { #base } // TODO: Test.
+    } else {
+        quote_as_expr(base, None, enclosing_item_attr_args) // TODO: Test.
+    };
+    // let base = quote_as_expr(base, None, attr_args);
+
+    quote! { #(#new_attrs)* #base #dot_token #await_token } // TODO: Test.
+    // quote! { #(#attrs)* #base #dot_token #await_token }
 }
+
+/// Handles the binary operator expressions (like `a + b`, `a += b`).
 fn quote_as_expr_binary(
     expr_binary: &syn::ExprBinary,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprBinary {
         // `a + b`, `a += b`
@@ -271,18 +337,35 @@ fn quote_as_expr_binary(
         right, //: Box<Expr>,
     } = expr_binary;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_binary };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_binary };
     }
-    let left = quote_as_expr(left, None, attr_args);
-    let right = quote_as_expr(right, None, attr_args);
-    quote! { #(#attrs)* #left #op #right }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_binary };
+    //     }
+    // }
+
+    let (left, right) = if has_loggable {
+        (quote! { #left }, quote! { #right }) // TODO: Test.
+    } else {
+        (
+            quote_as_expr(left, None, enclosing_item_attr_args), // TODO: Test.
+            quote_as_expr(right, None, enclosing_item_attr_args), // TODO: Test.
+        )
+    };
+    // let left = quote_as_expr(left, None, enclosing_item_attr_args);
+    // let right = quote_as_expr(right, None, enclosing_item_attr_args);
+
+    quote! { #(#new_attrs)* #left #op #right }
+    // quote! { #(#attrs)* #left #op #right }
 }
+
 fn quote_as_expr_block(
     expr_block: &syn::ExprBlock,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprBlock {
         attrs, //: Vec<Attribute>,
@@ -290,17 +373,32 @@ fn quote_as_expr_block(
         block, //: Block,
     } = expr_block;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_block };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_block };
     }
-    let block = quote_as_block(block, attr_args);
-    quote! { #(#attrs)* #label #block }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_block };
+    //     }
+    // }
+
+    let block = if has_loggable {
+        quote! { #block } // TODO: Test.
+    } else {
+        quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
+    };
+    // let block = quote_as_block(block, enclosing_item_attr_args);
+
+    quote! { #(#new_attrs)* #label #block }
+    // quote! { #(#attrs)* #label #block }
 }
+
+/// Handles a `break ['label] [<break return value>]`.
 fn quote_as_expr_break(
     expr_break: &syn::ExprBreak,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprBreak {
         attrs,       //: Vec<Attribute>,
@@ -309,17 +407,45 @@ fn quote_as_expr_break(
         expr,        //: Option<Box<Expr>>,
     } = expr_break;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_break };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_break };
     }
-    let expr = expr
-        .as_ref()
-        .map(|expr| quote_as_expr(expr, None, attr_args));
-    quote! { #(#attrs)* #break_token #label #expr }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_break };
+    //     }
+    // }
+
+    let expr = expr.as_ref().map(|expr| {
+        if has_loggable {
+            quote! { #expr }
+        } else {
+            quote_as_expr(expr, None, enclosing_item_attr_args)
+        }
+        // quote_as_expr(expr, None, enclosing_item_attr_args)
+    });
+
+    quote! { #(#new_attrs)* #break_token #label #expr }
+    // quote! { #(#attrs)* #break_token #label #expr }
 }
-fn quote_as_expr_call(expr_call: &syn::ExprCall, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+
+/// Handles a function call expression: `invoke(a, b)`, `<expr>(<expr>, <expr>)`.
+///
+/// If the call is a standard output function, e.g. `"_[e]print"` (see details in `quote_as_expr_path()`),
+/// then prepends it with `maybe_flush()`, i.e. converts it to the following
+/// (to flush the FCL cache before the user's standard ouput)
+/// ```ignore
+/// {
+///     ... maybe_flush();
+///     <this call>
+/// }
+/// ```
+fn quote_as_expr_call(
+    expr_call: &syn::ExprCall,
+    enclosing_item_attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
     let syn::ExprCall {
         attrs, //: Vec<Attribute>,
         func, //: Box<Expr>,
@@ -328,29 +454,62 @@ fn quote_as_expr_call(expr_call: &syn::ExprCall, attr_args: &AttrArgs) -> proc_m
         .. // paren_token
     } = expr_call;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_call };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_call }; // TODO: Test.
     }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_call };
+    //     }
+    // }
+
     let mut is_print_func_name = false;
-    let func = quote_as_expr(func, Some(&mut is_print_func_name), attr_args);
-    let args = {
-        let mut traversed_args = quote! {};
-        for arg in args {
-            let traversed_arg = quote_as_expr(arg, None, attr_args);
-            traversed_args = quote! { #traversed_args #traversed_arg, }
-        }
-        traversed_args
+
+    let (func, args) = if has_loggable {
+        (quote! { #func }, quote! { #args }) // TODO: Test.
+    } else {
+        (
+            quote_as_expr(
+                func,
+                Some(&mut is_print_func_name),
+                enclosing_item_attr_args,
+            ), // TODO: Test.
+            {
+                let mut traversed_args = quote! {};
+                for arg in args {
+                    let traversed_arg = quote_as_expr(arg, None, enclosing_item_attr_args);
+                    traversed_args = quote! { #traversed_args #traversed_arg, }
+                }
+                traversed_args // TODO: Test.
+            }, // quote_as_expr(args, None, enclosing_item_attr_args),
+        )
     };
-    let mut ret_val = quote! { #(#attrs)* #func ( #args ) };
+    // let func = quote_as_expr(
+    //     func,
+    //     Some(&mut is_print_func_name),
+    //     enclosing_item_attr_args,
+    // );
+    // let args = {
+    //     let mut traversed_args = quote! {};
+    //     for arg in args {
+    //         let traversed_arg = quote_as_expr(arg, None, enclosing_item_attr_args);
+    //         traversed_args = quote! { #traversed_args #traversed_arg, }
+    //     }
+    //     traversed_args
+    // };
+
+    let mut ret_val = quote! { #(#new_attrs)* #func ( #args ) };
     if is_print_func_name {
         #[cfg(feature = "singlethreaded")]
         let thread_logger_access = quote! {
-            use std::borrow::BorrowMut;
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                logger.borrow_mut().borrow_mut().maybe_flush();
-            })
+            { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts.
+                use std::borrow::BorrowMut;
+                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                    logger.borrow_mut().borrow_mut().maybe_flush();
+                })
+            }
         };
         #[cfg(not(feature = "singlethreaded"))]
         let thread_logger_access = quote! {
@@ -359,13 +518,20 @@ fn quote_as_expr_call(expr_call: &syn::ExprCall, attr_args: &AttrArgs) -> proc_m
             })
         };
         ret_val = quote! {
-            #thread_logger_access;
-            #ret_val
+            {
+                #thread_logger_access;
+                #ret_val
+            }
         }
     };
     ret_val
 }
-fn quote_as_expr_cast(expr_cast: &syn::ExprCast, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
+
+/// Handles a cast expression: `foo as f64`.
+fn quote_as_expr_cast(
+    expr_cast: &syn::ExprCast,
+    enclosing_item_attr_args: &AttrArgs,
+) -> proc_macro2::TokenStream {
     // foo as f64
     let syn::ExprCast {
         attrs,    //: Vec<Attribute>,
@@ -374,17 +540,32 @@ fn quote_as_expr_cast(expr_cast: &syn::ExprCast, attr_args: &AttrArgs) -> proc_m
         ty,       //: Box<Type>,
     } = expr_cast;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_cast };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_cast }; // TODO: Test.
     }
-    let expr = quote_as_expr(expr, None, attr_args);
-    quote! { #(#attrs)* #expr #as_token #ty }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_cast };
+    //     }
+    // }
+
+    let expr = if has_loggable {
+        quote! { #expr } // TODO: Test.
+    } else {
+        quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
+    };
+    // let expr = quote_as_expr(expr, None, enclosing_item_attr_args);
+
+    quote! { #(#new_attrs)* #expr #as_token #ty }
+    // quote! { #(#attrs)* #expr #as_token #ty }
 }
+
+/// Handles a closure expression: `|a, b| a + b`.
 pub fn quote_as_expr_closure(
     expr_closure: &syn::ExprClosure,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ExprClosure {
         attrs,      //: Vec<Attribute>,
@@ -400,16 +581,22 @@ pub fn quote_as_expr_closure(
         body,       //: Box<Expr>,
     } = expr_closure;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #expr_closure };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_closure }; // TODO: Test.
     }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #expr_closure };
+    //     }
+    // }
+
     // Get the token stream of {{param names and values} optional string}:
     let input_vals = if inputs.is_empty() {
         quote! { None }
     } else {
-        match attr_args.params_logging {
+        match enclosing_item_attr_args.params_logging {
             ParamsLogging::Log => {
                 let mut param_format_str = String::new();
                 let mut param_list = quote! {};
@@ -428,7 +615,7 @@ pub fn quote_as_expr_closure(
     };
 
     // Closure name:
-    let coords_ts = if attr_args.log_closure_coords {
+    let coords_ts = if enclosing_item_attr_args.log_closure_coords {
         let (start_line, start_col) = {
             let proc_macro2::LineColumn { line, column } = or1_token.span().start();
             (line, column + 1)
@@ -442,24 +629,31 @@ pub fn quote_as_expr_closure(
         let to_ts_res = proc_macro2::TokenStream::from_str(&coords_str);
         match to_ts_res {
             Ok(ts) => quote! { #ts },
-            Err(_lex_err) => quote! { #coords_str },
+            Err(_lex_err) => quote! { #coords_str }, // TODO: Must never get here? Comment in detail.
         }
     } else {
         quote! { .. }
     };
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
-    if !attr_args.prefix.is_empty() {
-        let prefix = &attr_args.prefix;
+    if !enclosing_item_attr_args.prefix.is_empty() {
+        let prefix = &enclosing_item_attr_args.prefix;
         log_closure_name_ts = quote! { #prefix::#log_closure_name_ts }
     }
     let log_closure_name_str = remove_spaces(&log_closure_name_ts.to_string());
     let attr_args = AttrArgs {
         prefix: log_closure_name_ts,
-        ..*attr_args
+        ..*enclosing_item_attr_args
     };
 
-    let body = { quote_as_expr(&**body, None, &attr_args) };
+    // Optionally instrument the closure body:
+    let body = if has_loggable {
+        quote! { #body } // TODO: Test.
+    } else {
+        quote_as_expr(&**body, None, &attr_args) // TODO: Test.
+    };
+    // let body = { quote_as_expr(&**body, None, &attr_args) };
 
+    // `logging_is_on()`:
     let logging_is_on = quote! {
         logger.borrow()
     };
@@ -472,8 +666,10 @@ pub fn quote_as_expr_closure(
     };
 
     // Return the token stream of the instrumented closure:
+    // TODO: Test.
     quote! {
-        #(#attrs)*
+        #(#new_attrs)*
+        // #(#attrs)*
         #lifetimes #constness #movability #asyncness #capture
         #or1_token #inputs #or2_token #output
         {
@@ -805,9 +1001,9 @@ pub fn quote_as_macro(
             || &macro_name.ident.to_string() == &"eprintln"
             || &macro_name.ident.to_string() == &"eprint"
         {
-            // TODO: Assert the optional last-but-one path segment is "std" 
-            // (and no more path segments, 
-            // or their simplified/canonical form ends up in `std`, e.g., `std::something_unrelated::..` is equivalent to `std`, 
+            // TODO: Assert the optional last-but-one path segment is "std"
+            // (and no more path segments,
+            // or their simplified/canonical form ends up in `std`, e.g., `std::something_unrelated::..` is equivalent to `std`,
             // if `..` is supported in the paths).
 
             #[cfg(feature = "singlethreaded")]
@@ -954,6 +1150,14 @@ fn quote_as_expr_paren(
     let expr = quote_as_expr(&**expr, None, attr_args);
     quote! { #(#attrs)* ( #expr ) }
 }
+
+/// Handles the path (TODO: More details about the path).
+///
+/// ### Parameters
+/// * If the last path segment is `"_[e]print"` and the second parameter `is_print_func_name.is_some()`
+///   then updates the `is_print_func_name` parameter with the value `Option<&true>`.  
+///   TODO: .. -> 'If the path is `"[std::io::]_[e]print"` or `"[std::][e]print"`' (see `[e]println()` macro definition).
+///   TODO: Consider checking `is_print_func_name.is_some()` first.
 fn quote_as_expr_path(
     expr_path: &syn::ExprPath,
     is_print_func_name: Option<&mut bool>,
@@ -969,6 +1173,8 @@ fn quote_as_expr_path(
     if let Some(name) = path.segments.last() {
         let name = name.ident.to_string();
         if &name == &"_print" || &name == &"_eprint" {
+            // TODO: See also `std::[e]print()` in `[e]println()` macro definition.
+            // TODO: Validate the path segments prior to last (`std::io::` only).
             if let Some(is_print_func_name) = is_print_func_name {
                 *is_print_func_name = true;
             }
@@ -1309,6 +1515,33 @@ fn quote_as_expr_yield(
         .map(|ref_boxed_expr| quote_as_expr(&**ref_boxed_expr, None, attr_args));
     quote! { #(#attrs)* #yield_token #expr }
 }
+
+// NOTE:
+// ```txt
+// Compiler Error:
+//   attributes on expressions are experimental
+//   see issue #15701 <https://github.com/rust-lang/rust/issues/15701> for more information
+//   add `#![feature(stmt_expr_attributes)]` to the crate attributes to enable
+// ```
+// In other words,
+// * by default the expressions cannot be `#[loggable]`,
+//   and any code
+//      combining the attr_args of the expression's `#[loggable]`
+//      with those of the enclosing entity's `#[loggable]`
+//   is a dead code;
+// * but if the user has `#![feature(stmt_expr_attributes)]` and tries to make the expressions `#[loggable]`,
+//   or the attributes on expressions stop being experimental,
+//   then the dead code is expected { to come into play and do the expected thing }.
+// That is why the combining is implemented, even though it is dead by default.
+// TODO: Test in a separate file/crate with the `#![feature(stmt_expr_attributes)]`.
+//
+/// Handles the expressions.
+/// 
+/// ### Parameters
+/// * If the expression is `syn::ExprPath` and
+///   the last path segment is `"_[e]print"` and the second parameter `is_print_func_name.is_some()` 
+///   then updates the `is_print_func_name` parameter with the value `Option<&true>`.
+///   See more details on `quote_as_expr_path()`.
 
 #[rustfmt::skip]
 pub fn quote_as_expr(expr: &syn::Expr, is_print_func_name: Option<&mut bool>, attr_args: &AttrArgs) -> proc_macro2::TokenStream {

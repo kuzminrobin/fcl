@@ -34,8 +34,61 @@ quote_as_item                                   N/A
                 traversed_block_from_sig        ^ - see above
             quote_as_trait_item_macro_rules_invocation
                                                 OK, trait_macro.rs
->                        
-quote_as_expr                            
+>
+// TODO: 
+// * Consider `update_passed` -> `attrs_have_non_loggable` | `non_loggable_found`.
+// *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
+quote_as_expr
+    quote_as_expr_array                         OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_assign                        OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_async                         OK, TODO: Test.
+        quote_as_block                          ^ - see above
+    quote_as_expr_await                         OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_binary                        OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_block                         OK, TODO: Test.
+        quote_as_block                          ^ - see above
+    quote_as_expr_break                         OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_call                          OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_cast                          OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    quote_as_expr_closure                       OK, TODO: Test.
+        quote_as_expr                           ^ - see above
+    // quote_as_expr_const
+    // quote_as_expr_continue
+    quote_as_expr_field
+    quote_as_expr_for_loop
+    quote_as_expr_group
+    quote_as_expr_if
+    quote_as_expr_index
+    // quote_as_expr_infer
+    quote_as_expr_let
+    // quote_as_expr_lit
+    quote_as_expr_loop
+    quote_as_expr_macro
+    quote_as_expr_match
+    quote_as_expr_method_call
+    quote_as_expr_paren
+    quote_as_expr_path
+    quote_as_expr_range
+    quote_as_expr_raw_addr
+    quote_as_expr_reference
+    quote_as_expr_repeat
+    quote_as_expr_return
+    quote_as_expr_struct
+    quote_as_expr_try
+    quote_as_expr_try_block
+    quote_as_expr_tuple
+    quote_as_expr_unary
+    quote_as_expr_unsafe
+    quote_as_expr_while
+    quote_as_expr_yield
+
 
 TODO: Use `updated_attr_args()` eherevere applicable.
  */

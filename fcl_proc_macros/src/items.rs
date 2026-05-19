@@ -1,38 +1,11 @@
 use crate::{
-    AttrArgs, FclAttribute, LoggableAttrInfo, ParamsLogging,
+    AttrArgs, FclAttribute, ParamsLogging,
     exprs::{quote_as_block, quote_as_expr},
-    remove_spaces, update_param_data_from_pat,
+    get_loggable_attr_params, remove_spaces, update_param_data_from_pat, updated_attr_args,
 };
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{ItemMacro, Macro};
-
-/// Combines the enclosing entity's attr_args with the current entity's attr_args,
-/// returns a tuple of
-/// * `true`, if the current entity has no `#[non_loggable]` attribute (the update passed),
-///   `false` otherwise (the update didn't pass, in which case the other parts of the tuple should be ignored);
-/// * the vector of combined attributes (where the `#[loggable]` attribute arguments are combined);
-/// * `true`, if the current entity has `#[loggable]` (with or without arguments) among its attributes,
-///   `false` otherwise.
-fn updated_attr_args( // TODO: Apply wherever applicable.
-    current_attrs: &Vec<syn::Attribute>,
-    enclosing_item_attr_args: &AttrArgs,
-) -> (bool, Vec<syn::Attribute>, bool) {
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-
-    for attr in current_attrs {
-        if attr.is_non_loggable() {
-            return (false, new_attrs, has_loggable); //quote! { #impl_item_fn };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
-    }
-    (true, new_attrs, has_loggable)
-}
 
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -98,112 +71,6 @@ fn updated_attr_args( // TODO: Apply wherever applicable.
 //     // let vis = quote_as_vis(vis, attr_args);
 //     quote!{ #(#attrs)* #vis #extern_token #crate_token #ident #rename #semi_token }
 // }
-
-fn get_loggable_attr_params_meta_tokens(
-    user_provided_attr_info: &LoggableAttrInfo,
-    enclosing_item_attr_args: &AttrArgs,
-) -> proc_macro2::TokenStream {
-    let LoggableAttrInfo {
-        prefix: user_provided_prefix,
-        params_logging: user_provided_params_logging,
-        log_closure_coords: user_provided_log_closure_coords,
-    } = user_provided_attr_info;
-
-    let new_prefix = user_provided_prefix
-        .as_ref()
-        .unwrap_or(&enclosing_item_attr_args.prefix /* .clone()*/);
-    // println!("prefix: \"{:?}\"", new_prefix);
-    let mut updated_tokens = quote! { prefix = #new_prefix, };
-    // println!("updated_tokens: {:?}", updated_tokens);
-    // if let Some(specified_prefix) = prefix {
-    //     updated_tokens = quote!{ prefix = #specified_prefix, };
-    // } else {
-    //     let inherited_prefix = &attr_args.prefix;
-    //     updated_tokens = quote!{ prefix = #inherited_prefix, };
-    // }
-
-    let new_params_logging =
-        user_provided_params_logging.unwrap_or(enclosing_item_attr_args.params_logging);
-    match new_params_logging {
-        ParamsLogging::Log => updated_tokens = quote! { #updated_tokens log_params, },
-        ParamsLogging::Skip => updated_tokens = quote! { #updated_tokens skip_params, },
-        // Any new ones require attention.
-    }
-    // println!("log_closure_coords: {:?}", log_closure_coords);
-    let new_log_closure_coords =
-        user_provided_log_closure_coords.unwrap_or(enclosing_item_attr_args.log_closure_coords);
-    if new_log_closure_coords {
-        updated_tokens = quote! { #updated_tokens log_closure_coords, }
-    } else {
-        updated_tokens = quote! { #updated_tokens skip_closure_coords, }
-    }
-    // println!("updated_tokens: {:?}", updated_tokens);
-    updated_tokens
-}
-
-// TODO: Review/refactor and doc-comment.
-// TODO: get_loggable_attr_params -> somthing containing `combine`, and singular form.
-fn get_loggable_attr_params(
-    attr: &syn::Attribute,
-    has_loggable: &mut bool,
-    enclosing_item_attr_args: &AttrArgs,
-) -> syn::Attribute {
-    // fn get_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, enclosing_item_attr_args: &AttrArgs, new_attrs: &mut Vec<syn::Attribute>) {
-    if let Some(user_provided_attr_info) = attr.get_loggable_attr_info() {
-        // The `attr` is the `#[loggable..]` attribute. In other words
-        // the fact that the `#[loggable..]` attribute is among the attributes of (is found by) the caller of this function
-        // means that the caller of this function has been called as part of the recursive traverse
-        // (as opposed to a separate macro-expansion of its own `#[loggable..]` attribute).
-        // That is, the caller of this function must not recursively traverese its internals,
-        // it must just retain its `#[loggable..]` attribute (and leave the internals as they are).
-        // That `#[loggable..]` attribute will be macro-expanded as a separate invocation of `fn fcl_proc_macros::loggable()`;
-        // that's when that `#[loggable..]` attribute will not be among the attributes of (will not be found by) the caller of this function,
-        // and that's when the internals (of the caller of this function) will be traversed and instrumented recursively.
-        *has_loggable = true;
-
-        let new_attr = syn::Attribute {
-            pound_token: attr.pound_token,
-            style: attr.style,
-            bracket_token: attr.bracket_token,
-            meta: match &attr.meta {
-                syn::Meta::List(metalist) => syn::Meta::List(syn::MetaList {
-                    path: metalist.path.clone(),
-                    // delimiter: syn::MacroDelimiter::Paren(
-                    //     Default::default()
-                    //     // syn::token::Paren {
-                    //     //     span: proc_macro2::extra::DelimSpan::from(proc_macro2::Span::call_site())
-                    //     // }
-                    // ),
-                    delimiter: metalist.delimiter.clone(),
-                    tokens: {
-                        get_loggable_attr_params_meta_tokens(
-                            &user_provided_attr_info,
-                            enclosing_item_attr_args,
-                        )
-                    },
-                }),
-                syn::Meta::Path(path) => syn::Meta::List(syn::MetaList {
-                    path: path.clone(),
-                    delimiter: syn::MacroDelimiter::Paren(Default::default()),
-                    tokens: {
-                        get_loggable_attr_params_meta_tokens(
-                            &user_provided_attr_info,
-                            enclosing_item_attr_args,
-                        )
-                    },
-                }),
-                // NameValue(MetaNameValue),
-                _ => attr.meta.clone(),
-            },
-        };
-        // println!("new_attr: {:?}", new_attr.meta.);
-        new_attr
-        // new_attrs.push(new_attr);
-    } else {
-        attr.clone()
-        // new_attrs.push(attr.clone());
-    }
-}
 
 fn input_vals(
     inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
@@ -863,7 +730,7 @@ fn quote_as_item_static(
     //         return quote! { #item_static };
     //     }
     // }
-    
+
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, attr_args);
