@@ -9,8 +9,8 @@ use syn::{ItemMacro, Macro};
 
 /// Combines the enclosing entity's attr_args with the current entity's attr_args,
 /// returns a tuple of
-/// * `true`, if the current entity has no `#[non_loggable]` attribute (the update succeeded),
-///   `false` otherwise (the update failed, in which case the other parts of the tuple should be ignored);
+/// * `true`, if the current entity has no `#[non_loggable]` attribute (the update passed),
+///   `false` otherwise (the update didn't pass, in which case the other parts of the tuple should be ignored);
 /// * the vector of combined attributes (where the `#[loggable]` attribute arguments are combined);
 /// * `true`, if the current entity has `#[loggable]` (with or without arguments) among its attributes,
 ///   `false` otherwise.
@@ -835,9 +835,10 @@ fn quote_as_item_mod(
     quote! { #(#new_attrs)* #vis #unsafety #mod_token #ident #content #semi }
 }
 
+/// Handles a staic item, like `static BIKE_SHED: Shed = Shed(42)`.
 fn quote_as_item_static(
     item_static: &syn::ItemStatic,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::ItemStatic {
         attrs,        //: Vec<Attribute>,
@@ -852,20 +853,31 @@ fn quote_as_item_static(
         semi_token,   //: Semi,
     } = item_static;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #item_static };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #item_static };
     }
-
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #item_static };
+    //     }
+    // }
+    
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let vis = quote_as_vis(vis, attr_args);
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let ty = quote_as_ty(ty, attr_args);
-    let expr = quote_as_expr(expr, None, attr_args);
-    quote! { #(#attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
+    let expr = if has_loggable {
+        quote! { #expr } // TODO: Test.
+    } else {
+        quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
+    };
+    // let expr = quote_as_expr(expr, None, enclosing_item_attr_args);
+    quote! { #(#new_attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
+    // quote! { #(#attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -903,7 +915,7 @@ fn quote_as_item_static(
 // }
 fn quote_as_trait_item_const(
     trait_item_const: &syn::TraitItemConst,
-    attr_args: &AttrArgs,
+    enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::TraitItemConst {
         attrs,       //: Vec<Attribute>,
@@ -916,16 +928,27 @@ fn quote_as_trait_item_const(
         semi_token,  //: Semi,
     } = trait_item_const;
 
-    for attr in attrs {
-        if attr.is_traverse_stopper() {
-            return quote! { #trait_item_const };
-        }
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #trait_item_const };
     }
+    // for attr in attrs {
+    //     if attr.is_traverse_stopper() {
+    //         return quote! { #trait_item_const };
+    //     }
+    // }
     let default = default.as_ref().map(|(eq_token, expr)| {
-        let expr = quote_as_expr(expr, None, attr_args);
+        let expr = if has_loggable {
+            quote! { #expr } // TODO: Test.
+        } else {
+            quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
+        };
+        // let expr = quote_as_expr(expr, None, enclosing_item_attr_args);
         quote! { #eq_token #expr }
     });
-    quote! {  #(#attrs)* #const_token #ident #generics #colon_token #ty #default #semi_token }
+    quote! {  #(#new_attrs)* #const_token #ident #generics #colon_token #ty #default #semi_token }
+    // quote! {  #(#attrs)* #const_token #ident #generics #colon_token #ty #default #semi_token }
 }
 
 fn quote_as_trait_item_fn(

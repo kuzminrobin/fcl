@@ -16,15 +16,28 @@ quote_as_item                                   N/A
                         quote_as_expr           v - see below
                         quote_as_stmt_macro     N/A (w TODO "What if the user has `#![feature(proc_macro_hygiene)]`")
                             quote_as_macro      N/A, ignores `attr_args`.
->                        
     quote_as_item_impl                          OK. TODO: Tests
-        quote_as_impl_item
-            quote_as_impl_item_fn               TODO: Test, Fail, Implement, Succeed (TDD).
-    quote_as_item_macro
-    quote_as_item_mod
-    quote_as_item_static
-    quote_as_item_trait
+        quote_as_impl_item                      N/A
+            quote_as_impl_item_fn               OK. TODO: Test
+            quote_as_impl_item_macro            TODO: Implement
+    quote_as_item_macro                         OK  trait_macro.rs, TODO: {impl, impl_for, mod, fn, closure?}_macro.rs
+        quote_as_item_macro_rules_def           N/A trait_macro.rs, TODO: {impl, impl_for, mod, fn, closure?}_macro.rs
+        quote_as_item_macro_rules_invocation    ? (Code: `// TODO: What about combining `attr_args`?`)
+    quote_as_item_mod                           OK mod_fn.rs, TODO: mod_macro.rs
+        quote_as_item                           ^ - see above
+    quote_as_item_static                        OK, TODO: Test
+        quote_as_expr                           v - see below
+    quote_as_item_trait                         OK, trait_fn.rs, trait_macro.rs. TODO: trait_*
+        quote_as_trait_item                     N/A
+            quote_as_trait_item_const           OK, TODO: Test
+            quote_as_trait_item_fn              OK, trait_fn
+                traversed_block_from_sig        ^ - see above
+            quote_as_trait_item_macro_rules_invocation
+                                                OK, trait_macro.rs
+>                        
 quote_as_expr                            
+
+TODO: Use `updated_attr_args()` eherevere applicable.
  */
 
 // params
