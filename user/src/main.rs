@@ -15,6 +15,25 @@ fn main() {
     let result = thread::Builder::new().name("T1".into()).spawn(thread_func); // T1 thread.
     calls(); // main() thread.
     let _ = result.unwrap().join();
+    
+    // struct Point {
+    //     x: u8,
+    //     y: u8,
+    // }
+    // let _p = Point { 
+    //     #[non_loggable]
+    //     x: 1, 
+    //     y: 1 
+    // };
+
+    // let _x = match Some(5) {
+    //     None => 1,
+
+    //     #[loggable]
+    //     // expected non-macro attribute, found attribute macro `loggable`
+    //     // not a non-macro attribute
+    //     Some(n) => n + 1,
+    // };
 }
 
 #[loggable]

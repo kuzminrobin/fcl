@@ -527,7 +527,7 @@ Let's imagine the following.
   (For this particular discussion we don't consider the mechanism 
   of [supertraits](https://rust-book.cs.brown.edu/ch20-02-advanced-traits.html#using-supertraits), 
   since the common part can be shared not only among the traits, but also among `mod` and `trait`, `trait` and `impl`, etc.).
-* The user decides to extract tho common part into a declarative macro.
+* The user decides to extract the common part into a declarative macro.
   ```rs
   macro_rules! users_macro {
     () => {
@@ -580,7 +580,8 @@ of `trait UsersTraitA` to skip the closure coordinates during logging,
 and to not skip for `UsersTraitB`.
 
 But such a prefixing (with `UsersTraitA::`) and `#[loggable]` arguments passing from a `trait` (like `UsersTraitA`) 
-to its internals (`f()` and `g()`) does not happen by default. And annotating `f()` and `g()` with `#[loggable]` 
+to its internals (`f()` and `g()`) through the `users_macro!{}` invocation does not happen by default. 
+And annotating `f()` and `g()` with `#[loggable]` 
 does not help:
 ```rs
 macro_rules! users_macro {
@@ -609,7 +610,7 @@ the expanding code sees `users_macro!{}` _invocation_ rather than the result of 
 ```
 In the end of the day the `f()` and `g()` don't get anything from the enclosing trait's `#[loggable]`, 
 neither the prefix (like `UsersTraitA::`), nor the arguments (like `skip_closure_coords`).  
-And if those are explicitly specified in a macro
+And if those are explicitly specified in a macro definition
 ```rs
 macro_rules! users_macro {
   () => {
@@ -629,7 +630,7 @@ The terminology gets somewhat confusing when macros handle macros.
   * either a macro definition (`macro_rules! users_macro { <rules> }}`)
   * or a macro invocation (`users_macro!{<args>}`).
 
-**NOTE: Do not spend time on any further explanation until the proof of concept.**
+<!-- **NOTE: Do not spend time on any further explanation until the proof of concept.** -->
 
   ```rs
   pub fn quote_as_macro(

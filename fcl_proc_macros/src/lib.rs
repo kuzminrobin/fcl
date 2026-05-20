@@ -550,7 +550,7 @@ trait FclAttribute {
 
     fn is_fcl_attribute(&self, attr_name: &str) -> bool;
 
-    fn is_traverse_stopper(&self) -> bool;
+    // fn is_traverse_stopper(&self) -> bool;
     fn is_non_loggable(&self) -> bool;
     // fn is_loggable(&self) -> bool;
 }
@@ -651,13 +651,13 @@ impl FclAttribute for syn::Attribute {
     //     IsTraverseStopper::is_fcl_attribute(self, "loggable")
     // }
 
-    // TODO: Remove when stopped using it.
-    /// Returns 
-    /// * `true` if the attribute is { `non_loggable` or `loggable`, optionally prefixed with `fcl_proc_macros::` }
-    /// * `false` otherwise.
-    fn is_traverse_stopper(&self) -> bool {
-        self.is_fcl_attribute("non_loggable") || self.is_fcl_attribute("loggable")
-    }
+    // // TODO: Remove when stopped using it.
+    // /// Returns 
+    // /// * `true` if the attribute is { `non_loggable` or `loggable`, optionally prefixed with `fcl_proc_macros::` }
+    // /// * `false` otherwise.
+    // fn is_traverse_stopper(&self) -> bool {
+    //     self.is_fcl_attribute("non_loggable") || self.is_fcl_attribute("loggable")
+    // }
 }
 
 /// Removes spaces from a string, except around 'as' (in framgents like "\<MyType as MyTrait>").
