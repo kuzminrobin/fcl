@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use crate::{
-    AttrArgs, ParamsLogging, items::quote_as_item, remove_spaces,
-    update_param_data_from_pat, updated_attr_args,
+    AttrArgs, ParamsLogging, items::quote_as_item, remove_spaces, update_param_data_from_pat,
+    updated_attr_args,
 };
 use quote::quote;
 use syn::spanned::Spanned;
@@ -957,12 +957,12 @@ fn quote_as_expr_if(
             }),
         ) // TODO: Test.
     } else {
-        let cond = quote_as_expr(&**cond, None, enclosing_item_attr_args);
-        let then_branch = quote_as_block(then_branch, enclosing_item_attr_args);
+        let cond = quote_as_expr(&**cond, None, enclosing_item_attr_args); // TODO: Test.
+        let then_branch = quote_as_block(then_branch, enclosing_item_attr_args); // TODO: Test.
         let else_branch = else_branch.as_ref().map(|(else_token, expr)| {
             let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
             quote! { #else_token #expr }
-        });
+        }); // TODO: Test.
         (cond, then_branch, else_branch)
         // quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
@@ -1345,7 +1345,7 @@ fn quote_as_expr_method_call(
     // }
 
     let (receiver, args) = if has_loggable {
-        (quote! { #receiver }, quote! { #args })
+        (quote! { #receiver }, quote! { #args }) // TODO: Test.
     } else {
         let receiver = quote_as_expr(&**receiver, None, enclosing_item_attr_args);
         // // Likely not applicable for instrumenting the run time functions and
@@ -1361,7 +1361,7 @@ fn quote_as_expr_method_call(
             traversed_args = quote! { #traversed_args #traversed_arg, }
         }
         (receiver, traversed_args)
-    };
+    }; // TODO: Test.
 
     // let receiver = quote_as_expr(&**receiver, None, enclosing_item_attr_args);
     // // // Likely not applicable for instrumenting the run time functions and
@@ -1405,9 +1405,9 @@ fn quote_as_expr_paren(
     // }
 
     let expr = if has_loggable {
-        quote! { #expr }
+        quote! { #expr } // TODO: Test.
     } else {
-        quote_as_expr(&**expr, None, enclosing_item_attr_args)
+        quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
@@ -1472,7 +1472,7 @@ fn quote_as_expr_range(
     // }
 
     let (start, end) = if has_loggable {
-        (Some(quote! { #start }), Some(quote! { #end }))
+        (Some(quote! { #start }), Some(quote! { #end })) // TODO: Test.
     } else {
         let start = start
             .as_ref()
@@ -1480,7 +1480,7 @@ fn quote_as_expr_range(
         let end = end
             .as_ref()
             .map(|end| quote_as_expr(&**end, None, enclosing_item_attr_args));
-        (start, end)
+        (start, end) // TODO: Test.
     };
     // let start = start
     //     .as_ref()
@@ -1518,15 +1518,17 @@ fn quote_as_expr_raw_addr(
     // }
 
     let expr = if has_loggable {
-        quote! { #expr }
+        quote! { #expr } // TODO: Test.
     } else {
-        quote_as_expr(&**expr, None, enclosing_item_attr_args)
+        quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #and_token #raw #mutability #expr }
     // quote! { #(#attrs)* #and_token #raw #mutability #expr }
 }
+
+/// Handles a referencing operation: `&a` or `&mut a`.
 fn quote_as_expr_reference(
     expr_reference: &syn::ExprReference,
     enclosing_item_attr_args: &AttrArgs,
@@ -1550,9 +1552,9 @@ fn quote_as_expr_reference(
     // }
 
     let expr = if has_loggable {
-        quote! { #expr }
+        quote! { #expr } // TODO: Test.
     } else {
-        quote_as_expr(&**expr, None, enclosing_item_attr_args)
+        quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
@@ -1584,10 +1586,10 @@ fn quote_as_expr_repeat(
     // }
 
     let (expr, len) = if has_loggable {
-        (quote! { #expr }, quote! { #len })
+        (quote! { #expr }, quote! { #len }) // TODO: Test.
     } else {
-        let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-        let len = quote_as_expr(&**len, None, enclosing_item_attr_args);
+        let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args); // TODO: Test.
+        let len = quote_as_expr(&**len, None, enclosing_item_attr_args); // TODO: Test.
         (expr, len)
     };
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
@@ -1620,9 +1622,9 @@ fn quote_as_expr_return(
     // }
     let expr = expr.as_ref().map(|expr| {
         if has_loggable {
-            quote! { #expr }
+            quote! { #expr } // TODO: Test.
         } else {
-            quote_as_expr(&**expr, None, enclosing_item_attr_args)
+            quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
         }
         // quote_as_expr(&**expr, None, enclosing_item_attr_args)
     });
@@ -1714,8 +1716,8 @@ fn quote_as_expr_struct(
 
     let (fields, rest) = if has_loggable {
         (
-            quote! { #fields },
-            rest.as_ref().map(|expr| quote! { #expr }),
+            quote! { #fields }, // TODO: Test.
+            rest.as_ref().map(|expr| quote! { #expr }), // TODO: Test.
         )
     } else {
         let fields = {
@@ -1729,7 +1731,7 @@ fn quote_as_expr_struct(
         let rest = rest
             .as_ref()
             .map(|expr| quote_as_expr(&**expr, None, enclosing_item_attr_args));
-        (fields, rest)
+        (fields, rest) // TODO: Test.
     };
     // let fields = {
     //     let mut traversed_fileds = quote! {};
@@ -1841,14 +1843,14 @@ fn quote_as_expr_tuple(
     // }
 
     let elems = if has_loggable {
-        quote!{ #elems }
+        quote! { #elems } // TODO: Test.
     } else {
         let mut traversed_elems = quote! {};
         for elem in elems {
             let traversed_elem = quote_as_expr(elem, None, enclosing_item_attr_args);
             traversed_elems = quote! { #traversed_elems #traversed_elem, }
         }
-        traversed_elems
+        traversed_elems // TODO: Test.
     };
     // let elems = {
     //     let mut traversed_elems = quote! {};
@@ -1887,12 +1889,12 @@ fn quote_as_expr_unary(
     // }
 
     let expr = if has_loggable {
-        quote!{ #expr }
+        quote! { #expr } // TODO: Test.
     } else {
-        quote_as_expr(&**expr, None, enclosing_item_attr_args)
+        quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-    
+
     quote! { #(#new_attrs)* #op #expr }
     // quote! { #(#attrs)* #op #expr }
 }
@@ -1921,12 +1923,12 @@ fn quote_as_expr_unsafe(
     // }
 
     let block = if has_loggable {
-        quote!{ #block }
+        quote! { #block } // TODO: Test.
     } else {
-        quote_as_block(block, enclosing_item_attr_args)
+        quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
     };
     // let block = quote_as_block(block, enclosing_item_attr_args);
-    
+
     quote! { #(#new_attrs)* #unsafe_token #block }
     // quote! { #(#attrs)* #unsafe_token #block }
 }
@@ -2004,17 +2006,15 @@ fn quote_as_expr_yield(
     //     }
     // }
 
-    let expr = expr
-        .as_ref()
-        .map(|ref_boxed_expr| {
-            if has_loggable {
-                quote!{ #expr }
-            } else {
-                quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args)    
-            }
-            // quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args)
-        });
-    
+    let expr = expr.as_ref().map(|ref_boxed_expr| {
+        if has_loggable {
+            quote! { #expr } // TODO: Test.
+        } else {
+            quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args) // TODO: Test.
+        }
+        // quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args)
+    });
+
     quote! { #(#new_attrs)* #yield_token #expr }
     // quote! { #(#attrs)* #yield_token #expr }
 }

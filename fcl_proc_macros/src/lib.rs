@@ -547,12 +547,8 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
 /* TODO: -> ExtendedAttribute? */
 trait FclAttribute {
     fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo>;
-
     fn is_fcl_attribute(&self, attr_name: &str) -> bool;
-
-    // fn is_traverse_stopper(&self) -> bool;
     fn is_non_loggable(&self) -> bool;
-    // fn is_loggable(&self) -> bool;
 }
 impl FclAttribute for syn::Attribute {
     /// Returns
@@ -647,17 +643,6 @@ impl FclAttribute for syn::Attribute {
         self.is_fcl_attribute("non_loggable")
         // <syn::Attribute as IsTraverseStopper>::is_fcl_attribute(self, "non_loggable")
     }
-    // fn is_loggable(&self) -> bool {
-    //     IsTraverseStopper::is_fcl_attribute(self, "loggable")
-    // }
-
-    // // TODO: Remove when stopped using it.
-    // /// Returns 
-    // /// * `true` if the attribute is { `non_loggable` or `loggable`, optionally prefixed with `fcl_proc_macros::` }
-    // /// * `false` otherwise.
-    // fn is_traverse_stopper(&self) -> bool {
-    //     self.is_fcl_attribute("non_loggable") || self.is_fcl_attribute("loggable")
-    // }
 }
 
 /// Removes spaces from a string, except around 'as' (in framgents like "\<MyType as MyTrait>").
