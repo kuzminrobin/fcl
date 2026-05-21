@@ -1,42 +1,35 @@
 # Workgin On
-* The Declarative Macros that are (marked as) `#[loggable]`.
-  * in traits.
-    * `// TODO: What about combining `attrs`?` in `fn quote_as_item_macro_rules_invocation()`
-* TODO (working on): Consider preserving the prefix in the nested/inner `#[loggable]`:
-  ```rs
-  #[loggable] // Gives the prefix "m::" to the internals.
-  mod m {
-    #[loggable(skip_params)]  // Currently clears the prefix "m::" for `f()` and its internals (but is not expected to).
-    fn f() {}
-  }
-  ```
-  How: The outer one can convert the inner one to `#[loggable(skip_params, prefix = m::)]`, if the inner one has no explicit `prefix=`.
-  * Preserve the prefix in nested `#[loggable]`.
-    ```rs
-    #[loggable] // 2. If nested `#[loggable]` attrs have no explicit `prefix=`, then nested ones -> `#[loggable(prefix = f())]`
-    fn f() {
-      #[loggable(skip_params)]  // 1. Currently "clears" the prefix "f::". Need to preserve it, if no explicit `prefix=`.
-      fn g(b: bool) {}
-    }
-    ```
-  * Same for closure coords.
 
 # Need ASAP
-* Implement params spreading for {skope/fn}:
-  ```rs
-  #[loggable]
-  {
-      #[loggable]
-      fn g(i: u8) {
-  ```
 
 # Must
-* File of consts.
 
 # Need
 
 # Next
 (See `>`)
+* updated_attr_args() 
+  * TODOs: RetVals
+    ```rs
+    // TODO:
+    // * Consider `update_passed` -> `attrs_have_non_loggable` | `non_loggable_found`.
+    // *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_array };
+    }
+    ```
+  * Use everywhere (update the code existed before `updated_attr_args()`)
+* File of consts.
+* Eternal Logging
+* Code TODOs
+* Documentation
+  * User Manual
+  * mdBook (internals)
+* crates.io
+* Test against the real projects
+* Videos
 * Tests
   * code_commons\src\call_graph.rs (the tests are in fcl)
     * add_loopbody_end.rs
@@ -52,9 +45,9 @@
     * fcl/algo_tests_add_loopbody_start.rs
     * fcl/algo_tests_add_loopbody_end.rs
   * fn/fn: {skip|log}_params, {skip|log}_closure_coords
->
   * prefix, {skip|log}_params, {skip|log}_closure_coords
     * Implement everywhere (items, exprs, ..).
+      >
   * The Declarative Macros that are (marked as) `#[loggable]`.
     * In items other than `trait`.
   * Language constructs
@@ -144,9 +137,39 @@
           log thread func or not).
         * Customizing the thread indent.
   * Consider tests.rs / {`mod singlethreaded` -> `mod single_threaded_tests`}.
-
+* Code documenting
+* Documentation
+  * Practicing Rust with FCL
 
 # Unsorted
+* (Needs testing, requires `#[feature..`) Implement params spreading for {skope/fn}:
+  ```rs
+  #[loggable]
+  {
+      #[loggable]
+      fn g(i: u8) {
+  ```
+* The Declarative Macros that are (marked as) `#[loggable]`.
+  * in traits.
+    * `// TODO: What about combining `attrs`?` in `fn quote_as_item_macro_rules_invocation()`
+* TODO (test the following): Consider preserving the prefix in the nested/inner `#[loggable]`:
+  ```rs
+  #[loggable] // Gives the prefix "m::" to the internals.
+  mod m {
+    #[loggable(skip_params)]  // Currently clears the prefix "m::" for `f()` and its internals (but is not expected to).
+    fn f() {}
+  }
+  ```
+  How: The outer one can convert the inner one to `#[loggable(skip_params, prefix = m::)]`, if the inner one has no explicit `prefix=`.
+  * Preserve the prefix in nested `#[loggable]`.
+    ```rs
+    #[loggable] // 2. If nested `#[loggable]` attrs have no explicit `prefix=`, then nested ones -> `#[loggable(prefix = f())]`
+    fn f() {
+      #[loggable(skip_params)]  // 1. Currently "clears" the prefix "f::". Need to preserve it, if no explicit `prefix=`.
+      fn g(b: bool) {}
+    }
+    ```
+  * Same for closure coords.
 * TODO: The whole item (e.g. trait) is in the macro (is a result of the macro expansion).
 * (Double-check that it's still applicable. There's a plan to work around it) TODO: 
   To docs: `#[loggable]` cannot penetrate into the macro invocation and traverse the result of the macro-expansion
@@ -170,7 +193,7 @@
     _ => // Use as is.
   }
   ```
-* TODO: If user has their own attributes `#[loggable]`/`#[non_loggable]` then to avoid conflict, 
+* TODO (already?): If user has their own attributes `#[loggable]`/`#[non_loggable]` then to avoid conflict, 
   enable the analysis in `is_traverse_stopper()`: 
   If the last segment on the path is "loggable" or "non_loggable" then 
   if preceeding segment is present && preceeding segment is not "fcl_proc_macros" {
@@ -192,7 +215,7 @@
   since their expansion done with `std::any::type_name` is not guaranteed. The comparison can fail after 
   the compiler update (the test can break).
 * TODO: Try `#[loggable(expand_trait_generics)]`. I.e. expand the trait's generics at runtime, like generic func's generics. 
-  * Refactor the `AttrArgs::prefix` to a container of Option<Strings, Generics> 
+  * Refactor the `AttrArgs::prefix` to a container of `Option<Strings, Generics>` 
   * Pass the trait's generics to the prefix (as `Generics` type).
   * In the call code (fn, closure) at runtime iterate through the `AttrArgs::prefix` and expand `Generics`.
 * TODO: #[loggable(skip_generic_params)]
