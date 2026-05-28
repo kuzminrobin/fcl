@@ -297,7 +297,7 @@ fn quote_as_item_fn(
     } = item_fn;
     // println!("{:?} {{", sig.ident);
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #item_fn };
@@ -367,7 +367,7 @@ fn quote_as_impl_item_fn(
         block,       //: Block,
     } = impl_item_fn;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #impl_item_fn };
@@ -419,7 +419,7 @@ fn quote_as_item_impl(
         .. // brace_token
     } = item_impl;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #item_impl };
@@ -684,7 +684,7 @@ fn quote_as_item_mod(
         semi,      //: Option<Semi>,
     } = item_mod;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #item_mod };
@@ -752,7 +752,7 @@ fn quote_as_item_static(
         semi_token,   //: Semi,
     } = item_static;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #item_static };
@@ -827,7 +827,7 @@ fn quote_as_trait_item_const(
         semi_token,  //: Semi,
     } = trait_item_const;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #trait_item_const };
@@ -861,7 +861,7 @@ fn quote_as_trait_item_fn(
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #trait_item_fn };
@@ -902,7 +902,7 @@ fn quote_as_trait_item_macro_rules_invocation(
         semi_token, // : Option<Semi>,
     } = trait_item_macro;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #trait_item_macro };
@@ -985,7 +985,7 @@ fn quote_as_item_trait(
         .. // restriction, brace_token
     } = item_trait;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #item_trait };
@@ -1235,7 +1235,7 @@ fn quote_as_item_macro(
                // ..
     } = item_macro;
 
-    let (update_succeeded, new_attrs, has_loggable) =
+    let (new_attrs, update_succeeded, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #item_macro };

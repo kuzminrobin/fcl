@@ -21,7 +21,7 @@ fn quote_as_expr_array(
     // TODO:
     // * Consider `update_passed` -> `attrs_have_non_loggable` | `non_loggable_found`.
     // *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_array };
@@ -67,7 +67,7 @@ fn quote_as_expr_assign(
         right,    //: Box<Expr>,
     } = expr_assign;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_assign };
@@ -268,7 +268,7 @@ fn quote_as_expr_async(
         block,       //: Block,
     } = expr_async;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_async };
@@ -302,7 +302,7 @@ fn quote_as_expr_await(
         await_token, //: Await,
     } = expr_await;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_await };
@@ -337,7 +337,7 @@ fn quote_as_expr_binary(
         right, //: Box<Expr>,
     } = expr_binary;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_binary };
@@ -373,7 +373,7 @@ fn quote_as_expr_block(
         block, //: Block,
     } = expr_block;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_block };
@@ -407,7 +407,7 @@ fn quote_as_expr_break(
         expr,        //: Option<Box<Expr>>,
     } = expr_break;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_break };
@@ -454,7 +454,7 @@ fn quote_as_expr_call(
         .. // paren_token
     } = expr_call;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_call }; // TODO: Test.
@@ -540,7 +540,7 @@ fn quote_as_expr_cast(
         ty,       //: Box<Type>,
     } = expr_cast;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_cast }; // TODO: Test.
@@ -581,7 +581,7 @@ pub fn quote_as_expr_closure(
         body,       //: Box<Expr>,
     } = expr_closure;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_closure }; // TODO: Test.
@@ -744,7 +744,7 @@ fn quote_as_expr_field(
         member,    //: Member,
     } = expr_field;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_field }; // TODO: Test.
@@ -845,7 +845,7 @@ fn quote_as_expr_for_loop(
         body,      //: Block,
     } = expr_for_loop;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_for_loop }; // TODO: Test.
@@ -897,7 +897,7 @@ fn quote_as_expr_group(
         .. // group_token
     } = expr_group;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_group }; // TODO: Test.
@@ -936,7 +936,7 @@ fn quote_as_expr_if(
         else_branch, //: Option<(Else, Box<Expr>)>,
     } = expr_if;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_if }; // TODO: Test.
@@ -991,7 +991,7 @@ fn quote_as_expr_index(
         .. // bracket_token
     } = expr_index;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_index }; // TODO: Test.
@@ -1035,7 +1035,7 @@ fn quote_as_expr_let(
         expr,      //: Box<Expr>,
     } = expr_let;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_let }; // TODO: Test.
@@ -1078,7 +1078,7 @@ fn quote_as_expr_loop(
         body,       //: Block,
     } = expr_loop;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_loop }; // TODO: Test.
@@ -1283,7 +1283,7 @@ fn quote_as_expr_match(
         .. // brace_token
     } = expr_match;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_match }; // TODO: Test.
@@ -1333,7 +1333,7 @@ fn quote_as_expr_method_call(
         .. // paren_token
     } = expr_method_call;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_method_call }; // TODO: Test.
@@ -1393,7 +1393,7 @@ fn quote_as_expr_paren(
         .. // paren_token
     } = expr_paren;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_paren }; // TODO: Test.
@@ -1460,7 +1460,7 @@ fn quote_as_expr_range(
         end,    //: Option<Box<Expr>>,
     } = expr_range;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_range }; // TODO: Test.
@@ -1506,7 +1506,7 @@ fn quote_as_expr_raw_addr(
         expr,       //: Box<Expr>,
     } = expr_raw_addr;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_raw_addr }; // TODO: Test.
@@ -1540,7 +1540,7 @@ fn quote_as_expr_reference(
         expr,       //: Box<Expr>,
     } = expr_reference;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_reference }; // TODO: Test.
@@ -1574,7 +1574,7 @@ fn quote_as_expr_repeat(
         .. // bracket_token
     } = expr_repeat;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_repeat }; // TODO: Test.
@@ -1610,7 +1610,7 @@ fn quote_as_expr_return(
         expr,         //: Option<Box<Expr>>,
     } = expr_return;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_return }; // TODO: Test.
@@ -1675,7 +1675,7 @@ fn quote_as_expr_struct(
         .. // brace_token
     } = expr_struct;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_struct }; // TODO: Test.
@@ -1760,7 +1760,7 @@ fn quote_as_expr_try(
         question_token, //: Question,
     } = expr_try;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_try }; // TODO: Test.
@@ -1797,7 +1797,7 @@ fn quote_as_expr_try_block(
         block,     //: Block,
     } = expr_try_block;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_try_block }; // TODO: Test.
@@ -1831,7 +1831,7 @@ fn quote_as_expr_tuple(
         .. // paren_token
     } = expr_tuple;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_tuple }; // TODO: Test.
@@ -1877,7 +1877,7 @@ fn quote_as_expr_unary(
         expr,  //: Box<Expr>,
     } = expr_unary;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_unary }; // TODO: Test.
@@ -1911,7 +1911,7 @@ fn quote_as_expr_unsafe(
         block,        //: Block,
     } = expr_unsafe;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_unsafe }; // TODO: Test.
@@ -1946,7 +1946,7 @@ fn quote_as_expr_while(
         body,        //: Block,
     } = expr_while;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_while }; // TODO: Test.
@@ -1995,7 +1995,7 @@ fn quote_as_expr_yield(
         expr,        //: Option<Box<Expr>>,
     } = expr_yield;
 
-    let (update_passed, new_attrs, has_loggable) =
+    let (new_attrs, update_passed, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #expr_yield }; // TODO: Test.

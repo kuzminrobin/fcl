@@ -315,17 +315,17 @@ pub fn loggable_block_contents(
 /// collects all the attributes in the output collection.
 /// 
 /// Returns a tuple of
+/// * the vector of attributes where for each `#[loggable]` attribute the arguments are combined;
 /// * `true`, if the current entity has no `#[non_loggable]` attribute (the update passed),
 ///   `false` otherwise (the update didn't pass, in which case the other parts of the tuple should be ignored);
-/// * the vector of attributes where for each `#[loggable]` attribute the arguments are combined;
 /// * `true`, if the current entity has `#[loggable]` (with or without arguments) among its attributes,
 ///   `false` otherwise.
 fn updated_loggable_attr_args(
     current_attrs: &Vec<syn::Attribute>,
     enclosing_item_attr_args: &AttrArgs,
 ) -> (
-    bool, // `non_loggable_found`
     Vec<syn::Attribute>, // `updated_attrs`
+    bool, // `non_loggable_not_found`
     bool, // `loggable_found`
 ) {
     let mut new_attrs = vec![];
@@ -348,7 +348,7 @@ fn updated_loggable_attr_args(
             ));
         // }
     }
-    (non_loggable_not_found, new_attrs, has_loggable)
+    (new_attrs, non_loggable_not_found, has_loggable)
     // (true, new_attrs, has_loggable)
 }
 
