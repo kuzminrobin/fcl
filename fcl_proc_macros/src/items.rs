@@ -297,9 +297,9 @@ fn quote_as_item_fn(
     } = item_fn;
     // println!("{:?} {{", sig.ident);
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #item_fn };
     }
     // let mut new_attrs = vec![];
@@ -367,9 +367,9 @@ fn quote_as_impl_item_fn(
         block,       //: Block,
     } = impl_item_fn;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #impl_item_fn };
     }
     // for attr in attrs {
@@ -419,9 +419,9 @@ fn quote_as_item_impl(
         .. // brace_token
     } = item_impl;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #item_impl };
     }
     // let mut new_attrs = vec![];
@@ -684,9 +684,9 @@ fn quote_as_item_mod(
         semi,      //: Option<Semi>,
     } = item_mod;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #item_mod };
     }
     // let mut new_attrs = vec![];
@@ -752,9 +752,9 @@ fn quote_as_item_static(
         semi_token,   //: Semi,
     } = item_static;
 
-    let (new_attrs, update_passed, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_passed {
+    if non_loggable_found {
         return quote! { #item_static };
     }
     // for attr in attrs {
@@ -827,9 +827,9 @@ fn quote_as_trait_item_const(
         semi_token,  //: Semi,
     } = trait_item_const;
 
-    let (new_attrs, update_passed, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_passed {
+    if non_loggable_found {
         return quote! { #trait_item_const };
     }
     // for attr in attrs {
@@ -861,9 +861,9 @@ fn quote_as_trait_item_fn(
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #trait_item_fn };
     }
     // let mut new_attrs = vec![];
@@ -902,9 +902,9 @@ fn quote_as_trait_item_macro_rules_invocation(
         semi_token, // : Option<Semi>,
     } = trait_item_macro;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #trait_item_macro };
     }
     // let mut new_attrs = vec![];
@@ -985,9 +985,9 @@ fn quote_as_item_trait(
         .. // restriction, brace_token
     } = item_trait;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #item_trait };
     }
     // let mut new_attrs = vec![];
@@ -1235,9 +1235,9 @@ fn quote_as_item_macro(
                // ..
     } = item_macro;
 
-    let (new_attrs, update_succeeded, has_loggable) =
+    let (new_attrs, non_loggable_found, has_loggable) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
-    if !update_succeeded {
+    if non_loggable_found {
         return quote! { #item_macro };
     }
     // let mut new_attrs = vec![];
