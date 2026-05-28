@@ -175,7 +175,7 @@ pub fn loggable_block_contents(
     let attr_args = syn::parse_macro_input!(attr_args_ts as AttrArgs); // NOTE: Handles the compilation errors appropriately (checked).
     let item_fn = syn::parse_macro_input!(attributed_item as syn::ItemFn);
     // let item_mod = syn::parse_macro_input!(attributed_item as syn::ItemMod);
-    items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args/*, true */).into()
+    items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args /*, true */).into()
     // items::quote_as_item_mod_loggable_block_contents(&item_fn, &attr_args/*, true */).into()
 
     // let syn::ItemMod {
@@ -204,7 +204,7 @@ pub fn loggable_block_contents(
     //     if attr.is_non_loggable() { // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
     //         return quote! { #item_mod }.into();
     //     }
-    //     new_attrs.push(items::get_loggable_attr_params(
+    //     new_attrs.push(items::if_loggable_then_combine_attr_args(
     //         attr,
     //         &mut has_loggable,
     //         enclosing_item_attr_args,
@@ -276,7 +276,6 @@ pub fn loggable_block_contents(
     //         semi,      //: Option<Semi>,
     //     } = item_mod;
 
-
     // }
 
     // */
@@ -310,34 +309,52 @@ pub fn loggable_block_contents(
     // output.into()
 }
 
-/// Combines the enclosing entity's attr_args with the current entity's attr_args,
-/// returns a tuple of
+/// Runs through the collection of `current_attrs` parameter, 
+/// for each `#[loggable]` attribute combines its arguments with `enclosing_item_attr_args` in a new attribute, 
+/// clones all other attributes,
+/// collects all the attributes in the output collection.
+/// 
+/// Returns a tuple of
 /// * `true`, if the current entity has no `#[non_loggable]` attribute (the update passed),
 ///   `false` otherwise (the update didn't pass, in which case the other parts of the tuple should be ignored);
-/// * the vector of combined attributes (where the `#[loggable]` attribute arguments are combined);
+/// * the vector of attributes where for each `#[loggable]` attribute the arguments are combined;
 /// * `true`, if the current entity has `#[loggable]` (with or without arguments) among its attributes,
 ///   `false` otherwise.
-fn updated_attr_args( // TODO: Apply wherever applicable.
+fn updated_loggable_attr_args(
     current_attrs: &Vec<syn::Attribute>,
     enclosing_item_attr_args: &AttrArgs,
-) -> (bool, Vec<syn::Attribute>, bool) {
+) -> (
+    bool, // `non_loggable_found`
+    Vec<syn::Attribute>, // `updated_attrs`
+    bool, // `loggable_found`
+) {
     let mut new_attrs = vec![];
     let mut has_loggable = false;
+    let mut non_loggable_not_found = true;
 
     for attr in current_attrs {
         if attr.is_non_loggable() {
-            return (false, new_attrs, has_loggable); //quote! { #impl_item_fn };
+            non_loggable_not_found = false;
         }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+        // if attr.is_non_loggable() {
+        //     new_attrs.push(attr.clone());
+        //     // return (false, current_attrs.clone(), has_loggable);
+        //     // return (false, new_attrs, has_loggable);
+        // } else {
+            new_attrs.push(if_loggable_then_combine_attr_args(
+                attr,
+                enclosing_item_attr_args,
+                &mut has_loggable,
+            ));
+        // }
     }
-    (true, new_attrs, has_loggable)
+    (non_loggable_not_found, new_attrs, has_loggable)
+    // (true, new_attrs, has_loggable)
 }
 
-fn get_loggable_attr_params_meta_tokens(
+/// Combines the parameters 
+/// and returns a token stream of `prefix = <prefix>, (log|skip)_params, (log|skip)_closure_coords,`.
+fn combine_loggable_attr_params_as_meta_tokens(
     user_provided_attr_info: &LoggableAttrInfo,
     enclosing_item_attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
@@ -349,7 +366,7 @@ fn get_loggable_attr_params_meta_tokens(
 
     let new_prefix = user_provided_prefix
         .as_ref()
-        .unwrap_or(&enclosing_item_attr_args.prefix /* .clone()*/);
+        .unwrap_or(&enclosing_item_attr_args.prefix);
     // println!("prefix: \"{:?}\"", new_prefix);
     let mut updated_tokens = quote! { prefix = #new_prefix, };
     // println!("updated_tokens: {:?}", updated_tokens);
@@ -380,70 +397,73 @@ fn get_loggable_attr_params_meta_tokens(
 }
 
 // TODO: Review/refactor and doc-comment.
-// TODO: get_loggable_attr_params -> somthing containing `combine`, and singular form.
-fn get_loggable_attr_params(
+//
+/// If the `attr` parameter is not `[fcl_proc_macros::]loggable` then returns a clone of it.
+/// 
+/// Otherwise
+/// * writes `true` to the value referred to by the `is_loggable` parameter;
+/// * returns a new `syn::Attribute` instance containing `#[loggable(<args>)]` with arguments that are a combination of 
+///   * `attr` parameter's arguments
+///   * `enclosing_item_attr_args`.
+fn if_loggable_then_combine_attr_args(
     attr: &syn::Attribute,
-    has_loggable: &mut bool,
     enclosing_item_attr_args: &AttrArgs,
+    is_loggable: &mut bool,
 ) -> syn::Attribute {
-    // fn get_loggable_attr_params(attr: &syn::Attribute, has_loggable: &mut bool, enclosing_item_attr_args: &AttrArgs, new_attrs: &mut Vec<syn::Attribute>) {
+
+    // If `attr` is `#[loggable]` (with or without args):
     if let Some(user_provided_attr_info) = attr.get_loggable_attr_info() {
+        // TODO: The comment below to mdBook.
         // The `attr` is the `#[loggable..]` attribute. In other words
         // the fact that the `#[loggable..]` attribute is among the attributes of (is found by) the caller of this function
         // means that the caller of this function has been called as part of the recursive traverse
         // (as opposed to a separate macro-expansion of its own `#[loggable..]` attribute).
-        // That is, the caller of this function must not recursively traverese its internals,
+        // That is, the caller of this function must not recursively traverese one's own internals,
         // it must just retain its `#[loggable..]` attribute (and leave the internals as they are).
-        // That `#[loggable..]` attribute will be macro-expanded as a separate invocation of `fn fcl_proc_macros::loggable()`;
+        // That `#[loggable..]` attribute will be macro-expanded as a separate invocation of fn `fcl_proc_macros::loggable()`;
         // that's when that `#[loggable..]` attribute will not be among the attributes of (will not be found by) the caller of this function,
         // and that's when the internals (of the caller of this function) will be traversed and instrumented recursively.
-        *has_loggable = true;
+        *is_loggable = true;
 
+        // Combine the attr args in a new attr (`#[loggable(<combined_attr_args>)]`):
         let new_attr = syn::Attribute {
             pound_token: attr.pound_token,
             style: attr.style,
             bracket_token: attr.bracket_token,
             meta: match &attr.meta {
+                // The `attr` parameter is `#[loggable(<args>)]`.
+                // Generate the `loggable(<combined_attr_args>)` meta:
                 syn::Meta::List(metalist) => syn::Meta::List(syn::MetaList {
                     path: metalist.path.clone(),
-                    // delimiter: syn::MacroDelimiter::Paren(
-                    //     Default::default()
-                    //     // syn::token::Paren {
-                    //     //     span: proc_macro2::extra::DelimSpan::from(proc_macro2::Span::call_site())
-                    //     // }
-                    // ),
                     delimiter: metalist.delimiter.clone(),
                     tokens: {
-                        get_loggable_attr_params_meta_tokens(
+                        combine_loggable_attr_params_as_meta_tokens(
                             &user_provided_attr_info,
                             enclosing_item_attr_args,
                         )
                     },
                 }),
+                // The `attr` parameter is `#[loggable]` with no args.
+                // Generate the `loggable(<enclosing_item_attr_args>)` meta:
                 syn::Meta::Path(path) => syn::Meta::List(syn::MetaList {
                     path: path.clone(),
                     delimiter: syn::MacroDelimiter::Paren(Default::default()),
                     tokens: {
-                        get_loggable_attr_params_meta_tokens(
+                        combine_loggable_attr_params_as_meta_tokens(
                             &user_provided_attr_info,
                             enclosing_item_attr_args,
                         )
                     },
                 }),
-                // NameValue(MetaNameValue),
                 _ => attr.meta.clone(),
             },
         };
         // println!("new_attr: {:?}", new_attr.meta.);
         new_attr
-        // new_attrs.push(new_attr);
     } else {
         attr.clone()
-        // new_attrs.push(attr.clone());
     }
 }
-
-
 
 // TODO: Consider deduping the `LoggableAttrInfo` and `LoggableAttrArgsOpt` or explaining why not.
 struct LoggableAttrInfo {
@@ -468,6 +488,7 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
     ///   * is `Some(false)` if the `input` contains `skip_closure_coords`,
     ///   * is `Some(true)` if the `input` contains `log_closure_coords`,
     ///   * is `None` otherwise.
+    /// 
     /// Otherwise returns `syn::Result::err(e)`.
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut args = LoggableAttrArgsOpt {
@@ -491,7 +512,7 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
             } else if lookahead.peek(kw::prefix) {
                 input.parse::<kw::prefix>()?;
                 input.parse::<syn::Token![=]>()?;
-                let optional_prefix = input.parse::<QSelfOrPath>()?; // TODO: Consider the case `#[loggable(prefix = )]` (cledaring the prefix).
+                let optional_prefix = input.parse::<QSelfOrPath>()?; // TODO: Consider the case `#[loggable(prefix = )]` (clearing the prefix).
                 if let QSelfOrPath(Some(q_self_or_path)) = optional_prefix {
                     let prefix_ts = match q_self_or_path {
                         LogPrefix::QSelf(qself) => quote! { #qself },
@@ -578,9 +599,10 @@ impl FclAttribute for syn::Attribute {
 
     /// Returns `None` if `self` is not `[fcl_proc_macros::]loggable`.
     /// Otherwise returns `Some(LoggableAttrInfo)` where the fields are
-    /// * the same as in `LoggableAttrArgsOpt` upon successful parsing
+    /// * the same as in `LoggableAttrArgsOpt` upon successful parsing, including all `None` if `loggable` args are empty,
     ///   (see comments for `fcl_proc_macros::LoggableAttrArgsOpt::parse()`),
-    /// * all `None` otherwise (at the moment of writing; TODO: Review in details and resolve the parsing failure case).
+    /// * all `None` upon parsing gailure (at the moment of writing; TODO: Review in details
+    ///   and resolve or doc the parsing failure case. See a NOTE in the code).
     fn get_loggable_attr_info(&self) -> Option<LoggableAttrInfo> {
         let (path, optional_tokens) = match &self.meta {
             syn::Meta::Path(path) => (path, None),
@@ -591,15 +613,15 @@ impl FclAttribute for syn::Attribute {
         let mut ret_val = None;
 
         // If the last path segment equals "loggable"
-        //      && preceeding path segment is None or is "fcl_proc_macros"
+        //      && preceeding path segment is (None || ("fcl_proc_macros" (TODO: `&& is or ends up in the only one`)) )
         // then
         //      Get and return LoggableAttrInfo
         // return None
         if let Some(last_path_segment) = path.segments.last()
-            && last_path_segment.ident.to_string() == "loggable"
+            && last_path_segment.ident.to_string() == "loggable"    // TODO: "loggable" to file of consts.
             && (path.segments.len() < 2 || {
                 let prev_segment_idx = path.segments.len() - 2;
-                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
+                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros" // TODO: "fcl_proc_macros" to file of consts.
             })
         {
             ret_val = Some(LoggableAttrInfo {
@@ -616,27 +638,11 @@ impl FclAttribute for syn::Attribute {
                         log_closure_coords: parsed.log_closure_coords,
                     });
                 }
-                // TODO: `else`? Silently ignore the parsing error?
+                // TODO: `else`? Silently ignore the parsing error? NOTE: The parsing error 
+                // could have been detected in the very beginning of `fn loggable()`; make sure[, test,] and doc it.
             }
         }
         return ret_val;
-        /*
-               if let Some(last_path_segment) = path.segments.last() &&
-                   last_path_segment.ident.to_string() == "loggable" &&
-                   (path.segments.len() < 2 || {
-                       let prev_segment_idx = path.segments.len() - 2;
-                       path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"
-                   })
-               {
-                   return true
-               }
-               return false
-        */
-        // let ret_val = if self.is_loggable() {
-
-        // } else {
-        //     None
-        // }
     }
 
     fn is_non_loggable(&self) -> bool {

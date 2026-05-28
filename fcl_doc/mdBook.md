@@ -500,9 +500,112 @@ for<'a, 'b, 'c> unsafe extern "C" fn(x: u8, i32, y: ... ,) ->
 I also didn't know that a function or a closure can be defined (and/or called) inside of arguments and generic arguments, parameters and generic parameters, return types, type definitions, etc.  
 
 In case you agree with the proverb "If you want to study a programming language then write a compiler for it", then this section is a step in that direction.
-
 ## Traversing a Module
 ## Traversing an `impl` Block
+## The Arguments of `#[loggable]`
+(TODO: Needs to be placed after the subsequent section "Traversing a Function")
+
+The `#[loggable]` attribute can have arguments, e.g. `#[loggable(prefix = MyPrefix, skip_closure_coords, log_params)]`, 
+each of which is optional. 
+
+These are
+* Closure coordinates logging. The closure coordinates are the file line and column number of the closure definition start and end.  
+  This argument has no specific name. The values are 
+  * `log_closure_coords`: the default value, the closure coordinates are to be logged in the `#[loggable]` entity and nested entites,
+    e.g.,
+    ```rs
+    #[loggable] // or `#[loggable(log_closure_coords)]`. 
+                // The closure coordinates are to be logged in `m` below and its nested entities.
+    mod m {
+      fn f() {
+        Some(0).map(
+          |x| x + 1 // This closure will be logged as `m::f::closure{5,6:5,14}() {}` (parameter `x` logging is not discussed here).
+        )
+      }
+    }
+    ```
+  * `skip_closure_coords`: the closure coordinates are to be logged as `..` (skipped) in the `#[loggable]` entity and nested entites,
+    e.g.,
+    ```rs
+    #[loggable(skip_closure_coords)] // The closure coordinates are to be skipped in `m` below and its nested entities.
+    mod m {
+      fn f() {
+        Some(0).map(
+          |x| x + 1 // This closure will be logged as `m::f::closure{..}() {}` (parameter `x` logging is not discussed here).
+        )
+      }
+    }
+    ```
+* Function and closure parameters logging.  This argument has no specific name. The values are 
+  * `log_params`: the default value, the function and closure parameters are to be logged in the `#[loggable]` entity and nested
+    entites, e.g.,
+    ```rs
+    #[loggable] // or `#[loggable(log_params)]`. 
+                // The parameters are to be logged in `m` below and its nested entities.
+    mod m {
+      fn f(_y: u8) { // Is to be logged as `m::f(_y: 5) {`. The parameter `_y` is logged.
+        Some(0).map(
+          |x| x + 1 // Is to be logged as `m::f::closure{..}(x: 0) {}` (the coordinates `..` are not discussed here).
+        )
+      }
+    }
+    ```
+  * `skip_params`: the parameters are not to be logged if absent, to be logged as `..` (skipped) if present, e.g.,
+    ```rs
+    #[loggable(skip_params)] // The parameters are to be skipped in `m` below and its nested entities.
+    mod m {
+      fn g() {}      // Is to be logged as `m::g() {}`. The parameters are absent, not logged.
+      fn f(_y: u8) { // Is to be logged as `m::f(..) {`. The parameter `_y` is present, logging is skipped.
+        Some(0).map(
+          |x| x + 1 // Is to be logged as `m::f::closure{..}(..) {}`, the parameter `x` is skipped 
+                    // (the coordinates `..` in `{..}` are not discussed here).
+        )
+      }
+    }
+    ```
+* `prefix`. _The user will hardly ever need to use this argument_.  
+  The `prefix` value will prepend the name of the `#[loggable]` entity in the FCL log. E.g., 
+  ```rs
+  #[loggable(prefix = ConsumerThread)] // The `ConsumerThread` will prepend `m` below.
+  mod m {
+    fn f() {} // Will be logged as `ConsumerThread::m::f() {}`.
+  }
+  ```
+  If the `prefix` were not provided in the example above then the function `f()` would be logged as `m::f()`.
+
+### The Arguments of Nested `#[loggable]` Attributes
+In case of nested `#[loggable]` attributes the inner one's arguments 
+* if provided, override those of the outer one,
+* otherwise, _reuse_ those of the outer one (see below).
+
+In particular
+* `#[loggable]` (with no arguments):
+  * for a top-level `#[loggable]` all arguments have default values:
+    * the closure coordinates logging is enabled (`log_closure_coords`),
+    * the function parameters logging is enabled (`log_params`),
+    * the `prefix` is empty;
+  * for a nested `#[loggable]` 
+    * the `prefix` is the `prefix` of the enclosing `#[loggable]`, followed by the name of the enclosing entity; e.g. 
+      ```rs
+      #[loggable(prefix=P)] // The enclosing (outer) `#[loggable]` has `prefix` provided.
+      mod m {               // The enclosing (outer) entity with name `m`.
+        #[loggable]         // The nested (inner) `#[loggable]` has NO `prefix` (reuses the `prefix`).
+        fn f() {}           // Is logged as `P::m::f() {}`. The prefix `P` is reused. The prefix `m` is added.
+      }
+      ```
+    * all other arguments have the same value as in the enclosing `#[loggable]`.
+* `#[loggable(prefix = MyPrefix)]`:
+  * for a top-level `#[loggable]` the `prefix` argument is `MyPrefix` token stream,
+  * for a nested `#[loggable]` the prefix becomes `MyPrefix` (overrides the outer one), e.g.,
+    ```rs
+    #[loggable(prefix = ConsumerThread)]
+    mod m {
+      #[loggable(prefix = MyPrefix)] // Overrides the `prefix` for `f()` and its nested entities.
+      fn f() {} // Is to be logged as `MyPrefix::f() {}`.
+
+      fn g() {} // Reuses the prefix. Is to be logged as `ConsumerThread::m::g() {}`.
+    }
+    ```
 ## Advanced
 ### The Declarative (`macro_rules`) Macros That Are `#[loggable]`
 Let's imagine the following.

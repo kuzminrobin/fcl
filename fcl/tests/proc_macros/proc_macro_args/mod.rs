@@ -121,9 +121,9 @@ quote_as_expr
     quote_as_expr_yield                         OK, TODO: Test.
         quote_as_expr                           ^ - see above
 >
-    Commit
+    Commi
 
-TODO: Use `updated_attr_args()` eherevere applicable.
+TODO: Use `updated_attr_args()` wherever applicable.
  */
 
 // params

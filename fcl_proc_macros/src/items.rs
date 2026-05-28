@@ -1,7 +1,6 @@
 use crate::{
-    AttrArgs, FclAttribute, ParamsLogging,
-    exprs::{quote_as_block, quote_as_expr},
-    get_loggable_attr_params, remove_spaces, update_param_data_from_pat, updated_attr_args,
+    AttrArgs, ParamsLogging,
+    exprs::{quote_as_block, quote_as_expr}, remove_spaces, update_param_data_from_pat, updated_loggable_attr_args,
 };
 use quote::quote;
 use syn::spanned::Spanned;
@@ -123,12 +122,30 @@ fn traversed_block_from_sig(
     attr_args: &AttrArgs,
 ) -> proc_macro2::TokenStream {
     let syn::Signature {
+        constness, //: Option<Const>,
+        // asyncness, //: Option<Async>,
+        // unsafety, //: Option<Unsafe>,
+        // abi, //: Option<Abi>,
+        // fn_token, //: Fn,
         ident,    //: Ident,
         generics, //: Generics,
+        // paren_token, //: Paren,
         inputs,   //: Punctuated<FnArg, Comma>,
+        // variadic, //: Option<Variadic>,
         output,   //: ReturnType,
         ..
     } = sig;
+
+    // Cannot instrument the `const` functions 
+    // since the instrumentation has non-const fn calls, that are not allowed in `const` context.
+    // TODO: Test.
+    //  * loggable enclosing, non-attributed nested const fn (OK, const fn doesn't get instrumented).
+    //  * loggable const fn (Ideally FAIL, "Cannot instrument const fn since the instrumentation makes non-const calls that are not allowed in const context".
+    //    Currently: OK?, const fn doesn't get instrumented? loggable attr is silently ignored?).
+    if constness.is_some() {
+        return quote! { #block };
+    }
+
     let inputs = input_vals(inputs, attr_args);
 
     let mut returns_something = false;
@@ -280,28 +297,33 @@ fn quote_as_item_fn(
     } = item_fn;
     // println!("{:?} {{", sig.ident);
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-
-    // println!("attrs.len(): {}", attrs.len());
-    for attr in attrs {
-        // match &attr.meta {
-        //     Meta::Path(path) => println!("Path: {:?}", path.get_ident()),
-        //     Meta::List(metalist) => println!("Meta::List Path{:?}", metalist.path.get_ident()),
-        //     Meta::NameValue(meta_name_value) => println!("NameValue Path: {:?}", meta_name_value.path.get_ident()),
-        // }
-        // println!("attr: {:?}", attr.meta);
-
-        if attr.is_non_loggable() {
-            // println!("}} {:?} // non_loggable", sig.ident);
-            return quote! { #item_fn };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #item_fn };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+
+    // // println!("attrs.len(): {}", attrs.len());
+    // for attr in attrs {
+    //     // match &attr.meta {
+    //     //     Meta::Path(path) => println!("Path: {:?}", path.get_ident()),
+    //     //     Meta::List(metalist) => println!("Meta::List Path{:?}", metalist.path.get_ident()),
+    //     //     Meta::NameValue(meta_name_value) => println!("NameValue Path: {:?}", meta_name_value.path.get_ident()),
+    //     // }
+    //     // println!("attr: {:?}", attr.meta);
+
+    //     if attr.is_non_loggable() {
+    //         // println!("}} {:?} // non_loggable", sig.ident);
+    //         return quote! { #item_fn };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
 
     let block = if has_loggable {
         // println!("not traversing");
@@ -346,7 +368,7 @@ fn quote_as_impl_item_fn(
     } = impl_item_fn;
 
     let (update_succeeded, new_attrs, has_loggable) =
-        updated_attr_args(attrs, enclosing_item_attr_args);
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_succeeded {
         return quote! { #impl_item_fn };
     }
@@ -397,19 +419,24 @@ fn quote_as_item_impl(
         .. // brace_token
     } = item_impl;
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-
-    for attr in attrs {
-        if attr.is_non_loggable() {
-            return quote! { #item_impl };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #item_impl };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+
+    // for attr in attrs {
+    //     if attr.is_non_loggable() {
+    //         return quote! { #item_impl };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -657,19 +684,24 @@ fn quote_as_item_mod(
         semi,      //: Option<Semi>,
     } = item_mod;
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-
-    for attr in attrs {
-        if attr.is_non_loggable() {
-            return quote! { #item_mod };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #item_mod };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+
+    // for attr in attrs {
+    //     if attr.is_non_loggable() {
+    //         return quote! { #item_mod };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
 
     let content = if has_loggable {
         // No item traversing. The items are passed as they are.
@@ -721,7 +753,7 @@ fn quote_as_item_static(
     } = item_static;
 
     let (update_passed, new_attrs, has_loggable) =
-        updated_attr_args(attrs, enclosing_item_attr_args);
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #item_static };
     }
@@ -796,7 +828,7 @@ fn quote_as_trait_item_const(
     } = trait_item_const;
 
     let (update_passed, new_attrs, has_loggable) =
-        updated_attr_args(attrs, enclosing_item_attr_args);
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if !update_passed {
         return quote! { #trait_item_const };
     }
@@ -829,19 +861,24 @@ fn quote_as_trait_item_fn(
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-    for attr in attrs {
-        if attr.is_non_loggable() {
-            // if attr.is_traverse_stopper() {
-            return quote! { #trait_item_fn };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #trait_item_fn };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+    // for attr in attrs {
+    //     if attr.is_non_loggable() {
+    //         // if attr.is_traverse_stopper() {
+    //         return quote! { #trait_item_fn };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
     let default = default.as_ref().map(|block| {
         if has_loggable {
             quote! { #block }
@@ -865,18 +902,23 @@ fn quote_as_trait_item_macro_rules_invocation(
         semi_token, // : Option<Semi>,
     } = trait_item_macro;
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-    for attr in attrs {
-        if attr.is_non_loggable() {
-            return quote! { #trait_item_macro };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #trait_item_macro };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+    // for attr in attrs {
+    //     if attr.is_non_loggable() {
+    //         return quote! { #trait_item_macro };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
     if has_loggable {
         // For the macro invocations with `#[loggable` combine
         // the enclosing entity's args of `#[loggable`
@@ -943,19 +985,24 @@ fn quote_as_item_trait(
         .. // restriction, brace_token
     } = item_trait;
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-
-    for attr in attrs {
-        if attr.is_non_loggable() {
-            return quote! { #item_trait };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #item_trait };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+
+    // for attr in attrs {
+    //     if attr.is_non_loggable() {
+    //         return quote! { #item_trait };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -1188,22 +1235,27 @@ fn quote_as_item_macro(
                // ..
     } = item_macro;
 
-    let mut new_attrs = vec![];
-    let mut has_loggable = false;
-
-    // println!("attrs.len(): {}", attrs.len());
-    for attr in attrs {
-        if attr.is_non_loggable() {
-            // TODO: Consider in detail the enclosing `#[loggable`, nested `#[non_loggable]` followed by `#[loggable` (prefix passing from enclosing to nested one).
-            // println!("}} {:?} // non_loggable", sig.ident);
-            return quote! { #item_macro };
-        }
-        new_attrs.push(get_loggable_attr_params(
-            attr,
-            &mut has_loggable,
-            enclosing_item_attr_args,
-        ));
+    let (update_succeeded, new_attrs, has_loggable) =
+        updated_loggable_attr_args(attrs, enclosing_item_attr_args);
+    if !update_succeeded {
+        return quote! { #item_macro };
     }
+    // let mut new_attrs = vec![];
+    // let mut has_loggable = false;
+
+    // // println!("attrs.len(): {}", attrs.len());
+    // for attr in attrs {
+    //     if attr.is_non_loggable() {
+    //         // TODO: Consider in detail the enclosing `#[loggable`, nested `#[non_loggable]` followed by `#[loggable` (prefix passing from enclosing to nested one).
+    //         // println!("}} {:?} // non_loggable", sig.ident);
+    //         return quote! { #item_macro };
+    //     }
+    //     new_attrs.push(if_loggable_then_combine_attr_args(
+    //         attr,
+    //         &mut has_loggable,
+    //         enclosing_item_attr_args,
+    //     ));
+    // }
     // If `#[loggable` is present (got here duiring the recursive traverse) then
     // combine the enclosing entity's `#[loggable` args with this one's `#[loggable` args (in `new_attrs`)
     // and leave all the rest as is for the subsequent individual expansion of the `#[loggable`.
