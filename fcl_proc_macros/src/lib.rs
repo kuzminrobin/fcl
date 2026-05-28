@@ -198,7 +198,7 @@ pub fn loggable_block_contents(
     //     // syn::Error::into_compile_error()
     // }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
 
     // for attr in attrs {
     //     if attr.is_non_loggable() { // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
@@ -206,13 +206,13 @@ pub fn loggable_block_contents(
     //     }
     //     new_attrs.push(items::if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
 
     // /*
-    //     let content = if has_loggable {
+    //     let content = if loggable_found {
     //         // // NOTE: The impl below deosn't compile since either a trait or a type have to be locally defined.
     //         // impl quote::ToTokens for (syn::token::Brace, Vec<syn::Item>) {
     //         //     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
@@ -309,11 +309,11 @@ pub fn loggable_block_contents(
     // output.into()
 }
 
-/// Runs through the collection of `current_attrs` parameter, 
-/// for each `#[loggable]` attribute combines its arguments with `enclosing_item_attr_args` in a new attribute, 
+/// Runs through the collection of `current_attrs` parameter,
+/// for each `#[loggable]` attribute combines its arguments with `enclosing_item_attr_args` in a new attribute,
 /// clones all other attributes,
 /// collects all the attributes in the output collection.
-/// 
+///
 /// Returns a tuple of
 /// * the vector of attributes where for each `#[loggable]` attribute the arguments are combined;
 /// * `true`, if the current entity has a `#[non_loggable]` attribute,
@@ -325,12 +325,12 @@ fn updated_loggable_attr_args(
     enclosing_item_attr_args: &AttrArgs,
 ) -> (
     Vec<syn::Attribute>, // `updated_attrs`
-    bool, // `non_loggable_found`
-    bool, // `loggable_found`
+    bool,                // `non_loggable_found`
+    bool,                // `loggable_found`
 ) {
     let mut new_attrs = vec![];
-    let mut has_loggable = false;
     let mut non_loggable_found = false;
+    let mut loggable_found = false;
 
     for attr in current_attrs {
         if attr.is_non_loggable() {
@@ -338,21 +338,21 @@ fn updated_loggable_attr_args(
         }
         // if attr.is_non_loggable() {
         //     new_attrs.push(attr.clone());
-        //     // return (false, current_attrs.clone(), has_loggable);
-        //     // return (false, new_attrs, has_loggable);
+        //     // return (false, current_attrs.clone(), loggable_found);
+        //     // return (false, new_attrs, loggable_found);
         // } else {
-            new_attrs.push(if_loggable_then_combine_attr_args(
-                attr,
-                enclosing_item_attr_args,
-                &mut has_loggable,
-            ));
+        new_attrs.push(if_loggable_then_combine_attr_args(
+            attr,
+            enclosing_item_attr_args,
+            &mut loggable_found,
+        ));
         // }
     }
-    (new_attrs, non_loggable_found, has_loggable)
-    // (true, new_attrs, has_loggable)
+    (new_attrs, non_loggable_found, loggable_found)
+    // (true, new_attrs, loggable_found)
 }
 
-/// Combines the parameters 
+/// Combines the parameters
 /// and returns a token stream of `prefix = <prefix>, (log|skip)_params, (log|skip)_closure_coords,`.
 fn combine_loggable_attr_params_as_meta_tokens(
     user_provided_attr_info: &LoggableAttrInfo,
@@ -399,10 +399,10 @@ fn combine_loggable_attr_params_as_meta_tokens(
 // TODO: Review/refactor and doc-comment.
 //
 /// If the `attr` parameter is not `[fcl_proc_macros::]loggable` then returns a clone of it.
-/// 
+///
 /// Otherwise
 /// * writes `true` to the value referred to by the `is_loggable` parameter;
-/// * returns a new `syn::Attribute` instance containing `#[loggable(<args>)]` with arguments that are a combination of 
+/// * returns a new `syn::Attribute` instance containing `#[loggable(<args>)]` with arguments that are a combination of
 ///   * `attr` parameter's arguments
 ///   * `enclosing_item_attr_args`.
 fn if_loggable_then_combine_attr_args(
@@ -410,7 +410,6 @@ fn if_loggable_then_combine_attr_args(
     enclosing_item_attr_args: &AttrArgs,
     is_loggable: &mut bool,
 ) -> syn::Attribute {
-
     // If `attr` is `#[loggable]` (with or without args):
     if let Some(user_provided_attr_info) = attr.get_loggable_attr_info() {
         // TODO: The comment below to mdBook.
@@ -488,7 +487,7 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
     ///   * is `Some(false)` if the `input` contains `skip_closure_coords`,
     ///   * is `Some(true)` if the `input` contains `log_closure_coords`,
     ///   * is `None` otherwise.
-    /// 
+    ///
     /// Otherwise returns `syn::Result::err(e)`.
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut args = LoggableAttrArgsOpt {
@@ -638,7 +637,7 @@ impl FclAttribute for syn::Attribute {
                         log_closure_coords: parsed.log_closure_coords,
                     });
                 }
-                // TODO: `else`? Silently ignore the parsing error? NOTE: The parsing error 
+                // TODO: `else`? Silently ignore the parsing error? NOTE: The parsing error
                 // could have been detected in the very beginning of `fn loggable()`; make sure[, test,] and doc it.
             }
         }

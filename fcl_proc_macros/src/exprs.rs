@@ -18,10 +18,7 @@ fn quote_as_expr_array(
         .. // bracket_token
     } = expr_array;
 
-    // TODO:
-    // * Consider 
-    // *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
-     let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_array };
@@ -32,7 +29,7 @@ fn quote_as_expr_array(
     //     }
     // }
     let elems = {
-        if has_loggable {
+        if loggable_found {
             quote! { #elems } // TODO: Test.
         } else {
             let mut traversed_elems = quote! {};
@@ -67,7 +64,7 @@ fn quote_as_expr_assign(
         right,    //: Box<Expr>,
     } = expr_assign;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_assign };
@@ -78,7 +75,7 @@ fn quote_as_expr_assign(
     //     }
     // }
 
-    let (left, right) = if has_loggable {
+    let (left, right) = if loggable_found {
         (quote! { #left }, quote! { #right }) // TODO: Test.
     } else {
         (
@@ -268,7 +265,7 @@ fn quote_as_expr_async(
         block,       //: Block,
     } = expr_async;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_async };
@@ -279,7 +276,7 @@ fn quote_as_expr_async(
     //     }
     // }
 
-    let block = if has_loggable {
+    let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
@@ -302,7 +299,7 @@ fn quote_as_expr_await(
         await_token, //: Await,
     } = expr_await;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_await };
@@ -313,7 +310,7 @@ fn quote_as_expr_await(
     //     }
     // }
 
-    let base = if has_loggable {
+    let base = if loggable_found {
         quote! { #base } // TODO: Test.
     } else {
         quote_as_expr(base, None, enclosing_item_attr_args) // TODO: Test.
@@ -337,7 +334,7 @@ fn quote_as_expr_binary(
         right, //: Box<Expr>,
     } = expr_binary;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_binary };
@@ -348,7 +345,7 @@ fn quote_as_expr_binary(
     //     }
     // }
 
-    let (left, right) = if has_loggable {
+    let (left, right) = if loggable_found {
         (quote! { #left }, quote! { #right }) // TODO: Test.
     } else {
         (
@@ -373,7 +370,7 @@ fn quote_as_expr_block(
         block, //: Block,
     } = expr_block;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_block };
@@ -384,7 +381,7 @@ fn quote_as_expr_block(
     //     }
     // }
 
-    let block = if has_loggable {
+    let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
@@ -407,7 +404,7 @@ fn quote_as_expr_break(
         expr,        //: Option<Box<Expr>>,
     } = expr_break;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_break };
@@ -419,7 +416,7 @@ fn quote_as_expr_break(
     // }
 
     let expr = expr.as_ref().map(|expr| {
-        if has_loggable {
+        if loggable_found {
             quote! { #expr }
         } else {
             quote_as_expr(expr, None, enclosing_item_attr_args)
@@ -454,7 +451,7 @@ fn quote_as_expr_call(
         .. // paren_token
     } = expr_call;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_call }; // TODO: Test.
@@ -467,7 +464,7 @@ fn quote_as_expr_call(
 
     let mut is_print_func_name = false;
 
-    let (func, args) = if has_loggable {
+    let (func, args) = if loggable_found {
         (quote! { #func }, quote! { #args }) // TODO: Test.
     } else {
         (
@@ -540,7 +537,7 @@ fn quote_as_expr_cast(
         ty,       //: Box<Type>,
     } = expr_cast;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_cast }; // TODO: Test.
@@ -551,7 +548,7 @@ fn quote_as_expr_cast(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -581,7 +578,7 @@ pub fn quote_as_expr_closure(
         body,       //: Box<Expr>,
     } = expr_closure;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_closure }; // TODO: Test.
@@ -646,7 +643,7 @@ pub fn quote_as_expr_closure(
     };
 
     // Optionally instrument the closure body:
-    let body = if has_loggable {
+    let body = if loggable_found {
         quote! { #body } // TODO: Test.
     } else {
         quote_as_expr(&**body, None, &attr_args) // TODO: Test.
@@ -744,7 +741,7 @@ fn quote_as_expr_field(
         member,    //: Member,
     } = expr_field;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_field }; // TODO: Test.
@@ -755,7 +752,7 @@ fn quote_as_expr_field(
     //     }
     // }
 
-    let base = if has_loggable {
+    let base = if loggable_found {
         quote! { #base } // TODO: Test.
     } else {
         quote_as_expr(&**base, None, enclosing_item_attr_args) // TODO: Test.
@@ -845,7 +842,7 @@ fn quote_as_expr_for_loop(
         body,      //: Block,
     } = expr_for_loop;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_for_loop }; // TODO: Test.
@@ -856,7 +853,7 @@ fn quote_as_expr_for_loop(
     //     }
     // }
 
-    let (expr, body) = if has_loggable {
+    let (expr, body) = if loggable_found {
         (quote! { #expr }, quote! { #body }) // TODO: Test.
     } else {
         (
@@ -897,7 +894,7 @@ fn quote_as_expr_group(
         .. // group_token
     } = expr_group;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_group }; // TODO: Test.
@@ -908,7 +905,7 @@ fn quote_as_expr_group(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -936,7 +933,7 @@ fn quote_as_expr_if(
         else_branch, //: Option<(Else, Box<Expr>)>,
     } = expr_if;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_if }; // TODO: Test.
@@ -947,7 +944,7 @@ fn quote_as_expr_if(
     //     }
     // }
 
-    let (cond, then_branch, else_branch) = if has_loggable {
+    let (cond, then_branch, else_branch) = if loggable_found {
         (
             quote! { #cond },
             quote! { #then_branch },
@@ -991,7 +988,7 @@ fn quote_as_expr_index(
         .. // bracket_token
     } = expr_index;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_index }; // TODO: Test.
@@ -1002,7 +999,7 @@ fn quote_as_expr_index(
     //     }
     // }
 
-    let (expr, index) = if has_loggable {
+    let (expr, index) = if loggable_found {
         (quote! { #expr }, quote! { #index }) // TODO: Test.
     } else {
         (
@@ -1035,7 +1032,7 @@ fn quote_as_expr_let(
         expr,      //: Box<Expr>,
     } = expr_let;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_let }; // TODO: Test.
@@ -1050,7 +1047,7 @@ fn quote_as_expr_let(
     // // closures (as opposed to compile time const functions and closures).
     // let pat = quote_as_pat(&**pat, attr_args);
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1078,7 +1075,7 @@ fn quote_as_expr_loop(
         body,       //: Block,
     } = expr_loop;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_loop }; // TODO: Test.
@@ -1089,7 +1086,7 @@ fn quote_as_expr_loop(
     //     }
     // }
 
-    let body = if has_loggable {
+    let body = if loggable_found {
         quote! { #body } // TODO: Test.
     } else {
         quote_as_loop_block(body, enclosing_item_attr_args) // TODO: Test.
@@ -1283,7 +1280,7 @@ fn quote_as_expr_match(
         .. // brace_token
     } = expr_match;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_match }; // TODO: Test.
@@ -1294,7 +1291,7 @@ fn quote_as_expr_match(
     //     }
     // }
 
-    let (expr, arms) = if has_loggable {
+    let (expr, arms) = if loggable_found {
         (quote! { #expr }, quote! { #(#arms)* }) // TODO: Test.
     } else {
         let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args); // TODO: Test.
@@ -1333,7 +1330,7 @@ fn quote_as_expr_method_call(
         .. // paren_token
     } = expr_method_call;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_method_call }; // TODO: Test.
@@ -1344,7 +1341,7 @@ fn quote_as_expr_method_call(
     //     }
     // }
 
-    let (receiver, args) = if has_loggable {
+    let (receiver, args) = if loggable_found {
         (quote! { #receiver }, quote! { #args }) // TODO: Test.
     } else {
         let receiver = quote_as_expr(&**receiver, None, enclosing_item_attr_args);
@@ -1393,7 +1390,7 @@ fn quote_as_expr_paren(
         .. // paren_token
     } = expr_paren;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_paren }; // TODO: Test.
@@ -1404,7 +1401,7 @@ fn quote_as_expr_paren(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1460,7 +1457,7 @@ fn quote_as_expr_range(
         end,    //: Option<Box<Expr>>,
     } = expr_range;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_range }; // TODO: Test.
@@ -1471,7 +1468,7 @@ fn quote_as_expr_range(
     //     }
     // }
 
-    let (start, end) = if has_loggable {
+    let (start, end) = if loggable_found {
         (Some(quote! { #start }), Some(quote! { #end })) // TODO: Test.
     } else {
         let start = start
@@ -1506,7 +1503,7 @@ fn quote_as_expr_raw_addr(
         expr,       //: Box<Expr>,
     } = expr_raw_addr;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_raw_addr }; // TODO: Test.
@@ -1517,7 +1514,7 @@ fn quote_as_expr_raw_addr(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1540,7 +1537,7 @@ fn quote_as_expr_reference(
         expr,       //: Box<Expr>,
     } = expr_reference;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_reference }; // TODO: Test.
@@ -1551,7 +1548,7 @@ fn quote_as_expr_reference(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1574,7 +1571,7 @@ fn quote_as_expr_repeat(
         .. // bracket_token
     } = expr_repeat;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_repeat }; // TODO: Test.
@@ -1585,7 +1582,7 @@ fn quote_as_expr_repeat(
     //     }
     // }
 
-    let (expr, len) = if has_loggable {
+    let (expr, len) = if loggable_found {
         (quote! { #expr }, quote! { #len }) // TODO: Test.
     } else {
         let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args); // TODO: Test.
@@ -1610,7 +1607,7 @@ fn quote_as_expr_return(
         expr,         //: Option<Box<Expr>>,
     } = expr_return;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_return }; // TODO: Test.
@@ -1621,7 +1618,7 @@ fn quote_as_expr_return(
     //     }
     // }
     let expr = expr.as_ref().map(|expr| {
-        if has_loggable {
+        if loggable_found {
             quote! { #expr } // TODO: Test.
         } else {
             quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1675,7 +1672,7 @@ fn quote_as_expr_struct(
         .. // brace_token
     } = expr_struct;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_struct }; // TODO: Test.
@@ -1714,7 +1711,7 @@ fn quote_as_expr_struct(
     // // closures (as opposed to compile time const functions and closures).
     // let path = quote_as_path(path, attr_args);
 
-    let (fields, rest) = if has_loggable {
+    let (fields, rest) = if loggable_found {
         (
             quote! { #fields }, // TODO: Test.
             rest.as_ref().map(|expr| quote! { #expr }), // TODO: Test.
@@ -1760,7 +1757,7 @@ fn quote_as_expr_try(
         question_token, //: Question,
     } = expr_try;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_try }; // TODO: Test.
@@ -1771,7 +1768,7 @@ fn quote_as_expr_try(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1797,7 +1794,7 @@ fn quote_as_expr_try_block(
         block,     //: Block,
     } = expr_try_block;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_try_block }; // TODO: Test.
@@ -1808,7 +1805,7 @@ fn quote_as_expr_try_block(
     //     }
     // }
 
-    let block = if has_loggable {
+    let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
@@ -1831,7 +1828,7 @@ fn quote_as_expr_tuple(
         .. // paren_token
     } = expr_tuple;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_tuple }; // TODO: Test.
@@ -1842,7 +1839,7 @@ fn quote_as_expr_tuple(
     //     }
     // }
 
-    let elems = if has_loggable {
+    let elems = if loggable_found {
         quote! { #elems } // TODO: Test.
     } else {
         let mut traversed_elems = quote! {};
@@ -1877,7 +1874,7 @@ fn quote_as_expr_unary(
         expr,  //: Box<Expr>,
     } = expr_unary;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_unary }; // TODO: Test.
@@ -1888,7 +1885,7 @@ fn quote_as_expr_unary(
     //     }
     // }
 
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -1911,7 +1908,7 @@ fn quote_as_expr_unsafe(
         block,        //: Block,
     } = expr_unsafe;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_unsafe }; // TODO: Test.
@@ -1922,7 +1919,7 @@ fn quote_as_expr_unsafe(
     //     }
     // }
 
-    let block = if has_loggable {
+    let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
@@ -1946,7 +1943,7 @@ fn quote_as_expr_while(
         body,        //: Block,
     } = expr_while;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_while }; // TODO: Test.
@@ -1957,7 +1954,7 @@ fn quote_as_expr_while(
     //     }
     // }
 
-    let (cond, body) = if has_loggable {
+    let (cond, body) = if loggable_found {
         (quote! { #cond }, quote! { #body }) // TODO: Test.
     } else {
         (
@@ -1995,7 +1992,7 @@ fn quote_as_expr_yield(
         expr,        //: Option<Box<Expr>>,
     } = expr_yield;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #expr_yield }; // TODO: Test.
@@ -2007,7 +2004,7 @@ fn quote_as_expr_yield(
     // }
 
     let expr = expr.as_ref().map(|ref_boxed_expr| {
-        if has_loggable {
+        if loggable_found {
             quote! { #expr } // TODO: Test.
         } else {
             quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args) // TODO: Test.

@@ -297,13 +297,13 @@ fn quote_as_item_fn(
     } = item_fn;
     // println!("{:?} {{", sig.ident);
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #item_fn };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
 
     // // println!("attrs.len(): {}", attrs.len());
     // for attr in attrs {
@@ -320,12 +320,12 @@ fn quote_as_item_fn(
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
 
-    let block = if has_loggable {
+    let block = if loggable_found {
         // println!("not traversing");
 
         // After updating/adding the params of/to #[loggable(<params>)]
@@ -367,7 +367,7 @@ fn quote_as_impl_item_fn(
         block,       //: Block,
     } = impl_item_fn;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #impl_item_fn };
@@ -378,7 +378,7 @@ fn quote_as_impl_item_fn(
     //     }
     // }
 
-    let block = if has_loggable {
+    let block = if loggable_found {
         // After updating/adding the params of/to #[loggable(<params>)]
         // leave the fn body UNinstrumented, so that a separate #[loggable(<params>)] macro invocation
         // will instrument the body.
@@ -419,13 +419,13 @@ fn quote_as_item_impl(
         .. // brace_token
     } = item_impl;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #item_impl };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
 
     // for attr in attrs {
     //     if attr.is_non_loggable() {
@@ -433,7 +433,7 @@ fn quote_as_item_impl(
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
@@ -461,7 +461,7 @@ fn quote_as_item_impl(
     // });
     // let self_ty = quote_as_type(&**self_ty, attr_args);
 
-    let items = if has_loggable {
+    let items = if loggable_found {
         quote! { #(#items)* }
     } else {
         // Add the impl type to the prefix
@@ -684,13 +684,13 @@ fn quote_as_item_mod(
         semi,      //: Option<Semi>,
     } = item_mod;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #item_mod };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
 
     // for attr in attrs {
     //     if attr.is_non_loggable() {
@@ -698,12 +698,12 @@ fn quote_as_item_mod(
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
 
-    let content = if has_loggable {
+    let content = if loggable_found {
         // No item traversing. The items are passed as they are.
         let content = content.as_ref().map(|(_brace, items)| {
             quote! { { #(#items)* } }
@@ -752,7 +752,7 @@ fn quote_as_item_static(
         semi_token,   //: Semi,
     } = item_static;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #item_static };
@@ -769,7 +769,7 @@ fn quote_as_item_static(
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
     // let ty = quote_as_ty(ty, attr_args);
-    let expr = if has_loggable {
+    let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -827,7 +827,7 @@ fn quote_as_trait_item_const(
         semi_token,  //: Semi,
     } = trait_item_const;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #trait_item_const };
@@ -838,7 +838,7 @@ fn quote_as_trait_item_const(
     //     }
     // }
     let default = default.as_ref().map(|(eq_token, expr)| {
-        let expr = if has_loggable {
+        let expr = if loggable_found {
             quote! { #expr } // TODO: Test.
         } else {
             quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
@@ -861,13 +861,13 @@ fn quote_as_trait_item_fn(
         semi_token, //: Option<Semi>,
     } = trait_item_fn;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #trait_item_fn };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
     // for attr in attrs {
     //     if attr.is_non_loggable() {
     //         // if attr.is_traverse_stopper() {
@@ -875,12 +875,12 @@ fn quote_as_trait_item_fn(
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
     let default = default.as_ref().map(|block| {
-        if has_loggable {
+        if loggable_found {
             quote! { #block }
         } else {
             traversed_block_from_sig(block, sig, enclosing_item_attr_args)
@@ -902,24 +902,24 @@ fn quote_as_trait_item_macro_rules_invocation(
         semi_token, // : Option<Semi>,
     } = trait_item_macro;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #trait_item_macro };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
     // for attr in attrs {
     //     if attr.is_non_loggable() {
     //         return quote! { #trait_item_macro };
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
-    if has_loggable {
+    if loggable_found {
         // For the macro invocations with `#[loggable` combine
         // the enclosing entity's args of `#[loggable`
         // and the current item's args of `#[loggable`
@@ -937,7 +937,7 @@ fn quote_as_trait_item_macro_rules_invocation(
         let mac =
 
         let default = default.as_ref().map(|block| {
-            if has_loggable {
+            if loggable_found {
                 quote! { #block }
             } else {
                 traversed_block_from_sig(block, sig, enclosing_item_attr_args)
@@ -985,13 +985,13 @@ fn quote_as_item_trait(
         .. // restriction, brace_token
     } = item_trait;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #item_trait };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
 
     // for attr in attrs {
     //     if attr.is_non_loggable() {
@@ -999,7 +999,7 @@ fn quote_as_item_trait(
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
@@ -1026,7 +1026,7 @@ fn quote_as_item_trait(
     // when the actual generic arguments are not known yet
     // (and whether the trait will be used at all).
     // That's why we cannot expand the traits' `#generics` when extending the prefix.
-    let items = if has_loggable {
+    let items = if loggable_found {
         quote! { #(#items)* }
     } else {
         let attr_args = AttrArgs {
@@ -1235,13 +1235,13 @@ fn quote_as_item_macro(
                // ..
     } = item_macro;
 
-    let (new_attrs, non_loggable_found, has_loggable) =
+    let (new_attrs, non_loggable_found, loggable_found) =
         updated_loggable_attr_args(attrs, enclosing_item_attr_args);
     if non_loggable_found {
         return quote! { #item_macro };
     }
     // let mut new_attrs = vec![];
-    // let mut has_loggable = false;
+    // let mut loggable_found = false;
 
     // // println!("attrs.len(): {}", attrs.len());
     // for attr in attrs {
@@ -1252,14 +1252,14 @@ fn quote_as_item_macro(
     //     }
     //     new_attrs.push(if_loggable_then_combine_attr_args(
     //         attr,
-    //         &mut has_loggable,
+    //         &mut loggable_found,
     //         enclosing_item_attr_args,
     //     ));
     // }
     // If `#[loggable` is present (got here duiring the recursive traverse) then
     // combine the enclosing entity's `#[loggable` args with this one's `#[loggable` args (in `new_attrs`)
     // and leave all the rest as is for the subsequent individual expansion of the `#[loggable`.
-    if has_loggable {
+    if loggable_found {
         return quote! { #(#new_attrs)* #ident #mac #semi_token };
     }
 
