@@ -8,21 +8,8 @@
 
 # Next
 (See `>`)
-* updated_attr_args() 
-  * TODOs: RetVals
-    ```rs
-    // TODO:
-    // * Consider `update_passed` -> `attrs_have_non_loggable` | `non_loggable_found`.
-    // *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
-    let (update_passed, new_attrs, has_loggable) =
-        updated_attr_args(attrs, enclosing_item_attr_args);
-    if !update_passed {
-        return quote! { #expr_array };
-    }
-    ```
-  * Use everywhere (update the code existed before `updated_attr_args()`)
+* Logging Endlessly (Eternal Logging)
 * File of consts.
-* Eternal Logging
 * Code TODOs
 * Documentation
   * User Manual
@@ -1980,3 +1967,17 @@ fn f() {
   * The tests\add_ret.rs got broken.
   * followed_by_flush for loop body.
   * test
+
+* updated_attr_args() 
+  * TODOs: RetVals
+    ```rs
+    // TODO:
+    // * Consider `update_passed` -> `attrs_have_non_loggable` | `non_loggable_found`.
+    // *           `has_loggable` -> `attrs_have_loggable` | `loggable_found`.
+    let (update_passed, new_attrs, has_loggable) =
+        updated_attr_args(attrs, enclosing_item_attr_args);
+    if !update_passed {
+        return quote! { #expr_array };
+    }
+    ```
+  * Use everywhere (update the code existed before `updated_attr_args()`)

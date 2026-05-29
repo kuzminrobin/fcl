@@ -368,45 +368,181 @@ In some environments or cases it is hard to catch a failure in the debugger or t
 
 The situation becomes a bit tricky when the software, such as a daemon or an embedded firmware, is running endlessly, and the failure happens rarely, like once a month.
 
-As for the log storage, the FCL, _customized by the user_, can log the function calls (interleaved with the binary's own debugging output) not only to a terminal but to a file or memory in a circular manner, such that the oldest log entries are overwritten with the new ones. When the failure happens the developer can see the log of the last 3 days or 2 weeks, etc., depending on the settings and available storage.
+As for the log storage, the FCL, _customized by the user_, can log the function calls (interleaved with the binary's own debugging output) not only to a terminal but to a circular memory or file, such that the oldest log entries are overwritten with the new ones. When the failure happens the developer can see the log of the last 3 days, 2 weeks, etc., depending on the settings and available storage.
 
-But what does happen to the dynamic memory occupied by the call tree? Based on the logic so far the call tree grows endlessly. This will exhaust the memory. How can FCL log endlessly but still retain all the functionality?
+But what does happen to the dynamic memory occupied by the call tree? Based on the logic so far the call tree grows endlessly. This will exhaust the memory.  
+Can FCL log endlessly but still retain all the functionality? Yes it can (TODO: not yet implemented), but with certain limitations.
 
-Let's consider a simple `main()` function that calls `init()`, after which it calls `work()` in a loop. During logging the `main()` gets added as a child to the pseudoroot. Then `init()` is added as a child of `main()`, then the `work()` (with its children) is added after `init()`, the repeated `work()` increments the repeat count of the first `work()` and gets removed from the call graph. The `work()` with the subtree different from the one of the first `work()`, stays in the call tree, and so on.
+Let's consider a simple `main()` function that calls `init()`, after which it calls `work()` in a loop.
+```rs
+main() {
+  init() {}
+  { // Loop body start.
+    work() {
+      . . .
+    } // work().
+  } // Loop body end.
+```
+During run the `main()` gets added to the call tree as a child of the pseudoroot. Then `init()` is added as a child of `main()`.  
+Then a loop iteration containing a call to `work()` is added as a second child of `main()`. The repeated iteration with identical `work()` increments the repeat count of the previous iteration and gets removed from the call tree. The iteration containing `work()` with a subtree different from the one of the previous iteration, stays in the call tree, and so on.
+```rs
+main() {
+  init() {}
+  { // Loop body start.
+    work() {
+      f() {}
+    } // work().
+  } // Loop body end.
+  // Loop body repeats 100 time(s).
+  { // Loop body start.
+    work() {
+      g() {}      // Different subtree of `work()`.
+    } // work().
+  } // Loop body end.
+  // Loop body repeats 3 time(s).
+```
+During the loop the FCL algorithm analyses the two latest iterations containing `work()` in order to make a decision whether to leave the latest iteration in the call tree and log it, or to remove it and increment the repeat count of the preceding iteration.
 
-During the loop the FCL algorithm analyses the two latest calls to `work()` in order to make a decision whether to leave the latest `work()` in the call tree and log it, or to remove it and increment the repeat count of the preceding `work()`.
-
-In that decision-making the `init()` is not needed in the call tree and can potentially be removed (it is already logged). 
-But if we remove it, then the list of children in `main()` will be distorted. 
+In that decision-making the `init()` is not needed in the call tree and can potentially be removed (deallocated), it is already logged. 
+But if it is removed, then the list of children in `main()` will be distorted. 
 This will affect the rare implementations where `main()`, upon certain condition or periodically, can return, and then get called again. 
-And upon return from the second (repeated) `main()` the FCL needs to compare the second `main()`'s subtree with that of the first `main()` and either log the second `main()`'s subtree or remove it and increment the repeat count of the first `main()`. 
-But if the FCL's algorithm removes the `main()`'s child `init()`, then the comparison of the two adjacent subtrees of `main()` will be distorted becuase those subtrees can differ in nested `init()` subtrees or their repeat count.
+And upon return from the second (repeated) `main()` the FCL needs to compare the second `main()`'s subtree with that of the first `main()`, and 
+* if they differ, flush the second `main()`'s subtree to the log and leave the second `main()`'s subtree in the call tree (for the future comparison with the third call to `main()`),
+* otherwise, remove second `main()`'s subtree from the call tree without logging and increment the repeat count of the first `main()`.
 
-To summarize, for the common case we cannot remove `init()` from the call graph (when we proceed to handling the calls to `work()`), because the `init()` particiaptes in comparing the adjacent subtrees of `main()`.
+So, if the FCL's algorithm removes the `main()`'s child `init()`, then the comparison of the two adjacent subtrees of `main()` will be distorted becuase those subtrees can differ in presence of the nested `init()`, in its subtree structure, or its repeat count.
 
-But what if `main()` is not added to the call graph? What if logging starts after the call to `main()` but before the call to `init()`? In that case the `init()` will be added to the call graph as the first child of the pseudoroot and logged. Then upon the first call to `work()` the algorighm will see that the `work()` has a name different from `init()`, thus the caching will not be triggered, the `work()` will be added to the call graph, logged without caching, and the `init()` will not be needed in the call graph starting with the call to `work()`. That is why, upon the first call to `work()`, the `init()` can be removed from the list of pseudoroot's children , and the `work()` can be added as the first child instead.  
+To summarize, for the common case the FCL's algorithm cannot remove `init()` from the call tree because the `init()` particiaptes in comparison of the adjacent subtrees of `main()`.
+
+But what if `main()` is not added to the call tree? What if logging starts after the call to `main()` but before the call to `init()`? 
+
+In that case the `init()` will be added to the call tree as the first child of the pseudoroot, and logged.  
+Then, upon start of the first loop iteration, the algorighm will see that the iteration is not a repeated call to `init()`, which means that, upon iteration end, its subtree will not be comapred to the subtree of `init()`, which means that the subtree of `init()` is not needed any more starting from the moment when the `init()` is followed by anything not named `init()`; to be more precise, is followed by anything that _is logged as not `init()`_, because in general there can be a special case where after the `init()` every iteration of the loop has no calls to functions or closures, i.e. all the iterations are childless and, for clarity, they get removed from the call tree without being logged, after which they are followed by another `init()`, whose subtree upon its end will need to be compared to the one of the previous `init()`.
+
+That is why, upon the first-most call to `work()` of any loop iteration, i.e. when the iteration gets logged as not `init()`, the `init()` can be removed from the list of pseudoroot's children, making the iteration with `work()` the only child instead.  
 (TODO: Not yet implemented. Reader Practice?)
 
-The repeated calls to `work()` will increment the repeat count of the first `work()`.
+The repeating iterations will increment the repeat count of the previous iteration and get removed from the call tree without being logged.
 
-Any different call to `work()`, the one having subtree different from that of the first `work()`, will cause
-* caching stop, 
-* the first `work()`'s repeat count flush, 
-* removal of the first `work()` from the list of pseudoroot's children, 
-* and adding the latest `work()` as the fist child of the pseudoroot.
+Any different iteration or call <!-- with a different call to `work()`, the one having subtree different from that of the first `work()`, --> will cause
+* the previous iteration's repeat count flush to the log, 
+* the previous iteration's removal <!-- of the first `work()`--> from the list of pseudoroot's children (because that iteration is not needed any more),
+* logging the latest iteration or call and retaining it in the call tree as the only child of the pseudoroot.
 
 (TODO: Not yet implemented. Reader Practice?)
 
-This can continue endlessly. At any moment the pseudoroot will have at most 2 latest children: 
+This can continue endlessly. 
+
+At any moment the pseudoroot will have at most 2 latest children: 
 * either 1 that is being added to the call tree and logged without caching, 
-* or 1 that is fully added and logged, plus 1 that is being added and cached. 
+* or 1 that is fully added to the call tree and logged (except the repeat count that is being cached), plus 1 with the same name that is being added to the call tree, but not being logged (it is being cached).
 
-For that to work the `main()` must not be logged. That is (TODO: Requires familiarity with `#[loggable]`, `#[non_loggable]`, automatic unstrumentation), 
+For that to work the `main()` must not be added to the call tree. The same is applicable to any functions running for a long time, like `main()`, including the thread functions. 
+
+That is (TODO: Requires familiarity with `#[loggable]`, `#[non_loggable]`, automatic unstrumentation), 
 * either the `main()` must not be instrumented with `#[loggable]`, 
-* or the logging must be enabled after the call to `main()`,
-* or, if `main()` is inside of a module marked as `#[loggable]`, the automatic unstrumentation of `main()` must be suppressed with `#[non_loggable]`.
+* or the logging must be disabled (TODO: Link to how to) by the moment of a call to `main()` (but can still stay enabled by the moment of the return from it),
+* or, if `main()` is inside of a module annotated with `#[loggable]`, the automatic recursive unstrumentation of `main()` must be suppressed with `#[non_loggable]`. For example,
+```rs
+#[loggable]
+mod m {
+  #[non_loggable]   // Logging is suppressed for `main()`.
+  pub fn main() {
+    . . .           // Calls functions defined with `#[loggable]`.
+  }
+  // The other functions are defined as `#[loggable]` recursively because `m` is `#[loggable]`.
+}
+pub use m::main;    // Make `m::main()` visible as `main()`.
+```
 
-The same is applicable to the nested functions of `main()` _running for a long time_, comparable to `main()`.
+### Instrumenting an Evidently Endless Loop
+// TODO: Endless `while` and `for`.
+
+For the code that contains a loop, during the `#[loggable]` macro expansion the instrumentation code is inserted before and after the loop. If the loop is evidently endless (in particular `loop` with no `break` statement) then Rust fails to infer the type returned by the loop. 
+
+The loops are expressions in Rust, thus they return a value of a certain type. The `for` and `while` loops return the Unit type value `()`. The `loop` returns a value of a type inferred from the value in the end of the `break`. If there is no `break`, then there is no return value, there is nothing to infer the return type from.
+```rs
+#[loggable] // Compiler Error (in the macro-expanded code): 
+            // Type annotations needed. Cannot infer type (`let ret_val = loop {`).
+fn endless() {
+  loop {    // Evidently endless loop.
+    f();
+  }
+}
+```
+To work around, the `loop` needs to have a `break` statement:
+```rs
+#[loggable]
+fn endless() {
+  loop {        // "Not-so-evidently" endless loop.
+    f();
+
+    if false {  // The loop termination that never happens.
+      break     // The loop returns the Unit type value `()` 
+                // that is reused by `fn endless()` as a function return type.
+    }
+  }
+}
+```
+
+### For Curiosity: How to Not Log the Loop Body Start and End
+The original user's code:
+```rs
+#[loggable] // `f()` gets logged.
+fn f() {
+  loop {  // Is also `#[loggable]` since `f()` is `#[loggable]`. 
+          // The loop body start and end get logged, which the user doesn't want.
+    g();  // Is defined as `#[loggable]`, gets logged.
+    . . .
+  }
+}
+// Log:
+// f() {
+//   { // Loop body start.      // The user does't want this line.
+//     g() {}
+//   } // Loop body end.        // The user does't want this line.
+//   // Loop body repeats 100 time(s).
+// }
+```
+Workarounds.  
+* Annotating the loop as `#[non_loggable]`.  
+  Such an annotation of expressions and statements is an experimental feature in Rust, thus it 
+  requires `#![feature(stmt_expr_attributes)]` which is not a problem for the users who already use that feature. 
+  ```rs
+  #[loggable] // `f()` gets logged.
+  fn f() {
+    #[non_loggable]
+    loop {  // The loop iterations don't get logged.
+      g();  // Is defined as `#[loggable]`, gets logged.
+      . . .
+    }
+  }
+  // Log:
+  // f() {
+  //   g() {}
+  //   // g() repeats 100 time(s).
+  // }
+  ```
+* Extracting the loop into a `#[non_loggable]` function, defined locally or non-locally.
+  ```rs
+  #[loggable] // `f()` gets logged.
+  fn f() {
+    #[non_loggable] // The annotated fn below does't get logged.
+    fn locally_defined_fn_with_loop(/* Params for the loop */) {
+      loop {  // Is also `#[non_loggable]` since `locally_defined_fn_with_loop()` is `#[non_loggable]`.
+              // The loop iterations don't get logged.
+        g();  // Is defined as `#[loggable]`, gets logged.
+        . . .
+      }
+    }
+    locally_defined_fn_with_loop(/* Args for the loop */)  // Loop invocation.
+  }
+  // Log:
+  // f() {
+  //   g() {}
+  //   // g() repeats 100 time(s).
+  // }
+  ```
 
 ### Logging the Threads Endlessly
 
