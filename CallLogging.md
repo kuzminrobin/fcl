@@ -129,6 +129,23 @@
   * Practicing Rust with FCL
 
 # Unsorted
+* Doc it: 
+  FCL can be useful for those who want to add the function call logging to their functionality
+  * compiler developers,
+  * CPU model developers (hardware simulators developers).
+* Doc it: 
+  Confusing Moments
+  In The user's code there can be a call to function `f()`, followed by some code calling functions and/or closures, followed by another function `g()`.
+  Those may be logged as 
+  ```rs
+  f() {}
+  g() {}
+  ```
+  The user may be confused: "Where are the calls between `f()` and `g()`?" 
+  That code could be inside of a loop all the iterations of which do not call any functions or closures, the iterations are childless. All the childress iterations are not logged to avoid cluttering the log with the empty loop iteraitons.
+  Instead of function `g()` there can be repeated/identical call to `f()`.  
+  TODO: In that case will the repeated `f()` increment the previous `f()`'s repeat count or will it be logged separately?
+* TODO: Call graph -> call tree (everywhere including "call_graph.rs")
 * (Needs testing, requires `#[feature..`) Implement params spreading for {skope/fn}:
   ```rs
   #[loggable]

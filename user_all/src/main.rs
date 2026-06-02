@@ -2,14 +2,15 @@ use fcl_proc_macros::*;
 
 #[fcl_proc_macros::loggable]
 mod func_and_closure_review {
-    pub fn f() { // The user's function definition.
+    pub fn f() {
+        // The user's function definition.
         let _c = Some(5).map(
-            |param| true    // The user's closure definition.
-        ); 
+            |param| true, // The user's closure definition.
+        );
     }
 }
 
-
+// #[fcl_proc_macros::non_loggable]
 #[fcl_proc_macros::loggable]
 pub fn main() {
     // fcl::_single_threaded_otimization!();
@@ -105,7 +106,7 @@ pub fn main() {
     }
     {
         use fcl_proc_macros::loggable;
-        #[loggable]  // The instrumenting macro for `my_func()`.
+        #[loggable] // The instrumenting macro for `my_func()`.
         fn my_func() {
             f(); // Function `my_func()` invokes function `f()` 3 times.
             f();
@@ -113,35 +114,32 @@ pub fn main() {
             m::g(5); // Then function `g()` from module `m` (see below).
 
             #[derive(std::fmt::Debug)]
-            struct MyStruct { // Structure defined locally in `my_func()`.
-                _field: u8
+            struct MyStruct {
+                // Structure defined locally in `my_func()`.
+                _field: u8,
             }
             impl MyStruct {
-                fn my_method(&mut self) { // `my_method()` also gets instrumented automatically.
+                fn my_method(&mut self) {
+                    // `my_method()` also gets instrumented automatically.
                     struct MyPoint {
                         x: i32,
-                        y: i32
+                        y: i32,
                     }
-                    let mut p = MyPoint {
-                        x: 2,
-                        y: -4
-                    };
+                    let mut p = MyPoint { x: 2, y: -4 };
                     // The closure below also gets instrumented automatically.
-                    let my_closure = |param: u16, &mut MyPoint{ x, y }| { 
-                        x + y
-                    };
+                    let my_closure = |param: u16, &mut MyPoint { x, y }| x + y;
                     let _ = my_closure(1, &mut p);
 
                     eprintln!("This is a sample stderr output.");
                 }
             }
-            let mut s = MyStruct{ _field: 3 };
+            let mut s = MyStruct { _field: 3 };
             s.my_method(); // Function `my_func()` invokes function `MyStruct::my_method()`.
         }
 
-        // The instrumenting macro for the whole `mod m` below, 
+        // The instrumenting macro for the whole `mod m` below,
         // all the internals get instrumented automatically.
-        #[loggable] 
+        #[loggable]
         mod m {
             pub fn g(param: i32) {
                 for _ in 0..100 {
@@ -163,22 +161,25 @@ pub fn main() {
         my_func(); // Invocation of the function.
     }
     func_and_closure_review::f();
-    
+
     {
         #[loggable] // Log by defualt the function and closure parameters inside of module `m` recursively 
-                    // (and add prefix "m::" to the function and closure names).
+        // (and add prefix "m::" to the function and closure names).
         mod m {
             use fcl_proc_macros::loggable;
 
-            pub fn f(b: bool) {             // Log example: `m::f(b: true) {`. The parameter `b: true` is logged by default.
-                Some(5).map(|x| x + 1);// Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`. The closure parameter `x: 5` is logged by default.
+            pub fn f(b: bool) {
+                // Log example: `m::f(b: true) {`. The parameter `b: true` is logged by default.
+                Some(5).map(|x| x + 1); // Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`. The closure parameter `x: 5` is logged by default.
             }
-            #[loggable(skip_params)]        // Skip the parameters logging for `g()` and its internals (and clear the prefix "m::" (TODO: Prevent clearing)).
-            pub fn g(p: u8) {               // Logs: `g(..) {`. The parameter `p` is not logged, the `..` instead tells that `g()` has parameter(s).
+            #[loggable(skip_params)] // Skip the parameters logging for `g()` and its internals (and clear the prefix "m::" (TODO: Prevent clearing)).
+            pub fn g(p: u8) {
+                // Logs: `g(..) {`. The parameter `p` is not logged, the `..` instead tells that `g()` has parameter(s).
                 Some(p).map(|x| x + 2); // Log example: `g()::closure{176,29:176,37}(..) {} -> 3`. The closure parameter `x` is not logged (the `..` instead).
 
-                #[loggable(log_params)]     // Log the parameters for `h()` and its internals (and clear the prefix "g()::" (TODO: Prevent clearing)).
-                fn h(ph: u8) {              // Log example: `h(ph: 1) {`. The parameter `ph: 1` is logged.
+                #[loggable(log_params)] // Log the parameters for `h()` and its internals (and clear the prefix "g()::" (TODO: Prevent clearing)).
+                fn h(ph: u8) {
+                    // Log example: `h(ph: 1) {`. The parameter `ph: 1` is logged.
                     Some(ph).map(|y| y + 3); // `h()::closure{180,34:180,42}(y: 1) {} -> 4`. The parameter `y: 1` is logged.
                 }
 
@@ -188,7 +189,123 @@ pub fn main() {
         m::f(true);
         m::g(1)
     }
+    // // endless();
+    // {
+    //     let mut i = 0;
+    //     loop {
+    //         // Evidently endless loop.
+    //         if i & 0x4 != 0 {   // Make some iters diff.
+    //             func_and_closure_review::f();
+    //         } else {
+    //             root::f();
+    //         }
+            
+    //         if false {
+    //             break;
+    //         }
+
+    //         i = i + 1;
+    //     }
+    // }
 }
+
+#[loggable]
+fn endless() {
+    let mut i = 0;
+    loop {
+        // Evidently endless loop.
+        if i & 0x4 != 0 {   // Make some iters diff.
+            func_and_closure_review::f();
+        } else {
+            root::f();
+        }
+        
+        if false {
+            break;
+        }
+
+        i = i + 1;
+    }
+}
+
+// fn endless() {
+//     use fcl::{CallLogger, MaybePrint};
+//     let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+//         let param_val_str = None;
+//         let mut body = move || {
+//             let ret_val = loop {
+//                 let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER
+//                     .with(|logger| logger.borrow().logging_is_on());
+//                 let _loopbody_logger = if logging_is_on {
+//                     Some(fcl::LoopbodyLogger::new())
+//                 } else {
+//                     None
+//                 };
+//                 {
+//                     func_and_closure_review::f();
+//                     if false {
+//                         break ();
+//                     }
+//                 }
+//             };
+//             fcl::call_log_infra::instances::THREAD_LOGGER
+//                 .with(|logger| logger.borrow_mut().log_loop_end());
+//             ret_val
+//         };
+//         if !logger.borrow().logging_is_on() {
+//             return body();
+//         }
+//         let mut generic_func_name = String::with_capacity(64);
+//         generic_func_name.push_str("endless");
+//         if !true {
+//             generic_func_name.push_str("<");
+//             let generic_arg_names_vec: Vec<&'static str> = /*alloc::vec::*/Vec::new();
+//             for (idx, generic_arg_name) in generic_arg_names_vec.into_iter().enumerate() {
+//                 if idx != 0 {
+//                     generic_func_name.push_str(",");
+//                 }
+//                 generic_func_name.push_str(generic_arg_name);
+//             }
+//             generic_func_name.push_str(">");
+//         }
+//         let mut callee_logger = fcl::CalleeLogger::new(&generic_func_name, param_val_str);
+//         let ret_val = body();
+//         if false {
+//             let ret_val_str = format!("{}", ret_val.maybe_print());
+//             // let ret_val_str = alloc::__export::must_use({
+//             //     alloc::fmt::format(alloc::__export::format_args!("{}", ret_val.maybe_print()))
+//             // });
+//             callee_logger.set_ret_val(ret_val_str);
+//         }
+//         ret_val
+//     });
+//     ret_val
+// }
+
+// #[loggable] // `f()` gets logged.
+// fn f() {
+//   #[non_loggable]
+//   loop {  // Is also `#[loggable]` since `f()` is `#[loggable]`.
+//           // The loop body start and end get logged which the user doesn't want.
+//     func_and_closure_review::f();  // Is defined as `#[loggable]`, gets logged.
+//     // . . .
+//     break
+//   }
+// }
+
+// #[loggable]
+// fn maybe_endless(i: u8) -> u8 {
+//     loop {
+//         func_and_closure_review::f();
+//         if i == 0 {
+//             break i;
+//         }
+//     }
+// }
+
+// #[non_loggable]
+// fn z() {
+// }
 
 // use fcl_proc_macros::loggable;
 #[fcl_proc_macros::loggable]
