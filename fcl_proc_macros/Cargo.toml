@@ -12,5 +12,6 @@ quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
 [features]
+idle = [] # Instrumentation is skipped.
 # default = ["singlethreaded"]
 singlethreaded = []

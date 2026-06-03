@@ -1,8 +1,11 @@
 use std::str::FromStr;
 
 use crate::{
-    AttrArgs, ParamsLogging, items::quote_as_item, remove_spaces, update_param_data_from_pat,
-    updated_loggable_attr_args,
+    common::{
+        AttrArgs, ParamsLogging, remove_spaces, update_param_data_from_pat,
+        updated_loggable_attr_args,
+    },
+    items::quote_as_item, 
 };
 use quote::quote;
 use syn::spanned::Spanned;

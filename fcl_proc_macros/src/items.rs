@@ -1,7 +1,9 @@
 use crate::{
-    AttrArgs, ParamsLogging,
+    common:: {
+        AttrArgs, ParamsLogging,
+        remove_spaces, update_param_data_from_pat, updated_loggable_attr_args,
+    },
     exprs::{quote_as_block, quote_as_expr},
-    remove_spaces, update_param_data_from_pat, updated_loggable_attr_args,
 };
 use quote::quote;
 use syn::spanned::Spanned;

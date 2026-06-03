@@ -5,5 +5,8 @@ edition = "2024"
 
 [dependencies]
 fcl = { path = "../fcl" }
+
 fcl_proc_macros = { path = "../fcl_proc_macros" }
+# fcl_proc_macros = { path = "../fcl_proc_macros", features = ["idle"] }    # Instrumentation is OFF.
+
 # gag = "1.0"

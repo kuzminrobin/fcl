@@ -8,7 +8,6 @@
 
 # Next
 (See `>`)
-* File of consts.
 * idle mode (turn off `#[loggable]`)
 * Code TODOs
 * Documentation
@@ -385,7 +384,7 @@
   In all the cases
   * In `fcl_proc_macros` if the feature ("idle") is active then the macro `#[loggable]` 
     just transfers the code from the input to the output without instrumenting it.  
-    Like `#[non_loggable]`.
+    Like `#[non_loggable]`. Or calls `#[non_loggable]`.
   * In `fcl` 
     * either no such a feature - all the global and thread-local expenses are still applicable, 
       but the functionality is not triggered (what about panic hook and stdoutput caching/syncing?
@@ -393,6 +392,7 @@
     * or if the feature ("idle") is active then [no code (and/or no global and thread-local instances),] 
       no panic hook [initialization] and no stdoutput caching/syncing [initialization].
 
+* TODO: `(skip|log)_retval`
 * TODO: Add a way to suppress the param printing.
   * For a particular `fn`: 
     * All params: `#[loggable(skip_param[, skip_ret_val])]`, 
@@ -1999,3 +1999,4 @@ fn f() {
     ```
   * Use everywhere (update the code existed before `updated_attr_args()`)
 * Logging Endlessly (Eternal Logging)
+* File of consts.

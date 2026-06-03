@@ -548,7 +548,7 @@ fn thread_func() {
     }
 
     #[loggable]
-    fn gg(i: i32) {
+    fn _gg(_i: i32) {
         ff();
     }
 

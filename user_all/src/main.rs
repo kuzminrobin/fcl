@@ -5,7 +5,7 @@ mod func_and_closure_review {
     pub fn f() {
         // The user's function definition.
         let _c = Some(5).map(
-            |param| true, // The user's closure definition.
+            |_param| true, // The user's closure definition.
         );
     }
 }
@@ -67,7 +67,7 @@ pub fn main() {
         }
         fn pattern_param_fn(
             MyPoint {
-                x, /*: _x*/
+                x: _x,
                 y: _y,
             }: MyPoint,
         ) {
@@ -76,14 +76,14 @@ pub fn main() {
 
         fn ref_pattern_param_fn(
             &mut MyPoint {
-                x, /*: _x*/
+                x: _x,
                 y: _y,
             }: &mut MyPoint,
         ) {
         }
         ref_pattern_param_fn(&mut MyPoint { x: 2, y: -4 }); // main()::ref_pattern_param_fn(&mut MyPoint{x: 2, y: _y: -4}) {}
 
-        fn tp((a, b): (i32, bool)) {}
+        fn tp((_a, _b): (i32, bool)) {}
         tp((8, false)); // main()::tp((a: 8, b: false)) {}
         fn tpp((MyPoint { x: _x1, y: _y1 }, MyPoint { x: _x2, y: _y2 }): (MyPoint, MyPoint)) {}
         tpp((MyPoint { x: 2, y: -4 }, MyPoint { x: -5, y: 6 })); // main()::tpp((MyPoint{x: _x1: 2, y: _y1: -4}, MyPoint{x: _x2: -5, y: _y2: 6})) {}
@@ -93,7 +93,7 @@ pub fn main() {
         f(MyTupleStruct(7, 'K')); // main()::f(MyTupleStruct(_i: 7, _c: 'K')) {}
 
         struct MyTupleStructS(MyPoint, char);
-        fn fts(MyTupleStructS(MyPoint { x, y: _y }, char): MyTupleStructS) {}
+        fn fts(MyTupleStructS(MyPoint { x: _x, y: _y }, _char): MyTupleStructS) {}
         assert!(fcl::logging_is_on!());
         fcl::push_logging_is_on!(false);
         assert!(!fcl::logging_is_on!());
@@ -101,7 +101,7 @@ pub fn main() {
         fcl::pop_logging_is_on!();
         assert!(fcl::logging_is_on!());
 
-        fn fs(&[a, b, ref i @ .., y, z]: &[i32; 6]) {}
+        fn fs(&[_a, _b, ref _i @ .., _y, _z]: &[i32; 6]) {}
         fs(&[0, 1, 2, 3, 4, 5]); // main()::fs(& [a: 0, b: 1, i: [2, 3], y: 4, z: 5]) {}
     }
     {
@@ -127,7 +127,7 @@ pub fn main() {
                     }
                     let mut p = MyPoint { x: 2, y: -4 };
                     // The closure below also gets instrumented automatically.
-                    let my_closure = |param: u16, &mut MyPoint { x, y }| x + y;
+                    let my_closure = |_param: u16, &mut MyPoint { x, y }| x + y;
                     let _ = my_closure(1, &mut p);
 
                     eprintln!("This is a sample stderr output.");
@@ -141,7 +141,7 @@ pub fn main() {
         // all the internals get instrumented automatically.
         #[loggable]
         mod m {
-            pub fn g(param: i32) {
+            pub fn g(_param: i32) {
                 for _ in 0..100 {
                     h();
                     i();
@@ -168,7 +168,7 @@ pub fn main() {
         mod m {
             use fcl_proc_macros::loggable;
 
-            pub fn f(b: bool) {
+            pub fn f(_b: bool) {
                 // Log example: `m::f(b: true) {`. The parameter `b: true` is logged by default.
                 Some(5).map(|x| x + 1); // Log example: `  m::f()::closure{168,29:168,33}(x: 5) {} -> 6`. The closure parameter `x: 5` is logged by default.
             }
@@ -189,7 +189,7 @@ pub fn main() {
         m::f(true);
         m::g(1)
     }
-    // // endless();
+    // // _endless();
     // {
     //     let mut i = 0;
     //     loop {
@@ -210,7 +210,7 @@ pub fn main() {
 }
 
 #[loggable]
-fn endless() {
+fn _endless() {
     let mut i = 0;
     loop {
         // Evidently endless loop.
