@@ -1,6 +1,7 @@
 use crate::{
     AttrArgs, ParamsLogging,
-    exprs::{quote_as_block, quote_as_expr}, remove_spaces, update_param_data_from_pat, updated_loggable_attr_args,
+    exprs::{quote_as_block, quote_as_expr},
+    remove_spaces, update_param_data_from_pat, updated_loggable_attr_args,
 };
 use quote::quote;
 use syn::spanned::Spanned;
@@ -130,13 +131,13 @@ fn traversed_block_from_sig(
         ident,    //: Ident,
         generics, //: Generics,
         // paren_token, //: Paren,
-        inputs,   //: Punctuated<FnArg, Comma>,
+        inputs, //: Punctuated<FnArg, Comma>,
         // variadic, //: Option<Variadic>,
-        output,   //: ReturnType,
+        output, //: ReturnType,
         ..
     } = sig;
 
-    // Cannot instrument the `const` functions 
+    // Cannot instrument the `const` functions
     // since the instrumentation has non-const fn calls, that are not allowed in `const` context.
     // TODO: Test.
     //  * loggable enclosing, non-attributed nested const fn (OK, const fn doesn't get instrumented).
@@ -268,12 +269,16 @@ pub(crate) fn quote_as_item_fn_loggable_block_contents(
     let syn::ItemFn {
         // attrs, //: Vec<Attribute>,
         // vis,   //: Visibility,
-        // sig,   //: Signature,
+        sig,   //: Signature,
         block, //: Box<Block>,
         ..
     } = item_fn;
 
-    // TODO: Assert sig.ident.to_string() == "loggable_block_contents".
+    // The assert must never fail:
+    debug_assert!(
+        sig.ident.to_string() == crate::consts::INTERMEDIATE_FN_NAME_FOR_MACRO_TRANSCRIBER,
+        "FCL Internal Error: Unexpected function name"
+    );
 
     let syn::Block {
         // brace_token, //: Brace,
@@ -491,7 +496,7 @@ fn quote_as_item_impl(
 /// Handles the `macro_rules` definiton.
 ///
 /// Expects that it is only called for an individual `#[loggable]` macro expansion
-/// (rather than a recursive traverse of the enclosing entity)
+/// (rather than during a recursive traverse of the enclosing entity's `#[loggable]`)
 /// of the user's declarative (`macro_rules!`) macro definition.
 fn quote_as_item_macro_rules_def(
     item_macro: &ItemMacro,
@@ -650,8 +655,9 @@ fn quote_as_item_macro_rules_def(
     };
 
     let prefixed_macro_ident = quote::format_ident!(
-        "loggable_macro_{}", // TODO: `loggable_macro_` to the file of consts.
-        ident.to_string()
+        "{}{}",
+        crate::consts::LOGGABLE_MACRO_NAME_PREFIX,
+        ident // The span is inhgerited from it.
     );
 
     let new_delimited_macro_rules = match delimiter {
@@ -1135,22 +1141,26 @@ fn quote_as_item_trait(
 //     quote!{ #token_stream }
 // }
 
-/// Returns the `proc_macro2::TokenStream` where the last path segment is prefixed
-/// with `loggable_macro_` (TODO: "is prefixed with the value of <macro name> from file <file of consts>").
+/// Converts the parameter to the `proc_macro2::TokenStream` so that the last path segment is prefixed
+/// with the value of `fcl_proc_macros::consts::LOGGABLE_MACRO_NAME_PREFIX`.
+///
+/// Returns the result.
 fn instrumented_macro_name_ts(macro_name: &syn::Path) -> proc_macro2::TokenStream {
     let Some(last_path_segment) = macro_name.segments.last() else {
         return quote! {};
     };
     let prefixed_last_path_segment_ident = quote::format_ident!(
-        "loggable_macro_{}", // TODO: `loggable_macro_` to the file of consts.
-        last_path_segment.ident.to_string()
+        "{}{}",
+        crate::consts::LOGGABLE_MACRO_NAME_PREFIX,
+        last_path_segment.ident // The span() is inherited from it.
     );
+
     let last_path_segment_args = &last_path_segment.arguments;
-    let mut result = quote! { #prefixed_last_path_segment_ident #last_path_segment_args }; // [0]
+    let mut result = quote! { #prefixed_last_path_segment_ident #last_path_segment_args }; // Path segment [0] (last).
     // NOTE: Right to left:
     for (index, path_segment) in macro_name.segments.iter().rev().enumerate() {
         if index != 0 {
-            result = quote! { #path_segment::#result }; // [1..]
+            result = quote! { #path_segment::#result }; // Path segments [1..] (those that precede/prepend [0]). `..[2]::[1]::[0]`.
         }
     }
     if let Some(leading_colon) = macro_name.leading_colon {
@@ -1190,7 +1200,7 @@ fn quote_as_item_macro_rules_invocation(
         log_closure_coords, // : bool,
     } = enclosing_item_attr_args;
     let prefix = if prefix.is_empty() {
-        quote! { __ } // TODO: `__` to file of consts. // TODO: Document it in the mdBook. 
+        EMPTY_PREFIX_SUBSTITUTE!() //quote! { __ } // TODO: Document it in the mdBook. 
     } else {
         prefix.clone()
     };

@@ -8,8 +8,8 @@
 
 # Next
 (See `>`)
-* Logging Endlessly (Eternal Logging)
 * File of consts.
+* idle mode (turn off `#[loggable]`)
 * Code TODOs
 * Documentation
   * User Manual
@@ -1998,3 +1998,4 @@ fn f() {
     }
     ```
   * Use everywhere (update the code existed before `updated_attr_args()`)
+* Logging Endlessly (Eternal Logging)

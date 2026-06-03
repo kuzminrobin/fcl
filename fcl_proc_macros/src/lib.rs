@@ -1,5 +1,8 @@
 use quote::quote;
 
+#[macro_use]
+mod consts;
+
 mod exprs;
 mod items;
 
@@ -174,139 +177,7 @@ pub fn loggable_block_contents(
 ) -> proc_macro::TokenStream {
     let attr_args = syn::parse_macro_input!(attr_args_ts as AttrArgs); // NOTE: Handles the compilation errors appropriately (checked).
     let item_fn = syn::parse_macro_input!(attributed_item as syn::ItemFn);
-    // let item_mod = syn::parse_macro_input!(attributed_item as syn::ItemMod);
-    items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args /*, true */).into()
-    // items::quote_as_item_mod_loggable_block_contents(&item_fn, &attr_args/*, true */).into()
-
-    // let syn::ItemMod {
-    //     attrs,     // : Vec<Attribute>,
-    //     vis,       // : Visibility,
-    //     unsafety,  // : Option<Unsafe>,
-    //     mod_token, // : Mod,
-    //     ident,     // : Ident,
-    //     content,   // : Option<(Brace, Vec<Item>)>,
-    //     semi,      // : Option<Semi>,
-    // } = item_mod;
-
-    // if ident.to_string() != "loggable_block_contents" {
-    //     return syn::Error::new(
-    //         ident.span(),
-    //         format!("expected `{}`", "loggable_block_contents"), // TODO: loggable_block_contents to consts file.
-    //     )
-    //     .into_compile_error()
-    //     .into();
-    //     // syn::Error::into_compile_error()
-    // }
-    // let mut new_attrs = vec![];
-    // let mut loggable_found = false;
-
-    // for attr in attrs {
-    //     if attr.is_non_loggable() { // TODO: Consider the arbitrtary combination of [multiple] `#[loggable]` and `#[non_loggable]` for general case and this case. What's reasonable in general, what's the difference here and why.
-    //         return quote! { #item_mod }.into();
-    //     }
-    //     new_attrs.push(items::if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
-    // }
-
-    // /*
-    //     let content = if loggable_found {
-    //         // // NOTE: The impl below deosn't compile since either a trait or a type have to be locally defined.
-    //         // impl quote::ToTokens for (syn::token::Brace, Vec<syn::Item>) {
-    //         //     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-    //         //         let (.., items) = self;
-    //         //         let mut tokenized_items = quote! {};
-    //         //         for item in items {
-    //         //             tokenized_items = quote! { #tokenized_items #item };
-    //         //         }
-    //         //         *tokens = quote! { { #tokenized_items } }
-    //         //     }
-    //         // }
-    //         //
-    //         // quote! { #content }
-
-    //         // No item traversing. The items are passed as they are.
-    //         let content = content.as_ref().map(|(_brace, items)| {
-    //             quote! { { #(#items)* } }
-    //             // let mut copied_items = quote! {};
-    //             // for item in items {
-    //             //     copied_items = quote! { #copied_items #item };
-    //             // }
-    //             // quote! { { #copied_items } }
-    //         });
-    //         content
-    //     } else {
-    //         let attr_args = AttrArgs {
-    //             prefix: if enclosing_item_attr_args.prefix.is_empty() {
-    //                 quote! { #ident }
-    //             } else {
-    //                 let prefix = &enclosing_item_attr_args.prefix;
-    //                 quote! { #prefix::#ident }
-    //             },
-    //             ..*enclosing_item_attr_args
-    //         };
-
-    //         // Traverse the items:
-    //         let content = content.as_ref().map(|(_brace, items)| {
-    //             let mut traversed_items = quote! {};
-    //             for item in items {
-    //                 let item = quote_as_item(item, &attr_args, false);
-    //                 traversed_items = quote! { #traversed_items #item };
-    //             }
-    //             quote! { { #traversed_items } }
-    //         });
-    //         content
-    //     };
-    //     quote! { #(#new_attrs)* #vis #unsafety #mod_token #ident #content #semi }
-    // */
-    // /*
-    // fn quote_as_item_mod(
-    //     item_mod: &syn::ItemMod,
-    //     enclosing_item_attr_args: &AttrArgs,
-    // ) -> proc_macro2::TokenStream {
-    //     let syn::ItemMod {
-    //         attrs,     //: Vec<Attribute>,
-    //         vis,       //: Visibility,
-    //         unsafety,  //: Option<Unsafe>,
-    //         mod_token, //: Mod,
-    //         ident,     //: Ident,
-    //         content,   //: Option<(Brace, Vec<Item>)>,
-    //         semi,      //: Option<Semi>,
-    //     } = item_mod;
-
-    // }
-
-    // */
-    // quote! {}.into()
-
-    // match syn::parse::<syn::Item/*::Mod*/>(attributed_item) {
-    //     Ok(item) => {
-    //         match item {
-    //             syn::Item::Mod(item_mod) =>
-    //                 items::quote_as_item_mod_loggable_block_contents(&item, &attr_args/*, true */).into()
-    //                 // quote_as_item_mod(item_mod, enclosing_item_attr_args)
-    //                 ,
-    //             _ => proc_macro::TokenStream::from(err.to_compile_error())
-    //         }
-
-    //     },
-    //     Err(err) => return proc_macro::TokenStream::from(err.to_compile_error()),
-    // }
-
-    // let output = {
-    //     if let Ok(item) = syn::parse::<syn::Item>(attributed_item.clone()) {
-    //         items::quote_as_item(&item, &attr_args, true)
-    //     } else if let Ok(expr) = syn::parse::<syn::Expr>(attributed_item.clone()) {
-    //         exprs::quote_as_expr(&expr, None, &attr_args)
-    //     } else {
-    //         let closure_w_opt_comma =
-    //             syn::parse_macro_input!(attributed_item as ExprClosureWOptComma); // NOTE: Handles the compilation errors appropriately.
-    //         exprs::quote_as_expr_closure(&closure_w_opt_comma.closure, &attr_args)
-    //     }
-    // };
-    // output.into()
+    items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args).into()
 }
 
 /// Runs through the collection of `current_attrs` parameter,
@@ -556,7 +427,7 @@ impl syn::parse::Parse for LoggableAttrArgsOpt {
 //         && last_path_segment.ident.to_string() == attr_name
 //         && (path.segments.len() < 2 || {
 //             let prev_segment_idx = path.segments.len() - 2;
-//             path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros"  // TODO: "fcl_proc_macros" to a file of consts.
+//             path.segments[prev_segment_idx].ident.to_string() == consts::CRATE_NAME // "fcl_proc_macros"
 //         })
 //     {
 //         return true;
@@ -588,7 +459,7 @@ impl FclAttribute for syn::Attribute {
             && last_path_segment.ident.to_string() == attr_name
             && (path.segments.len() < 2 || {
                 let prev_segment_idx = path.segments.len() - 2;
-                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros" // TODO: "fcl_proc_macros" to a file of consts.
+                path.segments[prev_segment_idx].ident.to_string() == consts::CRATE_NAME
             })
         {
             return true;
@@ -617,10 +488,10 @@ impl FclAttribute for syn::Attribute {
         //      Get and return LoggableAttrInfo
         // return None
         if let Some(last_path_segment) = path.segments.last()
-            && last_path_segment.ident.to_string() == "loggable"    // TODO: "loggable" to file of consts.
+            && last_path_segment.ident.to_string() == consts::LOGGABLE_MACRO_NAME
             && (path.segments.len() < 2 || {
                 let prev_segment_idx = path.segments.len() - 2;
-                path.segments[prev_segment_idx].ident.to_string() == "fcl_proc_macros" // TODO: "fcl_proc_macros" to file of consts.
+                path.segments[prev_segment_idx].ident.to_string() == consts::CRATE_NAME
             })
         {
             ret_val = Some(LoggableAttrInfo {

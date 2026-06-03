@@ -809,14 +809,14 @@ macro_rules! users_macro { // Is just repeated for clarity.
   }
 }
 ```
-By defautl the user expects that the functions `f()` and `g()` 
+By defautl I as a user would expect that the functions `f()` and `g()` 
 * inside of the `trait UsersTraitA` are prefixed with `UsersTraitA::` during logging,
 * and those inside of the `trait UsersTraitB` - with `UsersTraitB::`.
 
 The same is applicable to the arguments passed to `#[loggable]`. For example, if `trait UsersTraitA` is annotated with 
-`#[loggable(skip_closure_coords)]` then the user would expect the `f()` and `g()`  
-of `trait UsersTraitA` to skip the closure coordinates during logging,  
-and to not skip for `UsersTraitB`.
+`#[loggable(skip_closure_coords)]` then I would expect the `f()` and `g()`  
+* of `trait UsersTraitA` to skip the closure coordinates during logging,  
+* and to not skip for `UsersTraitB`.
 
 But such a prefixing (with `UsersTraitA::`) and `#[loggable]` arguments passing from a `trait` (like `UsersTraitA`) 
 to its internals (`f()` and `g()`) through the `users_macro!{}` invocation does not happen by default. 
@@ -869,6 +869,8 @@ The terminology gets somewhat confusing when macros handle macros.
   * either a macro definition (`macro_rules! users_macro { <rules> }}`)
   * or a macro invocation (`users_macro!{<args>}`).
 
+See `(1)` in the code below.
+
 <!-- **NOTE: Do not spend time on any further explanation until the proof of concept.** -->
 
   ```rs
@@ -877,9 +879,8 @@ The terminology gets somewhat confusing when macros handle macros.
       maybe_flush_invocation: &mut proc_macro2::TokenStream,
       _attr_args: &AttrArgs,
   ) -> proc_macro2::TokenStream {
-  // NOTE:
   // TODO: { 
-  //    (Outdated? See above) (In docs) Describe the original problem history in detail:
+  //    (Outdated original problem history? See above in "mdBook.md", outside of this code block) (In docs) Describe the original problem history in detail:
   //    I was testing a `trait` with different args to `#[loggable(...)]` but identical <internals> 
   //    (the same name was reused for the trait but in different scopes
   //      // TODO: Not considered scenario: The whole trait is extracted to a macro, not just <internals>.
@@ -915,13 +916,13 @@ The terminology gets somewhat confusing when macros handle macros.
   // } // TODO.
 
   // The Chat-GPT-5.2-Codex said that the expansion of {the macro invocation
-  // passed as the parameter `macro_`}, in order to instrument the result of the expansion,
+  // passed to `quote_as_macro()` as the parameter `macro_` }, in order to instrument the result of the expansion,
   // cannot be acquired at this point
   // since the declarative (`macro_rules`) macro expansion is done at a later compilation stage
   // (than the currently running procedural macro expansion),
   // and 'there is no stable API to "ask the compiler to expand this macro for me."'
   // TODO: Consider the following.
-  // * See (1) below.
+  // * See (1) below (the implemented functionality).
   // * (Dead end, doesn't work) See (2) below.
   // * (Doesn't work, the macros are expanded left-to-right/outer-to-inner) 
   //   Generating at this point such a code where `macro_` is passed as an arg 
@@ -1214,15 +1215,15 @@ The terminology gets somewhat confusing when macros handle macros.
   //      block_items!(<macro_args_alpha>)
   // }
   // trait Tr2 {
-  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      #[loggable(prefix=Tr2, log_params, log_closure_coords)]
   //      block_items!(<macro_args_beta>)
   //      . . .
   // }
   // trait Tr3 {
-  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      #[loggable(prefix=Tr3, log_params, log_closure_coords)]
   //      block_items!(<macro_args_beta>)
   //      . . .
-  //      #[loggable(prefix=Tr1, log_params, log_closure_coords)]
+  //      #[loggable(prefix=Tr3, log_params, log_closure_coords)]
   //      block_items!(<macro_args_alpha>)
   // }
   // ```
@@ -1402,7 +1403,7 @@ In both cases the user's macro definition can be
 
 If non-annotated user's macro 
 * is in the non-loggable context then it is to be left as is  
-  (not entered);
+  (not entered, no recursive traverse);
 * is in the loggable context then during the recursive traverse it is to be left as is  
   (either not entered or upon entry `quote`d as is)  
   (when entered, the #[loggable] is **not present**);  
