@@ -1,10 +1,10 @@
-#[cfg(not(feature = "idle"))]
+// #[cfg(not(feature = "idle"))]
 #[macro_use]
 mod consts;
 
-#[cfg(not(feature = "idle"))]
+// #[cfg(not(feature = "idle"))]
 mod exprs;
-#[cfg(not(feature = "idle"))]
+// #[cfg(not(feature = "idle"))]
 mod items;
 
 /// Suppresses the automatic recursive instrumentation of an item as `#[loggable]`.
@@ -155,10 +155,10 @@ pub fn loggable(
     _attr_args_ts: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    #[cfg(feature = "idle")]
-    { attributed_item }
+    // #[cfg(feature = "idle")]
+    // { attributed_item }
 
-    #[cfg(not(feature = "idle"))]
+    // #[cfg(not(feature = "idle"))]
     {
         let attr_args = syn::parse_macro_input!(_attr_args_ts as crate::common::AttrArgs); // Handles the compilation errors appropriately (checked).
         let output = {
@@ -177,7 +177,7 @@ pub fn loggable(
     }
 }
 
-#[cfg(not(feature = "idle"))]
+// #[cfg(not(feature = "idle"))]
 #[proc_macro_attribute]
 pub fn loggable_block_contents(
     attr_args_ts: proc_macro::TokenStream,
@@ -188,7 +188,7 @@ pub fn loggable_block_contents(
     items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args).into()
 }
 
-#[cfg(not(feature = "idle"))]
+// #[cfg(not(feature = "idle"))]
 mod common {
     use quote::quote;
     use crate::consts;

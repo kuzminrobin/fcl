@@ -5,7 +5,7 @@ use crate::{
         AttrArgs, ParamsLogging, remove_spaces, update_param_data_from_pat,
         updated_loggable_attr_args,
     },
-    items::quote_as_item, 
+    items::quote_as_item,
 };
 use quote::quote;
 use syn::spanned::Spanned;
@@ -501,22 +501,42 @@ fn quote_as_expr_call(
     // };
 
     let mut ret_val = quote! { #(#new_attrs)* #func ( #args ) };
+
     if is_print_func_name {
-        #[cfg(feature = "singlethreaded")]
+        let (extra_use, extra_borrow) = if cfg!(feature = "singlethreaded") {
+            (
+                quote! { use std::borrow::BorrowMut },
+                quote! { .borrow_mut() },
+            )
+        } else {
+            (quote! {}, quote! {})
+        };
+
         let thread_logger_access = quote! {
-            { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts.
-                use std::borrow::BorrowMut;
+            { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts
+              // (applicable to `cfg!(feature = "singlethreaded")` only, but doesn't harm otherwise).
+
+                #extra_use; // use std::borrow::BorrowMut;
                 fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                    logger.borrow_mut().borrow_mut().maybe_flush();
+                    logger.borrow_mut() #extra_borrow .maybe_flush();
                 })
             }
         };
-        #[cfg(not(feature = "singlethreaded"))]
-        let thread_logger_access = quote! {
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                logger.borrow_mut().maybe_flush();
-            })
-        };
+        // #[cfg(feature = "singlethreaded")]
+        // let thread_logger_access = quote! {
+        //     { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts.
+        //         use std::borrow::BorrowMut;
+        //         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+        //             logger.borrow_mut().borrow_mut().maybe_flush();
+        //         })
+        //     }
+        // };
+        // #[cfg(not(feature = "singlethreaded"))]
+        // let thread_logger_access = quote! {
+        //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+        //         logger.borrow_mut().maybe_flush();
+        //     })
+        // };
         ret_val = quote! {
             {
                 #thread_logger_access;
@@ -653,17 +673,22 @@ pub fn quote_as_expr_closure(
     };
     // let body = { quote_as_expr(&**body, None, &attr_args) };
 
-    // `logging_is_on()`:
-    let logging_is_on = quote! {
-        logger.borrow()
+    let extra_borrow = if cfg!(feature = "singlethreaded") {
+        quote! { .borrow_mut() }
+    } else {
+        quote! {}
     };
-    #[cfg(feature = "singlethreaded")]
-    let logging_is_on = quote! {
-        #logging_is_on.borrow()
-    };
-    let logging_is_on = quote! {
-        #logging_is_on.logging_is_on()
-    };
+    // // `logging_is_on()`:
+    // let logging_is_on = quote! {
+    //     logger.borrow()
+    // };
+    // #[cfg(feature = "singlethreaded")]
+    // let logging_is_on = quote! {
+    //     #logging_is_on.borrow()
+    // };
+    // let logging_is_on = quote! {
+    //     #logging_is_on.logging_is_on()
+    // };
 
     // Return the token stream of the instrumented closure:
     // TODO: Test.
@@ -687,7 +712,8 @@ pub fn quote_as_expr_closure(
 
                 // If logging is off then do nothing
                 // except executing the body and returning the value:
-                if ! #logging_is_on {
+                if ! logger.borrow() #extra_borrow .logging_is_on() {
+                // if ! #logging_is_on {
                     return body();
                 }
                 // Else (logging is on):
@@ -783,17 +809,22 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
         traversed_stmts
     };
 
-    // Get the multithreading-dependent `logging_is_on()` call token stream:
-    let logging_is_on = quote! {
-        logger.borrow()
+    let extra_borrow = if cfg!(feature = "singlethreaded") {
+        quote! { .borrow_mut() }
+    } else {
+        quote! {}
     };
-    #[cfg(feature = "singlethreaded")]
-    let logging_is_on = quote! {
-        #logging_is_on.borrow()
-    };
-    let logging_is_on = quote! {
-        #logging_is_on.logging_is_on()
-    };
+    // // Get the multithreading-dependent `logging_is_on()` call token stream:
+    // let logging_is_on = quote! {
+    //     logger.borrow()
+    // };
+    // #[cfg(feature = "singlethreaded")]
+    // let logging_is_on = quote! {
+    //     #logging_is_on.borrow()
+    // };
+    // let logging_is_on = quote! {
+    //     #logging_is_on.logging_is_on()
+    // };
 
     quote! {
         {
@@ -805,7 +836,10 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
             // (but the check `if logging_is_on` still needs to be in every iteration),
             // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`),
             // and at the end of that scope the `logging_is_on` dies.
-            let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { #logging_is_on });
+            let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                logger.borrow() #extra_borrow .logging_is_on()
+                // #logging_is_on
+            });
 
             let _loopbody_logger = if logging_is_on {
                 Some(fcl::LoopbodyLogger::new()) // Log the loop body start.
@@ -867,17 +901,21 @@ fn quote_as_expr_for_loop(
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
     // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
+    let extra_borrow = if cfg!(feature = "singlethreaded") {
+        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
+    } else {
+        quote! {}
+    };
+
     quote! {
         {
             let loop_result = { // At the moment of writing the unit value `()`
                 // is the only known possible value returnable by `for` loop.
                 #(#new_attrs)* #label #for_token #pat #in_token #expr #body
-                // #(#attrs)* #label #for_token #pat #in_token #expr #body
             };
 
-            // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
-                logger.borrow_mut().log_loop_end());
+                logger.borrow_mut() #extra_borrow .log_loop_end());
 
             loop_result
         }
@@ -1096,15 +1134,19 @@ fn quote_as_expr_loop(
     };
     // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
+    let extra_borrow = if cfg!(feature = "singlethreaded") {
+        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
+    } else {
+        quote! {}
+    };
     quote! {
         // Ret val for `loop` has been deprioritized since it requires extra
         // refactoring for the case of a (removed) loopbody with no nested calls.
         {
             let ret_val = #(#new_attrs)* #label #loop_token #body;
-            // let ret_val = #(#attrs)* #label #loop_token #body ;
 
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
-                logger.borrow_mut().log_loop_end());
+                logger.borrow_mut() #extra_borrow .log_loop_end());
 
             // TODO:
             // let ret_val_str = format!("{}", ret_val.maybe_print());
@@ -1117,7 +1159,7 @@ fn quote_as_expr_loop(
 }
 
 /// * Assigns `quote { logger.borrow_mut()[.borrow_mut()].maybe_flush(); }` to the parameter `maybe_flush_invocation`,
-///   if the macro name is "\[e]print\[ln]".
+///   if the macro name is `"[e]print[ln]"`.
 /// * Quotes (`quote{ ... }`) the macro as is. Ignores the `_attr_args` parameter.
 pub fn quote_as_macro(
     macro_: &syn::Macro,
@@ -1132,6 +1174,7 @@ pub fn quote_as_macro(
         .. // All others.
     } = macro_;
     if let Some(macro_name) = path.segments.last() {
+        // TODO: Consider single `if`.
         if &macro_name.ident.to_string() == &"println"
             || &macro_name.ident.to_string() == &"print"
             || &macro_name.ident.to_string() == &"eprintln"
@@ -1142,22 +1185,34 @@ pub fn quote_as_macro(
             // or their simplified/canonical form ends up in `std`, e.g., `std::something_unrelated::..` is equivalent to `std`,
             // if `..` is supported in the paths).
 
-            #[cfg(feature = "singlethreaded")]
-            let thread_logger_access = quote! {
-                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                    logger.borrow_mut().borrow_mut().maybe_flush();
-                })
-            };
-            #[cfg(not(feature = "singlethreaded"))]
-            let thread_logger_access = quote! {
-                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-                    logger.borrow_mut().maybe_flush();
-                })
+            let extra_borrow = if cfg!(feature = "singlethreaded") {
+                quote! { .borrow_mut() }
+            } else {
+                quote! {}
             };
 
-            *maybe_flush_invocation = quote! {
-                #thread_logger_access;
-            }
+            let thread_logger_access = quote! {
+                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                    logger.borrow_mut() #extra_borrow .maybe_flush();
+                })
+            };
+            // #[cfg(feature = "singlethreaded")]
+            // let thread_logger_access = quote! {
+            //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            //         logger.borrow_mut().borrow_mut().maybe_flush();
+            //     })
+            // };
+            // #[cfg(not(feature = "singlethreaded"))]
+            // let thread_logger_access = quote! {
+            //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            //         logger.borrow_mut().maybe_flush();
+            //     })
+            // };
+
+            *maybe_flush_invocation = thread_logger_access;
+            // *maybe_flush_invocation = quote! {  // TODO: Consider `*maybe_flush_invocation = thread_logger_access`.
+            //     #thread_logger_access;
+            // }
         }
     }
     quote! { #macro_ } // TODO: Consider returning `()`.
@@ -1716,7 +1771,7 @@ fn quote_as_expr_struct(
 
     let (fields, rest) = if loggable_found {
         (
-            quote! { #fields }, // TODO: Test.
+            quote! { #fields },                         // TODO: Test.
             rest.as_ref().map(|expr| quote! { #expr }), // TODO: Test.
         )
     } else {
@@ -1968,16 +2023,19 @@ fn quote_as_expr_while(
     // let cond = quote_as_expr(&**cond, None, enclosing_item_attr_args);
     // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
+    let extra_borrow = if cfg!(feature = "singlethreaded") {
+        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
+    } else {
+        quote! {}
+    };
     quote! {
         {
             // At the moment of writing the unit value `()`
             // is the only known possible value returnable by `while` loop.
             let ret_val = #(#new_attrs)* #label #while_token #cond #body ;
-            // let ret_val = #(#attrs)* #label #while_token #cond #body ;
 
-            // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
             fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
-                logger.borrow_mut().log_loop_end());
+                logger.borrow_mut() #extra_borrow .log_loop_end());
 
             ret_val
         }

@@ -1,3 +1,5 @@
+// #![cfg(not(feature = "idle"))]
+// //#![cfg(feature = "idle")]
 #![feature(specialization)]
 
 pub mod call_log_infra;
@@ -10,76 +12,190 @@ pub mod singlethreaded;
 
 use call_log_infra::instances::THREAD_LOGGER;
 
+#[cfg(feature = "singlethreaded")]
+#[macro_export]
+macro_rules! extra_borrow {
+    () => {
+        let logger = logger.borrow()
+    }
+}
+
+#[cfg(not(feature = "singlethreaded"))]
+#[macro_export]
+macro_rules! extra_borrow {
+    () => {};
+}
+#[cfg(feature = "singlethreaded")]
+#[macro_export]
+macro_rules! extra_borrow_mut {
+    () => {
+        let logger = logger.borrow_mut()
+    }
+}
+
+#[cfg(not(feature = "singlethreaded"))]
+#[macro_export]
+macro_rules! extra_borrow_mut {
+    () => {};
+}
+
+/// Sets a specific thread indent different from the default for the invoking thread.
+/// #### Examples
+/// ```rs
+/// fcl::set_thread_indent!(String::from("                "));
+/// ```
+#[macro_export]
+macro_rules! set_thread_indent {
+    ($expr:expr) => {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {   // TODO: Consider removing `::call_log_infra::instances` for the pub entities (like `THREAD_LOGGER`) accessible from the user code.
+            fcl::extra_borrow_mut!();    // TODO: Test
+            logger
+                .borrow_mut()
+                .set_thread_indent($expr)
+        })
+    };
+}
+
+/// Temporarily enables or disables the call logging for the invoking thread.
+/// #### Examples
+/// ```rs
+/// fcl::push_logging_is_on!(true); // Temporarily enable logging.
+/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+///
+/// fcl::push_logging_is_on!(false); // Temporarily disable logging.
+/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+/// ```
+#[macro_export]
+macro_rules! push_logging_is_on {
+    ($expr:expr) => {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            fcl::extra_borrow_mut!(); // TODO: Test.
+            logger.borrow_mut().push_logging_is_on($expr)
+        })
+    };
+}
+
+/// Reverts to the previous logging state (enabled/disabled) for the invoking thread.
+/// #### Examples
+/// ```rs
+/// fcl::push_logging_is_on!(true); // Temporarily enable logging.
+/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+///
+/// fcl::push_logging_is_on!(false); // Temporarily disable logging.
+/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+/// ```
+#[macro_export]
+macro_rules! pop_logging_is_on {
+    () => {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            fcl::extra_borrow_mut!(); // TODO: Test.
+            logger.borrow_mut().pop_logging_is_on()
+        })
+    };
+}
+
+/// Tells if call logging is enabled (by returning `true`) or disabled (by returning `false`)
+/// #### Examples
+/// ```rs
+/// let on = fcl::logging_is_on!();
+/// ```
+#[macro_export]
+macro_rules! logging_is_on {
+    () => {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            fcl::extra_borrow!(); // TODO: Test.
+            logger.borrow().logging_is_on()
+        })
+    };
+}
+
+/// Enables (if the argument is `true`) or disables (if the argument is `false`) the call logging
+/// for the invoking thread.
+/// #### Examples
+/// ```rs
+/// fcl::set_logging_is_on!(false); // Disable logging.
+/// fcl::set_logging_is_on!(true); // Enable logging.
+/// ```
+#[macro_export]
+macro_rules! set_logging_is_on {
+    ($expr:expr) => {
+        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            fcl::extra_borrow_mut!(); // TODO: Test.
+            logger.borrow_mut().set_logging_is_on($expr)
+        })
+    };
+}
+
 /// A trait to be implemented by a per-thread call logging instance.
-/// 
+///
 /// The trait assumes the following.
 /// 1. The implementing instance has a logging enabling/disabling mechanism
 /// in the form of the On/Off Stack whose top entry tells if logging is enabled.
 /// If the On/Off Stack is empty then the logging is
 /// {TODO: One of
-/// * enabled by default, and manually disabled (or not enabled) for `main()`, the thread functions, 
+/// * enabled by default, and manually disabled (or not enabled) for `main()`, the thread functions,
 /// and other long-living  functions (see "Loggign Endlessly" in the mdBook), which is easy (seems the most preferable approach),
-/// * a specific entry/macro in the file of the defaults (affecting all the threads?), 
+/// * a specific entry/macro in the file of the defaults (affecting all the threads?),
 /// * specified from the outside on a per-thread basis during the instance creation?,
 /// * disabled by default, then how to enable for main() and the thread functions? (seems the least preferable approach)
 /// }.
-/// 2. The implementing instance has a notion of a thread indent 
+/// 2. The implementing instance has a notion of a thread indent
 /// used for visual separation of different threads' log output.
-/// 3. The implementing instance has a notion of logging the functions/closures, loop bodies, 
+/// 3. The implementing instance has a notion of logging the functions/closures, loop bodies,
 /// and flushing the log cache.
 pub trait CallLogger {
     /// For the calling thread temporarily switches logging
-    /// * on, if the passed argument is `true`, 
+    /// * on, if the passed argument is `true`,
     /// * or off, if `false`.
-    /// 
+    ///
     /// In other words pushes to the On/Off Stack a new state specified by the argument.
     fn push_logging_is_on(&mut self, is_on: bool);
     /// Recovers the previous logging on/off state for the calling thread.
-    /// 
+    ///
     /// In other words pops an entry from the On/Off Stack, if it isn't empty.
     fn pop_logging_is_on(&mut self);
-    /// Tells if logging for the calling thread is 
+    /// Tells if logging for the calling thread is
     /// * on, by returning `true`,
     /// * or off, by returning `false`.
-    /// 
+    ///
     /// In other words returns a copy of the On/Off Stack top.
     fn logging_is_on(&self) -> bool;
     /// For the calling thread switches logging
-    /// * on, if the passed argument is `true`, 
+    /// * on, if the passed argument is `true`,
     /// * or off, if `false`.
-    /// 
+    ///
     /// In other words replaces the entry on top of the On/Off Stack.
     fn set_logging_is_on(&mut self, is_on: bool);
 
     /// Sets the indent for the calling thread's log.
-    /// 
-    /// Is used to visually separate the logs by different threads. 
-    /// For example, if the instrumented user's code has 2 threads, then it makes sense to log 
-    /// the spawned thread indented by half of the console width 
+    ///
+    /// Is used to visually separate the logs by different threads.
+    /// For example, if the instrumented user's code has 2 threads, then it makes sense to log
+    /// the spawned thread indented by half of the console width
     /// to visually separate the spawned thread's log from the `main()` thread's log.
     fn set_thread_indent(&mut self, _thread_indent: String) {}
 
-    /// For the calling thread updates the call graph with a function or closure call 
+    /// For the calling thread updates the call graph with a function or closure call
     /// and potentially logs that call.
     /// # Parameters
     /// * Function or closure name.
     /// * Optional string representation of the parameter names and values.
     fn log_call(&mut self, name: &str, param_vals: Option<String>);
 
-    /// For the calling thread updates the call graph with a function or closure return 
+    /// For the calling thread updates the call graph with a function or closure return
     /// and potentially logs that return.
     /// # Parameters
     /// * Optional string representation of the returned value.
     fn log_ret(&mut self, ret_val: Option<String>);
 
-    /// Unconditionally flushes the data cached in the call graph 
+    /// Unconditionally flushes the data cached in the call graph
     /// (TODO: likely "of the previous thread", see below).
-    /// 
+    ///
     /// Is called, for example,
-    /// upon thread context switch. If the new thread tries to log something then 
+    /// upon thread context switch. If the new thread tries to log something then
     /// the previous thread's log cache is flushed first.
     fn flush(&mut self) {}
-    /// Flushes the data cached in the call graph upon certain condition, such as 
+    /// Flushes the data cached in the call graph upon certain condition, such as
     /// the instrumented user's code own output or panic hook output.
     fn maybe_flush(&mut self);
 
@@ -98,7 +214,7 @@ pub trait MaybePrint {
 }
 /// The default trait implementation.
 impl<T> MaybePrint for T {
-    /// Returns a dummy string representation of the instance. 
+    /// Returns a dummy string representation of the instance.
     default fn maybe_print(&self) -> String {
         String::from("?")
     }
@@ -112,7 +228,7 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 }
 
 /// The type for instrumenting a user's function or a closure to be logged.
-/// 
+///
 /// Its constructor logs the function or closure call, and the destructor logs the return.
 /// ### Examples
 /// The instrumented user's function and closure:
@@ -121,14 +237,14 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 /// fn f() { // The user's function definition.
 ///     let _c = Some(5).map(
 ///         |value| true    // The user's closure definition.
-///     ); 
+///     );
 /// }
 /// ```
 /// The result of the macro expansion:
 /// ```ignore
 /// fn f() {
 ///     . . .
-///     // The instrumentation. 
+///     // The instrumentation.
 ///     // The instance whose constructor logs the call `f() {`
 ///     // and destructor logs the return `} // f().`.
 ///     let mut callee_logger = CalleeLogger::new("f"..);
@@ -136,14 +252,14 @@ impl<T: std::fmt::Debug> MaybePrint for T {
 ///     let _c = Some(5).map(
 ///         |value| {
 ///             . . .
-///             // The instrumentation. 
+///             // The instrumentation.
 ///             // The instance whose constructor logs the call `f()::closure{4,9:4,20} {`
 ///             // and destructor logs the return `} // f()::closure{4,9:4,20}.`.
 ///             let mut callee_logger = fcl::CalleeLogger::new("f()::closure{1,1:1,0}"..);
 ///             . . .
 ///             true    
 ///         }
-///     ); 
+///     );
 /// }
 /// ```
 pub struct CalleeLogger {
@@ -163,9 +279,7 @@ impl CalleeLogger {
             logger.borrow_mut().log_call(func_name, param_vals);
         });
 
-        Self {
-            ret_val_str: None,
-        }
+        Self { ret_val_str: None }
     }
 
     /// Sets a string representation of the value returned by the instrumented user's function/closure.
@@ -211,4 +325,3 @@ impl Drop for LoopbodyLogger {
         });
     }
 }
-

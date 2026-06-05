@@ -16,11 +16,16 @@ pub fn main() {
     // fcl::_single_threaded_otimization!();
     // fcl::call_log_infra::THREAD_LOGGER.with(|logger| logger.borrow_mut().set_logging_is_on(true)); // Turn logging on.
     // fcl::set_thread_indent!(String::from("                "));
+    fcl::set_logging_is_on!(false);
+
     let _a = Some(0);
 
     use root::*;
     f();
     g();
+
+    assert!(!fcl::logging_is_on!());
+    fcl::set_logging_is_on!(true);
 
     {
         use crate::*;

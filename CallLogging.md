@@ -9,6 +9,100 @@
 # Next
 (See `>`)
 * idle mode (turn off `#[loggable]`)
+  * Redesign features
+    * The functionality starts with `<empty>` (idle).
+      * code_commons crate
+        * No code by default.
+        * Cargo.toml: 
+          * `[features] full = []`. No default feature (no code by default).
+          * No dependencies
+        * All the code is for `#![cfg(feature = "full")]` only. No code otherwise.
+      * fcl_proc_macros crate
+        * Empty procedural attribute macros: 
+          * `#[loggable]` 
+          * `#[non_loggable]`.
+        * No other code
+          * No intermediate procedural attribute macros: `#[loggable_block_contents]`.
+        * Cargo.toml: 
+          * `[features] full = []`. No default feature (no code by default).
+          * No dependencies
+      * fcl crate 
+        * By default empty macros only: 
+          * push_logging_is_on, 
+          * pop_logging_is_on, 
+          * logging_is_on, 
+          * set_logging_is_on, 
+          * set_thread_indent
+        * No other code
+          * No instances
+        * Cargo.toml:
+          * ```toml
+            code_commons = { path = "../code_commons" }
+            fcl_proc_macros = { path = "../fcl_proc_macros" }
+
+            [features] 
+            default = [ "full" ]
+            minimum = [
+              "code_commons/full",
+              "fcl_proc_macros/full",
+              \# dependencies
+            ]
+            multithreading = [ 
+              "minimum"
+              \# dependencies
+            ]
+            std_output_sync = [ 
+              "minimum"
+              \# dependencies
+            ]
+            log_params = [ 
+              "minimum"
+              \# dependencies
+            ]
+            log_closure_coords = [ 
+              "minimum"
+              \# dependencies
+            ]
+            log_ret_val = [ 
+              "minimum"
+              \# dependencies
+            ]
+
+            full = [
+              "multithreading",
+              "std_output_sync",
+              "log_params",
+              "log_closure_coords",
+              "log_ret_val",
+              \# No extra code and dependencies
+            ]
+            ```
+          * No dependencies
+    * Then "minimum" ("minimal") feature of fcl crate 
+      * single-threaded code with "minimal writer" (somehow related to std output sync/redir), 
+        None of:
+        * multithreading support
+        * "std output sync"
+        * "log_params".
+        * "log_closure_coords"
+        * "log_ret_val"
+      * Cargo.toml: Added dependencies for that code.
+    * Then "multithreading" (requires "minimal"?)
+      * multithreading code, 
+      * None of
+        * "std output sync"
+        * "log_params".
+        * "log_closure_coords"
+        * "log_ret_val"
+      * Cargo.toml: Added dependencies for that code.
+    * Independent features. Can be added both to "minimal" and "multithreading":
+      * "std output sync"     (requires "minimal"?)
+      * "log_params"          (requires "minimal"?)
+      * "log_closure_coords"  (requires "minimal"?)
+      * "log_ret_val"         (requires "minimal"?)
+    * All of that is the "full" feature, and that feature is the default.
+  * To deactivate "all" (use "idle") - `default-features = false`.
+* Using FCL for a specific build configuration only (not debug, not release, but some `fcl[_{debug|release}]`)
 * Code TODOs
 * Documentation
   * User Manual
@@ -128,6 +222,10 @@
   * Practicing Rust with FCL
 
 # Unsorted
+* TODO: If the user's code and panic handler do not do any std output then the output sync is not needed. 
+  Consider a feature for that ("no_std_output_sync") and consider reusing the feature "minimal_writer" for that.
+* Utilize "fcl\src\thoughts.txt".
+* "README.md" to every crate.
 * Doc it: 
   FCL can be useful for those who want to add the function call logging to their functionality
   * compiler developers,

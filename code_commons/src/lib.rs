@@ -1,3 +1,5 @@
+// #![cfg(feature = "full")]
+
 // The code_commons crate is to be reused for various code-handling projects.
 mod call_graph;
 pub use call_graph::{CallGraph, ItemKind, RepeatCountCategory};

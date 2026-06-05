@@ -4,95 +4,95 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 use crate::call_log_infra::CallLoggerArbiter;
 use crate::CallLogger;
 
-/// Sets a specific thread indent different from the default for the invoking thread.
-/// #### Examples
-/// ```rs
-/// fcl::set_thread_indent!(String::from("                "));
-/// ```
-// // TODO: Consider extracting `set_thread_indent` from "singlethreaded.rs" and "multithreaded.rs" 
-// // into one file with the following def-n:
+// /// Sets a specific thread indent different from the default for the invoking thread.
+// /// #### Examples
+// /// ```rs
+// /// fcl::set_thread_indent!(String::from("                "));
+// /// ```
+// // // TODO: Consider extracting `set_thread_indent` from "singlethreaded.rs" and "multithreaded.rs" 
+// // // into one file with the following def-n:
+// // #[macro_export]
+// // macro_rules! set_thread_indent {
+// //     ($expr:expr) => {
+// //         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+// //             let mut logger = logger.borrow_mut();
+// //
+// //             #[cfg(feature = "singlethreaded")]
+// //             let mut logger = logger.borrow_mut();
+// //
+// //             logger.set_thread_indent($expr)
+// //         })
+// //     };
+// // }
 // #[macro_export]
 // macro_rules! set_thread_indent {
 //     ($expr:expr) => {
-//         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-//             let mut logger = logger.borrow_mut();
-//
-//             #[cfg(feature = "singlethreaded")]
-//             let mut logger = logger.borrow_mut();
-//
-//             logger.set_thread_indent($expr)
-//         })
+//         fcl::call_log_infra::instances::THREAD_LOGGER   // TODO: Consider removing `::call_log_infra::instances` for the pub entities (like `THREAD_LOGGER`) accessible from the user code.
+//             .with(|logger| logger.borrow_mut().set_thread_indent($expr))
 //     };
 // }
-#[macro_export]
-macro_rules! set_thread_indent {
-    ($expr:expr) => {
-        fcl::call_log_infra::instances::THREAD_LOGGER   // TODO: Consider removing `::call_log_infra::instances` for the pub entities (like `THREAD_LOGGER`) accessible from the user code.
-            .with(|logger| logger.borrow_mut().set_thread_indent($expr))
-    };
-}
 
-/// Temporarily enables or disables the call logging for the invoking thread.
-/// #### Examples
-/// ```rs
-/// fcl::push_logging_is_on!(true); // Temporarily enable logging.
-/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
-///
-/// fcl::push_logging_is_on!(false); // Temporarily disable logging.
-/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
-/// ```
-#[macro_export]
-macro_rules! push_logging_is_on {
-    ($expr:expr) => {
-        fcl::call_log_infra::instances::THREAD_LOGGER
-            .with(|logger| logger.borrow_mut().push_logging_is_on($expr))
-    };
-}
+// /// Temporarily enables or disables the call logging for the invoking thread.
+// /// #### Examples
+// /// ```rs
+// /// fcl::push_logging_is_on!(true); // Temporarily enable logging.
+// /// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+// ///
+// /// fcl::push_logging_is_on!(false); // Temporarily disable logging.
+// /// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+// /// ```
+// #[macro_export]
+// macro_rules! push_logging_is_on {
+//     ($expr:expr) => {
+//         fcl::call_log_infra::instances::THREAD_LOGGER
+//             .with(|logger| logger.borrow_mut().push_logging_is_on($expr))
+//     };
+// }
 
-/// Reverts to the previous logging state (enabled/disabled) for the invoking thread.
-/// #### Examples
-/// ```rs
-/// fcl::push_logging_is_on!(true); // Temporarily enable logging.
-/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
-///
-/// fcl::push_logging_is_on!(false); // Temporarily disable logging.
-/// fcl::pop_logging_is_on!();  // Revert to previous logging state.
-/// ```
-#[macro_export]
-macro_rules! pop_logging_is_on {
-    () => {
-        fcl::call_log_infra::instances::THREAD_LOGGER
-            .with(|logger| logger.borrow_mut().pop_logging_is_on())
-    };
-}
+// /// Reverts to the previous logging state (enabled/disabled) for the invoking thread.
+// /// #### Examples
+// /// ```rs
+// /// fcl::push_logging_is_on!(true); // Temporarily enable logging.
+// /// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+// ///
+// /// fcl::push_logging_is_on!(false); // Temporarily disable logging.
+// /// fcl::pop_logging_is_on!();  // Revert to previous logging state.
+// /// ```
+// #[macro_export]
+// macro_rules! pop_logging_is_on {
+//     () => {
+//         fcl::call_log_infra::instances::THREAD_LOGGER
+//             .with(|logger| logger.borrow_mut().pop_logging_is_on())
+//     };
+// }
 
-/// Tells if call logging is enabled (by returning `true`) or disabled (by returning `false`) 
-/// for the invoking thread.
-/// #### Examples
-/// ```rs
-/// let on = fcl::logging_is_on!();
-/// ```
-#[macro_export]
-macro_rules! logging_is_on {
-    () => {
-        fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| logger.borrow().logging_is_on())
-    };
-}
+// /// Tells if call logging is enabled (by returning `true`) or disabled (by returning `false`) 
+// /// for the invoking thread.
+// /// #### Examples
+// /// ```rs
+// /// let on = fcl::logging_is_on!();
+// /// ```
+// #[macro_export]
+// macro_rules! logging_is_on {
+//     () => {
+//         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| logger.borrow().logging_is_on())
+//     };
+// }
 
-/// Enables (if the argument is `true`) or disables (if the argument is `false`) the call logging
-/// for the invoking thread.
-/// #### Examples
-/// ```rs
-/// fcl::set_logging_is_on!(false); // Disable logging.
-/// fcl::set_logging_is_on!(true); // Enable logging.
-/// ```
-#[macro_export]
-macro_rules! set_logging_is_on {
-    ($expr:expr) => {
-        fcl::call_log_infra::instances::THREAD_LOGGER
-            .with(|logger| logger.borrow_mut().set_logging_is_on($expr))
-    };
-}
+// /// Enables (if the argument is `true`) or disables (if the argument is `false`) the call logging
+// /// for the invoking thread.
+// /// #### Examples
+// /// ```rs
+// /// fcl::set_logging_is_on!(false); // Disable logging.
+// /// fcl::set_logging_is_on!(true); // Enable logging.
+// /// ```
+// #[macro_export]
+// macro_rules! set_logging_is_on {
+//     ($expr:expr) => {
+//         fcl::call_log_infra::instances::THREAD_LOGGER
+//             .with(|logger| logger.borrow_mut().set_logging_is_on($expr))
+//     };
+// }
 
 /// The instance of this type provides to the multiple threads the access to the `CallLoggerArbiter`.
 pub struct ThreadGatekeeper { // TODO: Consider -> ArbiterGatekeeper
