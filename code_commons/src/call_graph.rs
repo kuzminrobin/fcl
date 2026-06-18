@@ -1,3 +1,5 @@
+// TODO: Consider splitting the file.
+
 use crate::CoderunNotifiable;
 use std::{cell::RefCell, rc::Rc};
 
@@ -7,13 +9,15 @@ type Link = Rc<RefCell<CallNode>>;
 /// * a function call,
 /// * a closure call,
 /// * a loop body.
-struct CallNode { // TODO: Consider CallNode -> ItemNode or CallGraphItemNode.
+struct CallNode {
+    // TODO: Consider CallNode -> ItemNode or CallGraphItemNode.
     /// Describes what this node represents:
     /// * a call (function/closure, with a name and optional parameter values), or
     /// * a loop body.
     kind: ItemKind, // TODO: Consider kind -> item_info or item_input_info or signature_info.
     /// String representation of an optional value returned by a function, closure, or `loop`
     /// (`while` and `for` do not return a value other than unit `()`).
+    #[cfg(feature = "ret_val_logging")]
     ret_val: Option<String>,
     /// Nested calls made by this node (not locally defined functions/closures).
     children: Vec<Link>,
@@ -79,6 +83,7 @@ impl CallNode {
     fn new(kind: ItemKind) -> Self {
         Self {
             kind: kind,
+            #[cfg(feature = "ret_val_logging")]
             ret_val: None,
             children: Vec::new(),
             repeat_count: RepeatCount::new(),
@@ -86,10 +91,12 @@ impl CallNode {
             followed_by_flush: false,
         }
     }
+    #[cfg(feature = "ret_val_logging")]
     /// Sets the string representation of the value returned by the function, closure or `loop` iteration.
     fn set_ret_val(&mut self, output: Option<String>) {
         self.ret_val = output;
     }
+    #[cfg(feature = "ret_val_logging")]
     /// Returns a reference to the optional string representation of the value
     /// returned by the function, closure, or `loop` iteration.
     fn get_ret_val(&self) -> &Option<String> {
@@ -183,6 +190,7 @@ pub enum ItemKind {
         /// Function or closure name.
         name: String,
         /// Optional formatted parameter values.
+        #[cfg(feature = "params_logging")]
         param_vals: Option<String>,
     },
     /// Loop body item.
@@ -297,6 +305,7 @@ impl CallGraph {
     pub fn new(coderun_notifiable: Rc<RefCell<dyn CoderunNotifiable>>) -> Self {
         let pseudoroot = Rc::new(RefCell::new(CallNode::new(ItemKind::Call {
             name: String::from(""),
+            #[cfg(feature = "params_logging")]
             param_vals: None,
         })));
         Self {
@@ -321,10 +330,15 @@ impl CallGraph {
     // Call Graph State:
     // `current`: parent (call | loopbody). `call_stack`: {..., parent}.
     // `current.children`: Optional( [..., previous_sibling] ).
-    pub fn add_call(&mut self, call_name: &str, param_vals: Option<String>) {
+    pub fn add_call(
+        &mut self,
+        call_name: &str,
+        #[cfg(feature = "params_logging")] param_vals: Option<String>,
+    ) {
         // Create the new_sibling node:
         let new_sibling = Rc::new(RefCell::new(CallNode::new(ItemKind::Call {
             name: String::from(call_name),
+            #[cfg(feature = "params_logging")]
             param_vals: param_vals.clone(),
         })));
 
@@ -361,7 +375,7 @@ impl CallGraph {
             //      or a loopbody (b) or {previous sibling was followed by a flush after the latest repeat count inc})
             //        log the previous sibling's repeat count, if non-zero. Applicable to (a) and (b).
             //        Log the call being added.
-            // 
+            //
             //        // Endless logging support:
             //        if new_sibling is pseudoroot's child
             //          Drop the previous sibling.
@@ -403,26 +417,21 @@ impl CallGraph {
                     self.coderun_notifiable.borrow_mut().notify_call(
                         self.call_depth(),
                         &call_name,
+                        #[cfg(feature = "params_logging")]
                         &param_vals,
                     );
 
                     // TODO: Test thoroughly (a shallow test shows in Task Manager that the allocated memory doesn't grow).
                     // // Endless logging support:
                     // if new_sibling is pseudoroot's child
-                    //    (the pseudoroot only is on the call stack, 
+                    //    (the pseudoroot only is on the call stack,
                     //     the new_sibling is not yet there but is already among the pseudoroot's children in the call tree)
                     // { Drop the previous sibling. }
                     if siblings_call_depth == 0 {
                         // Remove new_sibling from the pseudoroot's list of children:
-                        parent
-                            .borrow_mut()
-                            .children
-                            .pop();
+                        parent.borrow_mut().children.pop();
                         // Remove previous sibling from the pseudoroot's list of children:
-                        parent
-                            .borrow_mut()
-                            .children
-                            .pop();
+                        parent.borrow_mut().children.pop();
                         // Add new_sibling to the pseudoroot's list of children again:
                         parent
                             // self.current_node // parent
@@ -445,6 +454,7 @@ impl CallGraph {
                 self.coderun_notifiable.borrow_mut().notify_call(
                     self.call_depth(),
                     &call_name,
+                    #[cfg(feature = "params_logging")]
                     &param_vals,
                 );
             }
@@ -492,7 +502,7 @@ impl CallGraph {
     //        [... // Nested calls (children).
     //         [// last_child() repeats 9 time(s). // Not yet flushed. ]]
     //     } // The return being handled.
-    pub fn add_ret(&mut self, ret_val: Option<String>) {
+    pub fn add_ret(&mut self, #[cfg(feature = "ret_val_logging")] ret_val: Option<String>) {
         // returning_sibling.has_ended = true
         //
         // If caching is not active {
@@ -530,11 +540,12 @@ impl CallGraph {
 
         // Impl:
         let returning_sibling = self.current_node.clone();
+        #[cfg(feature = "ret_val_logging")]
         returning_sibling.borrow_mut().set_ret_val(ret_val);
 
         let children_call_depth = self.call_depth();
 
-        // `returning_sibling.has_ended = true`: 
+        // `returning_sibling.has_ended = true`:
         returning_sibling.borrow_mut().has_ended = true;
 
         // If caching is not active {
@@ -559,6 +570,7 @@ impl CallGraph {
                         children_call_depth - 1, // `- 1`: The returning_sibling is still on the call stack. The call_depth reflects the children's indent.
                         &name,
                         has_nested_calls,
+                        #[cfg(feature = "ret_val_logging")]
                         self.current_node.borrow().get_ret_val(),
                     );
                 }
@@ -638,7 +650,8 @@ impl CallGraph {
                         // // Endless logging support:
                         // if returning_sibling is pseudoroot's child
                         //   Drop the previous sibling.
-                        if call_stack_len == 2 { // pseudoroot and returning_sibling.
+                        if call_stack_len == 2 {
+                            // pseudoroot and returning_sibling.
                             parent_or_pseudoroot.borrow_mut().children.remove(0); // Previous sibling is always at index 0 in pseudoroot.
                         }
                     }
@@ -697,7 +710,10 @@ impl CallGraph {
         // if !self.caching_is_active() {
         //     let children_call_depth = self.call_depth();
         //     let returning_sibling = self.call_stack.last().unwrap(); // TODO: Consider `self.call_stack.last().unwrap()` -> `self.current_node` (to get rid of the `unwrap()`).
-        //     returning_sibling.borrow_mut().set_ret_val(ret_val);
+        //     returning_sibling.borrow_mut().set_ret_val(
+        //         #[cfg(feature = "ret_val_logging")]
+        //         ret_val
+        //     );
 
         //     // Log the repeat count, if non-zero, of the last_child, if present:
         //     if let Some(last_child) = returning_sibling.borrow().children.last()
@@ -866,17 +882,17 @@ impl CallGraph {
         // Create the new loopbody node.
         // If caching is not active {
         //      If optional_previous_sibling is a call
-        //          flush its non-flushed repeat count (even though all subsequent loopbodies can get removed for being childless 
+        //          flush its non-flushed repeat count (even though all subsequent loopbodies can get removed for being childless
         //          and a repeated call can follow).
-        // 
+        //
         //      // TODO: Test.
         //      // Endless logging support:
         //      If    optional_previous_sibling is pseudoroot's child
         //         && optional_previous_sibling is a {call or previous loops' loopbody}
         //              Remove optional_previous_sibling
-        // 
+        //
         //      // Begin caching the new loopbody node (if it ends up being childless then it will be removed):
-        //      If it is the initial loopbody 
+        //      If it is the initial loopbody
         //        // (i.e. the first-most loopbody (iteration) of the loop
         //        // or all the previous loopbodies (iterations) of the current loop have been removed for being childless)
         //      {
@@ -889,18 +905,18 @@ impl CallGraph {
         //          //       or indirectly in the nested (initial) loopbodies)
         //          //     * or loopbody end
         //          //     * or flush.
-        //          // Upon the first-most nested function or closure call 
+        //          // Upon the first-most nested function or closure call
         //          //   * the cache will be flushed (beginning with the current loopbody start,
         //          //     through the nested loopbodies' starts, and ending with the first-most nested function or closure start),
-        //          //   * caching will end, 
+        //          //   * caching will end,
         //          //   * and execution will continue.
         //          // Upon initial loopbody end,
         //          // if the loopbody ends up having no (direct or indirect) nested function or closure calls
         //          //          (TODO: Is it really applicable for childless removal? "and caching didn't end upon flush"), then
         //          //     the childless loopbody will get removed and the subsequent loopbody, if any, of the current loop
         //          //     will be marked later as initial;
-        //          // otherwise (the inital loopbody has (logged) children) 
-        //          //     the last child's non-flushed repeat count (which will be the only non-flushed thing) will get flushed. 
+        //          // otherwise (the inital loopbody has (logged) children)
+        //          //     the last child's non-flushed repeat count (which will be the only non-flushed thing) will get flushed.
         //          //     Plus the loop body end.
         //      } otherwise (it is non-initial loopbody) {
         //          caching info
@@ -952,11 +968,15 @@ impl CallGraph {
         // If caching is not active {
         if !self.caching_is_active() {
             // If optional_previous_sibling
-            if let Some(previous_sibling) = optional_previous_sibling.clone() {    //.as_ref() {
+            if let Some(previous_sibling) = optional_previous_sibling.clone() {
                 // is a call
                 //     flush its non-flushed repeat count.
                 if let ItemKind::Call { .. } = previous_sibling.borrow().kind {
-                    if !previous_sibling.borrow().repeat_count.non_flushed_is_empty() {
+                    if !previous_sibling
+                        .borrow()
+                        .repeat_count
+                        .non_flushed_is_empty()
+                    {
                         self.coderun_notifiable.borrow_mut().notify_repeat_count(
                             siblings_call_depth,
                             &previous_sibling.borrow().kind,
@@ -970,7 +990,8 @@ impl CallGraph {
                 // If    optional_previous_sibling is pseudoroot's child
                 //    && optional_previous_sibling is a {call or previous loops' loopbody}
                 //         Remove optional_previous_sibling
-                if self.call_stack.len() == 1 { // pseudoroot only
+                if self.call_stack.len() == 1 {
+                    // pseudoroot only
                     let remove_previous_sibling = match previous_sibling.borrow().kind {
                         ItemKind::Call { .. } => true,
                         ItemKind::Loopbody { ends_the_loop } => ends_the_loop,
@@ -1030,7 +1051,6 @@ impl CallGraph {
 
         // make it current (the subsequent calls will be added as children to the new node).
         self.current_node = new_loopbody_node.clone();
-
     }
 
     /// Adds the loop body end to the call graph.
@@ -1110,21 +1130,21 @@ impl CallGraph {
         //         previous_sibling.followed_by_flush = false. // Enable subsequent sibling caching and previous_sibling's rep count inc.
         //     }
         //     else { // Not equal.
-        //         If caching is active 
+        //         If caching is active
         //              if the previous_sibling is the caching model node then {
         //                  Log the previous_sibling's non-flushed repeat count.
         //                  Log the subtree of the ending loop body.
         //                  Stop caching.
-        // 
+        //
         //                  // Endless logging support:
-        //                  if a child of pseudoroot 
+        //                  if a child of pseudoroot
         //                      Remove the previous_sibling from the call tree.
-        //              } 
+        //              }
         //              // else (caching has started at a parent level or above) Do nothing, continue caching.
         //         }
         //         else (caching is inactive)
         //              // Endless logging support:
-        //              if a child of pseudoroot 
+        //              if a child of pseudoroot
         //                  Remove the previous_sibling from the call tree.
         //
         //         // {previous_sibling // if still alive after endless logging support}.followed_by_flush doesn't matter any more.
@@ -1149,7 +1169,6 @@ impl CallGraph {
             None => panic!("FCL Internal Error: Unexpected bottom of the call stack"), // Must never get here. The program state
             // is unexpected, panicking ASAP.
             // TODO: Consider `self.coderun_notifiable.borrow_mut().notify_error()` + `flush()` + {panic?} instead of panicking.
-
             Some(parent_or_pseudoroot) => parent_or_pseudoroot.clone(),
         };
         self.current_node = parent_or_pseudoroot.clone();
@@ -1287,20 +1306,21 @@ impl CallGraph {
 
                             // TODO: Test.
                             // Endless logging support:
-                            // if a child of pseudoroot 
-                            if self.call_stack.len() == 1 { // pseudoroot
+                            // if a child of pseudoroot
+                            if self.call_stack.len() == 1 {
+                                // pseudoroot
                                 // Remove the previous_sibling from the call tree.
                                 parent_or_pseudoroot.borrow_mut().children.remove(0);
                             }
-                            
                         }
                         // else (caching has started at a parent level or above) Do nothing, continue caching.
                     } else {
                         // else (caching is inactive)
                         // TODO: Test.
                         // Endless logging support:
-                        // if a child of pseudoroot 
-                        if self.call_stack.len() == 1 { // pseudoroot
+                        // if a child of pseudoroot
+                        if self.call_stack.len() == 1 {
+                            // pseudoroot
                             // Remove the previous_sibling from the call tree.
                             parent_or_pseudoroot.borrow_mut().children.remove(0);
                         }
@@ -1386,15 +1406,13 @@ impl CallGraph {
         //  Do nothing.
     }
 
-    /// Marks the specified node as `followed_by_flush = true` if it has ended, 
+    /// Marks the specified node as `followed_by_flush = true` if it has ended,
     /// otherwise marks its latest descendant, if it has ended.
     fn mark_as_followed_by_flush(node: Link) {
         if node.borrow().has_ended {
             node.borrow_mut().followed_by_flush = true;
         } else {
-            let Some(last_child) =
-                node.borrow().children.last().map(|node| node.clone())
-            else {
+            let Some(last_child) = node.borrow().children.last().map(|node| node.clone()) else {
                 return;
             };
             Self::mark_as_followed_by_flush(last_child)
@@ -1405,8 +1423,8 @@ impl CallGraph {
     ///
     /// Flushing occurs on:
     /// * thread context switch;
-    /// * log synchronization with 
-    ///   * standard output in the instrumented code, and 
+    /// * log synchronization with
+    ///   * standard output in the instrumented code, and
     ///   * panic hook;
     /// * call in the initial loop body.
     ///
@@ -1473,7 +1491,7 @@ impl CallGraph {
                 // Otherwise (repeat count is flushed) do nothing.
 
                 // If the latest_sibling has ended, then {
-                //      mark it as `followed_by_flush = true` to prevent caching for the subsequent sibling, 
+                //      mark it as `followed_by_flush = true` to prevent caching for the subsequent sibling,
                 //      even if {the subsequent sibling is a call with the same name or it's a next iteration of the current loop}.
                 // } else {
                 //      mark latest_sibling's latest descendant, if it has ended.
@@ -1509,14 +1527,14 @@ impl CallGraph {
         self.caching_info.is_active()
     }
 
-    /// Returns `true` if the two subtrees are equal by structure, 
+    /// Returns `true` if the two subtrees are equal by structure,
     /// item names, order, and repeat counts.
     /// Parameter values and return values are ignored.
     ///
     /// ### Parameters
     /// * The first subtree root (typically the caching model node).
     /// * The second subtree root (typically the node being cached with `0` repeat count).
-    /// * The flag telling to compare repeat count on the roots 
+    /// * The flag telling to compare repeat count on the roots
     ///   (`false` on the roots, `true` on the descendants recursively).
     fn trees_are_equal(a: &Link, b: &Link, compare_root_repeat_count: bool) -> bool {
         let a = a.borrow();
@@ -1559,10 +1577,17 @@ impl CallGraph {
 
         // Log `.. {`:
         match &current_node.kind {
-            ItemKind::Call { name, param_vals } => {
-                self.coderun_notifiable
-                    .borrow_mut()
-                    .notify_call(call_depth, name, param_vals);
+            ItemKind::Call {
+                name,
+                #[cfg(feature = "params_logging")]
+                param_vals,
+            } => {
+                self.coderun_notifiable.borrow_mut().notify_call(
+                    call_depth,
+                    name,
+                    #[cfg(feature = "params_logging")]
+                    param_vals,
+                );
             }
             ItemKind::Loopbody { .. } => self
                 .coderun_notifiable
@@ -1586,6 +1611,7 @@ impl CallGraph {
                         call_depth,
                         name,
                         has_nested_calls,
+                        #[cfg(feature = "ret_val_logging")]
                         current_node.get_ret_val(),
                     );
                 }

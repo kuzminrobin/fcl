@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use fcl_proc_macros::{loggable};
 
-#[cfg(feature = "singlethreaded")]
-use fcl::CallLogger;
-use fcl::call_log_infra::instances::{THREAD_DECORATOR};
+// #[cfg(feature = "single_threaded")]
+// use fcl::common::CallLogger;
+use fcl::common::call_log_infra::instances::{THREAD_DECORATOR};
 
 use crate::common::*;
 

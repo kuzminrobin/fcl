@@ -1,4 +1,4 @@
-// #![cfg(feature = "full")]
+#![cfg(feature = "common")]
 
 // The code_commons crate is to be reused for various code-handling projects.
 mod call_graph;
@@ -14,7 +14,10 @@ pub trait CoderunNotifiable {
     /// * The call depth.
     /// * The function or closure name.
     /// * The optional string representation of the parameter names and values.
-    fn notify_call(&mut self, _call_depth: usize, _name: &str, _param_vals: &Option<String>) {}
+    fn notify_call(&mut self, _call_depth: usize, _name: &str, 
+        #[cfg(feature = "params_logging")]
+        _param_vals: &Option<String>
+    ) {}
 
     /// Notifies about a function or a closure return.
     /// # Parameters
@@ -27,6 +30,7 @@ pub trait CoderunNotifiable {
         _call_depth: usize,
         _name: &str,
         _has_nested_calls: bool,
+        #[cfg(feature = "ret_val_logging")]
         _ret_val: &Option<String>,
     ) {
     }

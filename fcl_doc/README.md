@@ -82,6 +82,9 @@ my_func(); // Invocation of the function.
 ```
 
 # What the FCL Is For
+Unsorted: For those who want to get a quick idea about what happens in the software upon certain action (e.g. a mouse click)
+and understand where to start.
+
 Some of the readers may wonder: "What such a functionality can be needed for?"  
 Or someone can say: "Such a functionality is already implemented by the UNIX utility ???".
 
@@ -89,7 +92,7 @@ First of all, FCL demonstrates an example of Rust procedural macros that manipul
 the information that I felt lack of after having read "[The Little Book of Rust Macros](https://lukaswirth.dev/tlborm/)".
 
 Second, the UNIX utiltity ... requires the existence of that utility in the excution environment. 
-It also requires an operating system. But the FCL let's the instrumented program to log its own 
+It also requires an operating system. But the FCL lets the instrumented program to log its own 
 function calls by itself, without using any utility and, even more, without using an operating system. 
 The user's program instrumented with the FCL (or by example of FCL) can potentially run in bare metal environments
 and log their functions over a hardware communication interface like SPI, UART, I2C, etc. (after the 
@@ -102,7 +105,7 @@ Third, the FCL can be used as a tool that facilitates the debugging or crash ana
 * when the debugger is a more resource-consuming tool, hard to set up, or otherwise less efficient,
 * when the bug shows itself extremely rarely, e.g. once a month in a software running 24 hours a day, 
   or the consequence of the bug shows itself too late to break in the debugger,
-  such that the only way to analyze the bug is by looking at the logs for the last few days or weeks.
+  such that the only way to analyze the bug is by looking at the logs of the last few hours, days, or weeks.
 
 For example, for the first time I implemented similar functionality in an environment that was simulating 
 the hardware to run the firmware. Or in other words, the firmware was executed on a virtual hardware. 

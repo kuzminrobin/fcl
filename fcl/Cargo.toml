@@ -4,25 +4,96 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-filedescriptor = "0.8.3"
-tempfile = "3.20.0"
-#serial_test = "3.2.0"
-#serial_test = "3.3.1"
-regex = "1.12.3"
+filedescriptor = { version = "0.8.3", optional = true }
+tempfile = { version = "3.20.0", optional = true }
+#serial_test = { version = "3.2.0", optional = true }
+#serial_test = { version = "3.3.1", optional = true }
+regex = { version = "1.12.3", optional = true }         # tests
 
-code_commons = { path = "../code_commons" }
-fcl_proc_macros = { path = "../fcl_proc_macros" }
-#fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
 
-[features]
-#idle = [                    # No code of this crate is compiled.
-#    "code_commons/idle",    # No code of this crate is compiled.
-#    "fcl_proc_macros/idle"  # Instrumentation is skipped.
-#] 
-##idle = [] # No code of this crate is compiled.
+code_commons = { path = "../code_commons", optional = true, default-features = false }
+# code_commons = { path = "../code_commons" }
 
-# default = ["singlethreaded"]
-singlethreaded = []
-#singlethreaded = [ "fcl_proc_macros/singlethreaded" ]
+# TODO: Consider removing "fcl_proc_macros" crate dependency to avoid discrepancy between 
+# the user-chosen and fcl-crate-chosen features of the "fcl_proc_macros" crate.
+fcl_proc_macros = { path = "../fcl_proc_macros", optional = true, default-features = false }
+#fcl_proc_macros = { path = "../fcl_proc_macros", features = ["multithreaded"] }
+#fcl_proc_macros = { path = "../fcl_proc_macros" }                   # For doc comments examples, integration tests. 
+#fcl_proc_macros = { path = "../fcl_proc_macros", features = ["single_threaded"] }
 
-minimal_writer = [ "singlethreaded" ]
+###########
+
+[features] 
+common = [
+    "dep:code_commons",
+    "code_commons/common",
+    # dependencies
+]
+log_merger = [                          # Merges multiuple thread logs to one.
+    "common"
+]
+std_output_sync = [ 
+    "dep:filedescriptor",
+    "dep:tempfile",
+    "common",
+    # "log_merger"    # TODO: "std_output_sync" must not require "log_merger".
+]
+params_logging = [ 
+    "code_commons/params_logging",
+    "fcl_proc_macros/params_logging",
+    "common",
+]
+closure_coords_logging = [
+    "common",
+    "fcl_proc_macros/closure_coords_logging",
+    "dep:regex",
+]
+ret_val_logging = [ 
+    "code_commons/ret_val_logging",
+    "fcl_proc_macros/ret_val_logging",
+    "common"
+]
+single_threaded = [
+    "fcl_proc_macros/single_threaded",  # TODO: Must not depend on "fcl_proc_macros".
+    "common",
+    # dependencies
+]
+multithreaded = [
+    "common",
+    "fcl_proc_macros/multithreaded",
+    # dependencies
+]
+full_single_threaded = [
+    "single_threaded",
+    "log_merger",
+    "std_output_sync",
+    "params_logging",
+    "closure_coords_logging",
+    "ret_val_logging",
+    # No extra code and dependencies
+]
+full_multithreaded = [
+    "multithreaded",
+    "log_merger",
+    "std_output_sync",
+    "params_logging",
+    "closure_coords_logging",
+    "ret_val_logging",
+    # No extra code and dependencies
+]
+default = [ "full_multithreaded" ]  #"params_logging" ] #"std_output_sync" ]  # "log_merger" ]  # "common" ] #
+# default = [ "full_multithreaded" ]
+
+# ##################
+# [features]
+# #idle = [                    # No code of this crate is compiled.
+# #    "code_commons/idle",    # No code of this crate is compiled.
+# #    "fcl_proc_macros/idle"  # Instrumentation is skipped.
+# #] 
+# ##idle = [] # No code of this crate is compiled.
+# 
+# # default = ["singlethreaded"]
+# singlethreaded = []
+# #singlethreaded = [ "fcl_proc_macros/singlethreaded" ]
+# 
+# minimal_writer = [ "singlethreaded" ]

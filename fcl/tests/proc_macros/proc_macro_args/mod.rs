@@ -183,7 +183,30 @@ TODO: Use `updated_attr_args()` wherever applicable.
 // Yield             |     |       |      |        |            |                |       |
 // Verbatim          |     |       |      |        |            |                |       |
 
+#[cfg(feature = "closure_coords_logging")]
+/// NOTE: Cannot be a function since participates in a string literal generation.
+macro_rules! closure_coords {
+    () => { "0,0:0,0" }
+}
+#[cfg(not(feature = "closure_coords_logging"))]
+/// NOTE: Cannot be a function since participates in a string literal generation.
+macro_rules! closure_coords {
+    () => { "" }
+}
+
+#[cfg(feature = "closure_coords_logging")]
+/// NOTE: Cannot be a function since participates in a string literal generation.
+macro_rules! dots {
+    () => { ".." }
+}
+#[cfg(not(feature = "closure_coords_logging"))]
+/// NOTE: Cannot be a function since participates in a string literal generation.
+macro_rules! dots {
+    () => { "" }
+}
+
 mod fn_fn_call_params;
+// #[cfg(feature = "closure_coords_logging")]
 mod fn_fn_closure_coords;
 mod mod_fn;
 // fn_mod

@@ -1,10 +1,12 @@
-// #[cfg(not(feature = "idle"))]
+#[cfg(all(feature = "single_threaded", feature = "multithreaded"))]
+compile_error!("Feature \"single_threaded\" and feature \"multithreaded\" cannot be enabled at the same time");
+
+#[cfg(feature = "common")]
 #[macro_use]
 mod consts;
-
-// #[cfg(not(feature = "idle"))]
+#[cfg(feature = "common")]
 mod exprs;
-// #[cfg(not(feature = "idle"))]
+#[cfg(feature = "common")]
 mod items;
 
 /// Suppresses the automatic recursive instrumentation of an item as `#[loggable]`.
@@ -44,6 +46,7 @@ mod items;
 /// }
 /// ```
 #[proc_macro_attribute]
+// NOTE: functions tagged with `#[proc_macro_attribute]` must currently reside in the root of the crate
 pub fn non_loggable(
     _attr_args: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
@@ -151,14 +154,17 @@ pub fn non_loggable(
 /// my_module::<MyStruct as MyPureTrait>::B::f() {} // Is prefixed with "my_module::<MyStruct as MyPureTrait>::B::".
 /// ```
 #[proc_macro_attribute]
+// NOTE: functions tagged with `#[proc_macro_attribute]` must currently reside in the root of the crate
 pub fn loggable(
     _attr_args_ts: proc_macro::TokenStream,
     attributed_item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    // #[cfg(feature = "idle")]
-    // { attributed_item }
+    #[cfg(not(feature = "common"))]
+    { 
+        attributed_item 
+    }
 
-    // #[cfg(not(feature = "idle"))]
+    #[cfg(feature = "common")]
     {
         let attr_args = syn::parse_macro_input!(_attr_args_ts as crate::common::AttrArgs); // Handles the compilation errors appropriately (checked).
         let output = {
@@ -177,7 +183,7 @@ pub fn loggable(
     }
 }
 
-// #[cfg(not(feature = "idle"))]
+#[cfg(feature = "common")]
 #[proc_macro_attribute]
 pub fn loggable_block_contents(
     attr_args_ts: proc_macro::TokenStream,
@@ -188,10 +194,14 @@ pub fn loggable_block_contents(
     items::quote_as_item_fn_loggable_block_contents(&item_fn, &attr_args).into()
 }
 
-// #[cfg(not(feature = "idle"))]
+#[cfg(feature = "common")]
 mod common {
-    use quote::quote;
+    // // #[cfg(feature = "common")]
+    // #[macro_use]
+    // mod consts;
+
     use crate::consts;
+    use quote::quote;
 
     /// Runs through the collection of `current_attrs` parameter,
     /// for each `#[loggable]` attribute combines its arguments with `enclosing_item_attr_args` in a new attribute,
@@ -558,6 +568,7 @@ mod common {
         tmp_str.replace("$as$", " as ")
     }
 
+    #[cfg(feature = "params_logging")]
     pub(crate) fn update_param_data_from_pat(
         input_pat: &syn::Pat,
         param_format_str: &mut String,
@@ -731,8 +742,8 @@ mod common {
                 let syn::PatType {
                     // attrs, //: Vec<Attribute>,
                     pat, //: Box<Pat>,
-                        // colon_token, //: Colon,
-                        // ty, //: Box<Type>,
+                         // colon_token, //: Colon,
+                         // ty, //: Box<Type>,
                     ..
                 } = pat_type;
                 update_param_data_from_pat(pat.as_ref(), param_format_str, param_list);

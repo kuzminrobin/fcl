@@ -129,7 +129,7 @@ fn fn_init_fn() {
             concat!(
                 "g(ret_some: false, p: 1) {} -> None\n",
                 "h(p: 3) {\n",
-                "  h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "  h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "} -> Some(4) // h().\n",
             )
         );
@@ -140,7 +140,7 @@ fn fn_init_fn() {
             concat!(
                 "g(..) {} -> None\n",
                 "h(..) {\n",
-                "  h::closure{..}(..) {} -> 4\n",
+                "  h::closure{", dots!(), "}(..) {} -> 4\n",
                 "} -> Some(4) // h().\n",
             )
         );
@@ -151,7 +151,7 @@ fn fn_init_fn() {
             concat!(
                 "g(ret_some: false, p: 1) {} -> None\n",
                 "h(p: 3) {\n",
-                "  h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "  h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "} -> Some(4) // h().\n",
             )
         );
@@ -164,7 +164,7 @@ fn fn_init_fn() {
             log,
             concat!(
                 "g(ret_some: true, p: 1) {\n",
-                "  g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "  g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "} -> Some(0) // g().\n",
             )
         );
@@ -174,7 +174,7 @@ fn fn_init_fn() {
             log,
             concat!(
                 "g(..) {\n",
-                "  g::closure{..}(..) {} -> 0\n",
+                "  g::closure{", dots!(), "}(..) {} -> 0\n",
                 "} -> Some(0) // g().\n",
             )
         );
@@ -184,7 +184,7 @@ fn fn_init_fn() {
             log,
             concat!(
                 "g(ret_some: true, p: 1) {\n",
-                "  g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "  g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "} -> Some(0) // g().\n",
             )
         );
@@ -281,7 +281,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -294,7 +294,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -307,7 +307,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(..) {} -> None\n",
                 "  f::h(..) {\n",
-                "    f::h::closure{..}(..) {} -> 4\n",
+                "    f::h::closure{", dots!(), "}(..) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -320,7 +320,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -331,7 +331,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -343,7 +343,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -355,7 +355,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(..) {\n",
-                "    f::g::closure{..}(..) {} -> 0\n",
+                "    f::g::closure{", dots!(), "}(..) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -367,7 +367,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -465,7 +465,7 @@ fn fn_init_fn() {
                 "f(..) {\n",
                 "  f::g(..) {} -> None\n",
                 "  f::h(..) {\n",
-                "    f::h::closure{..}(..) {} -> 4\n",
+                "    f::h::closure{", dots!(), "}(..) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -478,7 +478,7 @@ fn fn_init_fn() {
                 "f(..) {\n",
                 "  f::g(..) {} -> None\n",
                 "  f::h(..) {\n",
-                "    f::h::closure{..}(..) {} -> 4\n",
+                "    f::h::closure{", dots!(), "}(..) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -491,7 +491,7 @@ fn fn_init_fn() {
                 "f(..) {\n",
                 "  f::g(..) {} -> None\n",
                 "  f::h(..) {\n",
-                "    f::h::closure{..}(..) {} -> 4\n",
+                "    f::h::closure{", dots!(), "}(..) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -504,7 +504,7 @@ fn fn_init_fn() {
                 "f(..) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -515,7 +515,7 @@ fn fn_init_fn() {
             concat!(
                 "f(..) {\n",
                 "  f::g(..) {\n",
-                "    f::g::closure{..}(..) {} -> 0\n",
+                "    f::g::closure{", dots!(), "}(..) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -527,7 +527,7 @@ fn fn_init_fn() {
             concat!(
                 "f(..) {\n",
                 "  f::g(..) {\n",
-                "    f::g::closure{..}(..) {} -> 0\n",
+                "    f::g::closure{", dots!(), "}(..) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -539,7 +539,7 @@ fn fn_init_fn() {
             concat!(
                 "f(..) {\n",
                 "  f::g(..) {\n",
-                "    f::g::closure{..}(..) {} -> 0\n",
+                "    f::g::closure{", dots!(), "}(..) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -551,7 +551,7 @@ fn fn_init_fn() {
             concat!(
                 "f(..) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -649,7 +649,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -662,7 +662,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -675,7 +675,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(..) {} -> None\n",
                 "  f::h(..) {\n",
-                "    f::h::closure{..}(..) {} -> 4\n",
+                "    f::h::closure{", dots!(), "}(..) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -688,7 +688,7 @@ fn fn_init_fn() {
                 "f(expr_branch: false, nested_attr: ?) {\n",
                 "  f::g(ret_some: false, p: 1) {} -> None\n",
                 "  f::h(p: 3) {\n",
-                "    f::h::closure{0,0:0,0}(x: 3) {} -> 4\n",
+                "    f::h::closure{", closure_coords!(), "}(x: 3) {} -> 4\n",
                 "  } -> Some(4) // f::h().\n",
                 "} // f().\n",
             )
@@ -699,7 +699,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -711,7 +711,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -723,7 +723,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(..) {\n",
-                "    f::g::closure{..}(..) {} -> 0\n",
+                "    f::g::closure{", dots!(), "}(..) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )
@@ -735,7 +735,7 @@ fn fn_init_fn() {
             concat!(
                 "f(expr_branch: true, nested_attr: ?) {\n",
                 "  f::g(ret_some: true, p: 1) {\n",
-                "    f::g::closure{0,0:0,0}(x: 1) {} -> 0\n",
+                "    f::g::closure{", closure_coords!(), "}(x: 1) {} -> 0\n",
                 "  } -> Some(0) // f::g().\n",
                 "} // f().\n",
             )

@@ -5,5 +5,10 @@ edition = "2024"
 
 [dependencies]
 
-# [features]
-# full = []
+[features]
+common = []
+params_logging = [ "common" ]
+ret_val_logging = [ "common" ]
+
+# Tmp
+# default = [ "ret_val_logging", "ret_val_logging", ]

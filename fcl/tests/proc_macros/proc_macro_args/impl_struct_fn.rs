@@ -132,28 +132,28 @@ fn impl_struct_fn() {
             log_contents,
             concat!(
                 "noargs_af(_p: 1) {\n",
-                "  noargs_af::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  noargs_af::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // noargs_af().\n",
 
                 "skip_af(..) {\n",
-                "  skip_af::closure{..}(..) {} -> 0\n",
+                "  skip_af::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // skip_af().\n",
 
                 "log_af(_p: 1) {\n",
-                "  log_af::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  log_af::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // log_af().\n",
 
 
                 "noargs_m(self: &?) {\n",
-                "  noargs_m::closure{0,0:0,0}(y: 2) {} -> 2\n",
+                "  noargs_m::closure{", closure_coords!(), "}(y: 2) {} -> 2\n",
                 "} // noargs_m().\n",
 
                 "skip_m(..) {\n",
-                "  skip_m::closure{..}(..) {} -> 2\n",
+                "  skip_m::closure{", dots!(), "}(..) {} -> 2\n",
                 "} // skip_m().\n",
 
                 "log_m(self: &?) {\n",
-                "  log_m::closure{0,0:0,0}(y: 2) {} -> 2\n",
+                "  log_m::closure{", closure_coords!(), "}(y: 2) {} -> 2\n",
                 "} // log_m().\n",
             )
         );

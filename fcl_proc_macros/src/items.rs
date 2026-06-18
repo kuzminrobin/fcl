@@ -1,10 +1,13 @@
 use crate::{
-    common:: {
-        AttrArgs, ParamsLogging,
-        remove_spaces, update_param_data_from_pat, updated_loggable_attr_args,
+    common::{
+        AttrArgs, ParamsLogging, remove_spaces, // update_param_data_from_pat,
+        updated_loggable_attr_args,
     },
     exprs::{quote_as_block, quote_as_expr},
 };
+#[cfg(feature = "params_logging")]
+use crate::common::update_param_data_from_pat;
+
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{ItemMacro, Macro};
@@ -74,6 +77,7 @@ use syn::{ItemMacro, Macro};
 //     quote!{ #(#attrs)* #vis #extern_token #crate_token #ident #rename #semi_token }
 // }
 
+#[cfg(feature = "params_logging")]
 fn input_vals(
     inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
     attr_args: &AttrArgs,
@@ -133,8 +137,10 @@ fn traversed_block_from_sig(
         ident,    //: Ident,
         generics, //: Generics,
         // paren_token, //: Paren,
+        #[cfg(feature = "params_logging")]
         inputs, //: Punctuated<FnArg, Comma>,
         // variadic, //: Option<Variadic>,
+        #[cfg(feature = "ret_val_logging")]
         output, //: ReturnType,
         ..
     } = sig;
@@ -149,12 +155,40 @@ fn traversed_block_from_sig(
         return quote! { #block };
     }
 
-    let inputs = input_vals(inputs, attr_args);
+    #[cfg(feature = "params_logging")]
+    let (get_inputs_str_code, pass_inputs_str_code) = (
+        {
+            let input_vals = input_vals(inputs, attr_args);
+            quote!{ let param_val_str = #input_vals }
+        },
+        quote!{ param_val_str }
+    );
+    #[cfg(not(feature = "params_logging"))]
+    let (get_inputs_str_code, pass_inputs_str_code) = (
+        quote!{}, quote!{}
+    );
+    // #[cfg(feature = "params_logging")]
+    // let inputs = input_vals(inputs, attr_args);
+    // #[cfg(not(feature = "params_logging"))]
+    // let inputs = quote! { None };
 
-    let mut returns_something = false;
-    if let syn::ReturnType::Type(..) = output {
-        returns_something = true;
-    }
+    #[cfg(feature = "ret_val_logging")]
+    let ret_val_logging_code = if let syn::ReturnType::Type(..) = output {
+        quote!{
+            // use fcl::common::{MaybePrint};   // TODO: Consider getting this back and getting rid of `#use_maybe_print`.
+            let ret_val_str = format!("{}", ret_val.maybe_print());
+            callee_logger.set_ret_val(ret_val_str);
+        }
+    } else {
+        quote!{}
+    };
+    #[cfg(not(feature = "ret_val_logging"))]
+    let ret_val_logging_code = quote!{};
+
+    #[cfg(any(feature = "ret_val_logging", feature = "params_logging"))]
+    let use_maybe_print = quote!{ use fcl::common::{MaybePrint}; };
+    #[cfg(not(any(feature = "ret_val_logging", feature = "params_logging")))]
+    let use_maybe_print = quote!{};
 
     let block = {
         let func_log_name = {
@@ -182,29 +216,35 @@ fn traversed_block_from_sig(
 
         let func_log_name = remove_spaces(&func_log_name.to_string());
 
-        // Get the multithreading-dependent `logging_is_on()` call token stream:
-        let logging_is_on = quote! {
-            logger.borrow()
+        let extra_borrow = if cfg!(feature = "single_threaded") {
+            quote! { .borrow() } // TODO: Test.
+        } else {
+            quote! {}
         };
-        #[cfg(feature = "singlethreaded")]
-        let logging_is_on = quote! {
-            #logging_is_on.borrow()
-        };
-        let logging_is_on = quote! {
-            #logging_is_on.logging_is_on()
-        };
+        // // Get the multithreading-dependent `logging_is_on()` call token stream:
+        // let logging_is_on = quote! {
+        //     logger.borrow()
+        // };
+        // #[cfg(feature = "single_threaded")]
+        // let logging_is_on = quote! {
+        //     #logging_is_on.borrow()
+        // };
+        // let logging_is_on = quote! {
+        //     #logging_is_on.logging_is_on()
+        // };
 
         // Return the token stream of the instrumented function call:
         quote! {
             {
-                use fcl::{CallLogger, MaybePrint};
+                use fcl::common::{CallLogger, /*MaybePrint*/};
 
-                let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                let ret_val = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     // NOTE: Borrows the parameters. Has to be ahead of the `body`
                     // that moves the parameters to the `body` closure.
                     //
                     // At run time get the string of parameter names and values:
-                    let param_val_str = #inputs;
+                    #get_inputs_str_code;
+                    // let param_val_str = #inputs;
 
                     // NOTE: The `block` (the function body) will be executed (later)
                     // as a closure (rather than as is)
@@ -216,7 +256,8 @@ fn traversed_block_from_sig(
 
                     // If logging is off then do nothing
                     // except executing the body and returning the value:
-                    if !#logging_is_on {
+                    if !logger.borrow() #extra_borrow .logging_is_on() {
+                    // if !#logging_is_on {
                         return body();
                     }
                     // Else (loggign is on):
@@ -240,17 +281,24 @@ fn traversed_block_from_sig(
                         generic_func_name.push_str(">");
                     }
 
+                    #use_maybe_print;
+
                     // Log the call, like `f<char, u8>(param: 5) {`:
-                    let mut callee_logger = fcl::CalleeLogger::new(&generic_func_name, param_val_str);
+                    let mut callee_logger = fcl::common::CalleeLogger::new(&generic_func_name,
+                        #pass_inputs_str_code    // NOTE: Comma is not allowed here? TODO.
+                        // #inputs     // NOTE: Comma is not allowed here.
+                        // param_val_str
+                    );
 
                     // Execute the function body and catch the return value:
                     let ret_val = body();
 
-                    // Convert the return value to string and assign to the logger:
-                    if #returns_something {
-                        let ret_val_str = format!("{}", ret_val.maybe_print());
-                        callee_logger.set_ret_val(ret_val_str);
-                    }
+                    #ret_val_logging_code;
+                    // // Convert the return value to string and assign to the logger:
+                    // if #returns_something {
+                    //     let ret_val_str = format!("{}", ret_val.maybe_print());
+                    //     callee_logger.set_ret_val(ret_val_str);
+                    // }
 
                     // Log the return (and the return value), like `} -> 5 // f().`
                     // in the `CalleeLogger` destructor and return the value to the caller:
@@ -1206,24 +1254,24 @@ fn quote_as_item_macro_rules_invocation(
     } else {
         prefix.clone()
     };
-    let params_logging = match params_logging {
+    let params_logging = match params_logging { // TODO: feature = "params_logging"
         ParamsLogging::Log => quote! { log_params },
         ParamsLogging::Skip => quote! { skip_params },
     };
-    let log_closure_coords = if *log_closure_coords {
+    let closure_coords_logging = if *log_closure_coords { // TODO: feature = "closure_coords_logging"
         quote! { log_closure_coords }
     } else {
         quote! { skip_closure_coords }
     };
     let quoted_delimited_macro_args = match delimiter {
         syn::MacroDelimiter::Paren(_) => {
-            quote! { ( #prefix, #params_logging, #log_closure_coords, #macro_args ) }
+            quote! { ( #prefix, #params_logging, #closure_coords_logging, #macro_args ) }
         }
         syn::MacroDelimiter::Brace(_) => {
-            quote! { { #prefix, #params_logging, #log_closure_coords, #macro_args } }
+            quote! { { #prefix, #params_logging, #closure_coords_logging, #macro_args } }
         }
         syn::MacroDelimiter::Bracket(_) => {
-            quote! { [ #prefix, #params_logging, #log_closure_coords, #macro_args ] }
+            quote! { [ #prefix, #params_logging, #closure_coords_logging, #macro_args ] }
         }
     };
 

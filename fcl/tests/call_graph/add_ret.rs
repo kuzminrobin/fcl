@@ -2,9 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use fcl_proc_macros::loggable;
-#[cfg(feature = "singlethreaded")]
-use fcl::CallLogger;
-use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
+#[cfg(feature = "single_threaded")]
+use fcl::common::CallLogger;
+use fcl::common::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 
 // By the moment of `code_commons::call_graph::CallGraph::add_ret()` (being tested in this file)
 // the call graph state (and the terminology) is:
@@ -485,7 +485,7 @@ fn repeated_parent() {
 
     // Flush the log (flush the `parent()` repeat count to the call log).
     THREAD_LOGGER.with(|logger| {
-        #[cfg(feature = "singlethreaded")]
+        #[cfg(feature = "single_threaded")]
         let logger = logger.borrow_mut();
 
         logger.borrow_mut().flush();

@@ -1,8 +1,8 @@
 pub use std::sync::{Mutex, MutexGuard};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::{Arc, LazyLock}};
 
-use crate::call_log_infra::CallLoggerArbiter;
-use crate::CallLogger;
+use crate::common::call_log_infra::CallLoggerArbiter;
+use crate::common::CallLogger;
 
 // /// Sets a specific thread indent different from the default for the invoking thread.
 // /// #### Examples
@@ -17,7 +17,7 @@ use crate::CallLogger;
 // //         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
 // //             let mut logger = logger.borrow_mut();
 // //
-// //             #[cfg(feature = "singlethreaded")]
+// //             #[cfg(feature = "single_threaded")]
 // //             let mut logger = logger.borrow_mut();
 // //
 // //             logger.set_thread_indent($expr)
@@ -144,13 +144,25 @@ impl CallLogger for ThreadGatekeeper {
             .borrow_mut()
             .set_thread_indent(_thread_indent)
     }
-    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
+    fn log_call(&mut self, name: &str, 
+        #[cfg(feature = "params_logging")]
+        param_vals: Option<String>
+    ) {
         self.call_logger_arbiter
             .borrow_mut()
-            .log_call(name, param_vals)
+            .log_call(name, 
+                #[cfg(feature = "params_logging")]
+                param_vals
+            )
     }
-    fn log_ret(&mut self, ret_val: Option<String>) {
-        self.call_logger_arbiter.borrow_mut().log_ret(ret_val)
+    fn log_ret(&mut self, 
+        #[cfg(feature = "ret_val_logging")]
+        ret_val: Option<String>
+    ) {
+        self.call_logger_arbiter.borrow_mut().log_ret(
+            #[cfg(feature = "ret_val_logging")]
+            ret_val
+        )
     }
     fn flush(&mut self) {
         self.call_logger_arbiter.borrow_mut().flush()
@@ -167,12 +179,13 @@ impl CallLogger for ThreadGatekeeper {
     fn log_loop_end(&mut self) {
         self.call_logger_arbiter.borrow_mut().log_loop_end()
     }
+    // #[cfg(feature = "ret_val_logging")]
     // fn set_loop_ret_val(&mut self, ret_val: String);
 }
 
 /// Arbiter per-thread adapter used for synchronizing the thread access to the arbiter
 /// and destruction of the thread's logging infrastructure upon thread termination.
-pub struct ThreadGateAdapter { // TODO: Consider -> ArbiterAdapter
+pub(crate) struct ThreadGateAdapter { // TODO: Consider -> ArbiterAdapter
     gatekeeper: Arc<Mutex<ThreadGatekeeper>>, // TODO: Consider -> Arc<Mutex<dyn CallLogger>>
 }
 impl ThreadGateAdapter {
@@ -222,11 +235,23 @@ impl CallLogger for ThreadGateAdapter {
         self.get_gatekeeper().set_thread_indent(thread_indent)
     }
 
-    fn log_call(&mut self, name: &str, param_vals: Option<String>) {
-        self.get_gatekeeper().log_call(name, param_vals)
+    fn log_call(&mut self, name: &str, 
+        #[cfg(feature = "params_logging")]
+        param_vals: Option<String>
+    ) {
+        self.get_gatekeeper().log_call(name, 
+            #[cfg(feature = "params_logging")]
+            param_vals
+        )
     }
-    fn log_ret(&mut self, ret_val: Option<String>) {
-        self.get_gatekeeper().log_ret(ret_val)
+    fn log_ret(&mut self, 
+        #[cfg(feature = "ret_val_logging")]
+        ret_val: Option<String>
+    ) {
+        self.get_gatekeeper().log_ret(
+            #[cfg(feature = "ret_val_logging")]
+            ret_val
+        )
     }
     fn maybe_flush(&mut self) {
         self.get_gatekeeper().maybe_flush();
@@ -244,3 +269,16 @@ impl CallLogger for ThreadGateAdapter {
         self.get_gatekeeper().log_loop_end()
     }
 }
+
+
+// #[cfg(feature = "multithreaded")]
+//
+/// Shared by all the threads global thread synchronization primitive
+/// for accessing the thread-shared `CallLoggerArbiter` instance.
+pub(crate) static mut THREAD_GATEKEEPER: LazyLock<Arc<Mutex<ThreadGatekeeper>>> =
+    // TODO: Consider -> ARBITER_GATEKEEPER
+    LazyLock::new(|| unsafe {
+        Arc::new(Mutex::new(ThreadGatekeeper::new(
+            (*crate::common::call_log_infra::CALL_LOGGER_ARBITER).clone(),
+        )))
+    });

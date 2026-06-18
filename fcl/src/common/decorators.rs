@@ -91,7 +91,7 @@ macro_rules! decorator_write {  // TODO: Condsider renaming to `writer_write()`.
     ($self:ident, $($arg:tt)*) => {{
         let writer = match &mut $self.common.writer {
             Writer::Original(writer) => &mut **writer,
-            Writer::Substitute(writer) => &mut *writer.borrow_mut(),
+            Writer::Substitute(writer) => &mut *writer.borrow_mut(), // TODO: Consider `borrow_mut()` in detail, comment.
         };
         let _ignore_result = write!(writer, $($arg)*);  // TODO: Comment why ignore.
     }};
@@ -166,21 +166,34 @@ impl CoderunNotifiable for CodeLikeDecorator {
             self.line_end_pending = false;
         }
     }
-    fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
+    fn notify_call(&mut self, call_depth: usize, name: &str, 
+        #[cfg(feature = "params_logging")]
+        param_vals: &Option<String>
+    ) {
         if self.line_end_pending {
             decorator_write!(self, "\n"); // '\n' after "parent() {" before printing a nested call.
         }
         let indents = self.get_indents(call_depth); // TODO: Consider -> `let (thread_indent, func_indent) =`.
+
+        #[cfg(feature = "params_logging")]
+        let param_vals = param_vals
+                .as_ref()
+                .map(|string| string.as_str())
+                .unwrap_or("");
+        #[cfg(not(feature = "params_logging"))]
+        let param_vals = "";
+
         decorator_write!(
             self,
             "{}{}{}({}) {{",
             indents.0,
             indents.1,
             name,
-            param_vals
-                .as_ref()
-                .map(|string| string.as_str())
-                .unwrap_or(&""),
+            param_vals,
+            // param_vals
+            //     .as_ref()
+            //     .map(|string| string.as_str())
+            //     .unwrap_or(&""),
         ); // E.g. "<thread_indent><indent>sibling() {"
         self.line_end_pending = true; // '\n' pending. Won't be printed if there will be no nested calls (immediate "}\n").
     }
@@ -189,12 +202,17 @@ impl CoderunNotifiable for CodeLikeDecorator {
         call_depth: usize,
         name: &str,
         has_nested_calls: bool,
+        #[cfg(feature = "ret_val_logging")]
         ret_val: &Option<String>,
     ) {
+        #[cfg(feature = "ret_val_logging")]
         let ret_val_str = ret_val.as_ref().map_or_else(
             || "".to_string(), // None -> "".
             |output| format!(" -> {}", output),
         ); // Some() -> " -> Value".
+        #[cfg(not(feature = "ret_val_logging"))]
+        let ret_val_str = "";
+        
         if !has_nested_calls && self.line_end_pending {
             decorator_write!(self, "}}{}\n", ret_val_str); // "}\n" or "} -> RetVal\n".
         } else {
@@ -358,8 +376,20 @@ impl TreeLikeDecorator {
 }
 
 impl CoderunNotifiable for TreeLikeDecorator {
-    fn notify_call(&mut self, call_depth: usize, name: &str, param_vals: &Option<String>) {
+    fn notify_call(&mut self, call_depth: usize, name: &str, 
+        #[cfg(feature = "params_logging")]
+        param_vals: &Option<String>
+    ) {
         let indents = self.get_indents(call_depth);  // TODO: Consider -> `let (thread_indent, func_indent) =`.
+
+        #[cfg(feature = "params_logging")]
+        let param_vals = param_vals
+                .as_ref()
+                .map(|string| string.as_str())
+                .unwrap_or("");
+        #[cfg(not(feature = "params_logging"))]
+        let param_vals = "";
+
         decorator_write!(
             self,
             "{}{}{}{}({})\n",
@@ -367,10 +397,11 @@ impl CoderunNotifiable for TreeLikeDecorator {
             indents.1,
             self.indent_step_call,
             name,
-            param_vals
-                .as_ref()
-                .map(|string| string.as_str())
-                .unwrap_or(&"")
+            param_vals,
+            // param_vals
+            //     .as_ref()
+            //     .map(|string| string.as_str())
+            //     .unwrap_or(&"")
         ); // E.g."<thread_indent><indent>+-sibling", "| | | | +-sibling"
     }
 

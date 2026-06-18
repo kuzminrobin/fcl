@@ -1,13 +1,19 @@
+#[cfg(feature = "closure_coords_logging")]
 use std::str::FromStr;
 
 use crate::{
     common::{
-        AttrArgs, ParamsLogging, remove_spaces, update_param_data_from_pat,
+        AttrArgs, remove_spaces, //ParamsLogging, update_param_data_from_pat,
         updated_loggable_attr_args,
     },
     items::quote_as_item,
 };
+#[cfg(feature = "params_logging")]
+use crate::common::{ update_param_data_from_pat, ParamsLogging };
+
+
 use quote::quote;
+#[cfg(feature = "closure_coords_logging")]
 use syn::spanned::Spanned;
 
 fn quote_as_expr_array(
@@ -503,7 +509,7 @@ fn quote_as_expr_call(
     let mut ret_val = quote! { #(#new_attrs)* #func ( #args ) };
 
     if is_print_func_name {
-        let (extra_use, extra_borrow) = if cfg!(feature = "singlethreaded") {
+        let (extra_use, extra_borrow) = if cfg!(feature = "single_threaded") {
             (
                 quote! { use std::borrow::BorrowMut },
                 quote! { .borrow_mut() },
@@ -514,15 +520,15 @@ fn quote_as_expr_call(
 
         let thread_logger_access = quote! {
             { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts
-              // (applicable to `cfg!(feature = "singlethreaded")` only, but doesn't harm otherwise).
+              // (the scope is applicable to `cfg!(feature = "single_threaded")` only, but doesn't harm otherwise).
 
                 #extra_use; // use std::borrow::BorrowMut;
-                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut() #extra_borrow .maybe_flush();
                 })
             }
         };
-        // #[cfg(feature = "singlethreaded")]
+        // #[cfg(feature = "single_threaded")]
         // let thread_logger_access = quote! {
         //     { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts.
         //         use std::borrow::BorrowMut;
@@ -531,7 +537,7 @@ fn quote_as_expr_call(
         //         })
         //     }
         // };
-        // #[cfg(not(feature = "singlethreaded"))]
+        // #[cfg(feature = "multithreaded")]
         // let thread_logger_access = quote! {
         //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
         //         logger.borrow_mut().maybe_flush();
@@ -612,29 +618,74 @@ pub fn quote_as_expr_closure(
     //     }
     // }
 
-    // Get the token stream of {{param names and values} optional string}:
-    let input_vals = if inputs.is_empty() {
-        quote! { None }
-    } else {
-        match enclosing_item_attr_args.params_logging {
-            ParamsLogging::Log => {
-                let mut param_format_str = String::new();
-                let mut param_list = quote! {};
-                for (idx, input_pat) in inputs.iter().enumerate() {
-                    if idx != 0 {
-                        param_format_str.push_str(", ");
+    #[cfg(feature = "params_logging")]
+    fn closure_input_vals(
+        inputs: &syn::punctuated::Punctuated<syn::Pat, syn::token::Comma>, 
+        enclosing_item_attr_args: &AttrArgs
+    ) -> proc_macro2::TokenStream {
+        if inputs.is_empty() {
+            quote! { None }
+        } else {
+            match enclosing_item_attr_args.params_logging {
+                ParamsLogging::Log => {
+                    let mut param_format_str = String::new();
+                    let mut param_list = quote! {};
+                    for (idx, input_pat) in inputs.iter().enumerate() {
+                        if idx != 0 {
+                            param_format_str.push_str(", ");
+                        }
+                        update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
                     }
-                    update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
+                    quote! { Some(format!(#param_format_str, #param_list)) }
                 }
-                quote! { Some(format!(#param_format_str, #param_list)) }
-            }
-            ParamsLogging::Skip => {
-                quote! { Some(String::from("..")) }
+                ParamsLogging::Skip => {
+                    quote! { Some(String::from("..")) }
+                }
             }
         }
-    };
+    }
 
-    // Closure name:
+    #[cfg(feature = "params_logging")]
+    let (get_inputs_str_code, pass_inputs_str_code) = (
+        {
+            let input_vals = closure_input_vals(inputs, enclosing_item_attr_args);
+            quote!{ let param_val_str = #input_vals }
+        },
+        quote!{ param_val_str }
+    );
+    #[cfg(not(feature = "params_logging"))]
+    let (get_inputs_str_code, pass_inputs_str_code) = (
+        quote!{}, quote!{}
+    );
+
+    // // Get the token stream of {{param names and values} optional string}:
+    // #[cfg(feature = "params_logging")]
+    // let input_vals = closure_input_vals(inputs, enclosing_item_attr_args)
+    // /*if inputs.is_empty() {
+    //     quote! { None }
+    // } else {
+    //     match enclosing_item_attr_args.params_logging {
+    //         ParamsLogging::Log => {
+    //             let mut param_format_str = String::new();
+    //             let mut param_list = quote! {};
+    //             for (idx, input_pat) in inputs.iter().enumerate() {
+    //                 if idx != 0 {
+    //                     param_format_str.push_str(", ");
+    //                 }
+    //                 update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
+    //             }
+    //             quote! { Some(format!(#param_format_str, #param_list)) }
+    //         }
+    //         ParamsLogging::Skip => {
+    //             quote! { Some(String::from("..")) }
+    //         }
+    //     }
+    // }*/;
+    // #[cfg(not(feature = "params_logging"))]
+    // let input_vals = quote! {};
+
+    // Closure coordinates:
+    #[cfg(feature = "closure_coords_logging")]
     let coords_ts = if enclosing_item_attr_args.log_closure_coords {
         let (start_line, start_col) = {
             let proc_macro2::LineColumn { line, column } = or1_token.span().start();
@@ -654,6 +705,10 @@ pub fn quote_as_expr_closure(
     } else {
         quote! { .. }
     };
+    #[cfg(not(feature = "closure_coords_logging"))]
+    let coords_ts = quote! {};
+
+    // Closure name:
     let mut log_closure_name_ts = quote! { closure{#coords_ts} };
     if !enclosing_item_attr_args.prefix.is_empty() {
         let prefix = &enclosing_item_attr_args.prefix;
@@ -673,7 +728,7 @@ pub fn quote_as_expr_closure(
     };
     // let body = { quote_as_expr(&**body, None, &attr_args) };
 
-    let extra_borrow = if cfg!(feature = "singlethreaded") {
+    let extra_borrow = if cfg!(feature = "single_threaded") {
         quote! { .borrow_mut() }
     } else {
         quote! {}
@@ -682,13 +737,28 @@ pub fn quote_as_expr_closure(
     // let logging_is_on = quote! {
     //     logger.borrow()
     // };
-    // #[cfg(feature = "singlethreaded")]
+    // #[cfg(feature = "single_threaded")]
     // let logging_is_on = quote! {
     //     #logging_is_on.borrow()
     // };
     // let logging_is_on = quote! {
     //     #logging_is_on.logging_is_on()
     // };
+
+    #[cfg(feature = "ret_val_logging")]
+    let ret_val_logging_code = quote! {
+        use fcl::common::{MaybePrint};
+        // Uncondititonally tell the `callee_logger` what closure returns,
+        // since if the closure's return type is not specified explicitly
+        // then the return type is determined with the type inference
+        // which is not available now at pre-compile (preprocessing) time.
+        // In other words, at pre-compile time we don't know for sure
+        // if {the closure return type is the unit type `()` and the return value logging can be skipped}.
+        let ret_val_str = format!("{}", ret_val.maybe_print());
+        callee_logger.set_ret_val(ret_val_str);
+    };
+    #[cfg(not(feature = "ret_val_logging"))]
+    let ret_val_logging_code = quote! {};
 
     // Return the token stream of the instrumented closure:
     // TODO: Test.
@@ -698,14 +768,15 @@ pub fn quote_as_expr_closure(
         #lifetimes #constness #movability #asyncness #capture
         #or1_token #inputs #or2_token #output
         {
-            use fcl::{CallLogger, MaybePrint};
+            use fcl::common::{CallLogger/*, MaybePrint*/};
 
-            let ret_val = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| { // NOTE: The `logger` is used in `logging_is_on`.
-                // NOTE: Borrows the params, has to be in front of the `body`
-                // that moves the params to the `body` closure.
-                //
-                // At run time get the parameter names and values string:
-                let param_val_str = #input_vals;
+            let ret_val = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| { // NOTE: The `logger` is used in `logging_is_on`.
+                // // NOTE: Borrows the params, has to be in front of the `body`
+                // // that moves the params to the `body` closure.
+                // //
+                // // At run time get the parameter names and values string:
+                #get_inputs_str_code;
+                // let param_val_str = #input_vals;
 
                 // Get the body as a closure (to be executed later):
                 let mut body = #capture || { #body };
@@ -719,20 +790,25 @@ pub fn quote_as_expr_closure(
                 // Else (logging is on):
 
                 // Log the call, like `f()::closure{3,7:5:11}(param: true) {`:
-                let mut callee_logger = fcl::CalleeLogger::new(
-                    #log_closure_name_str, param_val_str);
+                let mut callee_logger = fcl::common::CalleeLogger::new(
+                    #log_closure_name_str,
+                    #pass_inputs_str_code   // NOTE: Comma `,` is not allowed here? TODO: Find out for sure.
+                    // #input_vals     // NOTE: Comma `,` is not allowed here.
+                    // param_val_str
+                );
 
                 // Execute the body and catch the return value:
                 let ret_val = body();
 
-                // Uncondititonally tell the `callee_logger` what closure returns,
-                // since if the closure's return type is not specified explicitly
-                // then the return type is determined with the type inference
-                // which is not available now at pre-compile (preprocessing) time.
-                // In other words, at pre-compile time we don't know for sure
-                // if {the closure return type is the unit type `()` and the return value logging can be skipped}.
-                let ret_val_str = format!("{}", ret_val.maybe_print());
-                callee_logger.set_ret_val(ret_val_str);
+                #ret_val_logging_code;
+                // // Uncondititonally tell the `callee_logger` what closure returns,
+                // // since if the closure's return type is not specified explicitly
+                // // then the return type is determined with the type inference
+                // // which is not available now at pre-compile (preprocessing) time.
+                // // In other words, at pre-compile time we don't know for sure
+                // // if {the closure return type is the unit type `()` and the return value logging can be skipped}.
+                // let ret_val_str = format!("{}", ret_val.maybe_print());
+                // callee_logger.set_ret_val(ret_val_str);
 
                 // Log the return, like `} // f()::closure{3,7:5:11}() -> 5.`,
                 // in the `callee_logger` destructor and return the value:
@@ -809,7 +885,7 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
         traversed_stmts
     };
 
-    let extra_borrow = if cfg!(feature = "singlethreaded") {
+    let extra_borrow = if cfg!(feature = "single_threaded") {
         quote! { .borrow_mut() }
     } else {
         quote! {}
@@ -818,7 +894,7 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
     // let logging_is_on = quote! {
     //     logger.borrow()
     // };
-    // #[cfg(feature = "singlethreaded")]
+    // #[cfg(feature = "single_threaded")]
     // let logging_is_on = quote! {
     //     #logging_is_on.borrow()
     // };
@@ -836,13 +912,13 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
             // (but the check `if logging_is_on` still needs to be in every iteration),
             // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`),
             // and at the end of that scope the `logging_is_on` dies.
-            let logging_is_on = fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+            let logging_is_on = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow() #extra_borrow .logging_is_on()
                 // #logging_is_on
             });
 
             let _loopbody_logger = if logging_is_on {
-                Some(fcl::LoopbodyLogger::new()) // Log the loop body start.
+                Some(fcl::common::LoopbodyLogger::new()) // Log the loop body start.
             } else {
                 None
             };
@@ -901,23 +977,23 @@ fn quote_as_expr_for_loop(
     // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
     // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
-    let extra_borrow = if cfg!(feature = "singlethreaded") {
-        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
+    let extra_borrow = if cfg!(feature = "single_threaded") {
+        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "single_threaded")]`, either update or document.
     } else {
         quote! {}
     };
 
     quote! {
         {
-            let loop_result = { // At the moment of writing the unit value `()`
+            let ret_val = { // At the moment of writing the unit value `()`
                 // is the only known possible value returnable by `for` loop.
                 #(#new_attrs)* #label #for_token #pat #in_token #expr #body
             };
 
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
+            fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger|
                 logger.borrow_mut() #extra_borrow .log_loop_end());
 
-            loop_result
+            ret_val
         }
     }
 }
@@ -1134,8 +1210,8 @@ fn quote_as_expr_loop(
     };
     // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
-    let extra_borrow = if cfg!(feature = "singlethreaded") {
-        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
+    let extra_borrow = if cfg!(feature = "single_threaded") {
+        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "single_threaded")]`, either update or document.
     } else {
         quote! {}
     };
@@ -1145,14 +1221,18 @@ fn quote_as_expr_loop(
         {
             let ret_val = #(#new_attrs)* #label #loop_token #body;
 
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
+            // TODO:
+            // #[cfg(feature = "ret_val_logging")]
+            // {
+            //     let ret_val_str = format!("{}", ret_val.maybe_print());
+            //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|thread_logger| {
+            //         thread_logger.borrow_mut().set_loop_ret_val(ret_val_str);
+            //     });
+            // }
+
+            fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger|
                 logger.borrow_mut() #extra_borrow .log_loop_end());
 
-            // TODO:
-            // let ret_val_str = format!("{}", ret_val.maybe_print());
-            // fcl::call_log_infra::instances::THREAD_LOGGER.with(|thread_logger| {
-            //     thread_logger.borrow_mut().set_loop_ret_val(ret_val_str);
-            // });
             ret_val
         }
     }
@@ -1185,24 +1265,24 @@ pub fn quote_as_macro(
             // or their simplified/canonical form ends up in `std`, e.g., `std::something_unrelated::..` is equivalent to `std`,
             // if `..` is supported in the paths).
 
-            let extra_borrow = if cfg!(feature = "singlethreaded") {
+            let extra_borrow = if cfg!(feature = "single_threaded") {
                 quote! { .borrow_mut() }
             } else {
                 quote! {}
             };
 
             let thread_logger_access = quote! {
-                fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut() #extra_borrow .maybe_flush();
                 })
             };
-            // #[cfg(feature = "singlethreaded")]
+            // #[cfg(feature = "single_threaded")]
             // let thread_logger_access = quote! {
             //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             //         logger.borrow_mut().borrow_mut().maybe_flush();
             //     })
             // };
-            // #[cfg(not(feature = "singlethreaded"))]
+            // #[cfg(feature = "multithreaded")]
             // let thread_logger_access = quote! {
             //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             //         logger.borrow_mut().maybe_flush();
@@ -2023,8 +2103,8 @@ fn quote_as_expr_while(
     // let cond = quote_as_expr(&**cond, None, enclosing_item_attr_args);
     // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
-    let extra_borrow = if cfg!(feature = "singlethreaded") {
-        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "singlethreaded")]`, either update or document.
+    let extra_borrow = if cfg!(feature = "single_threaded") {
+        quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "single_threaded")]`, either update or document.
     } else {
         quote! {}
     };
@@ -2034,7 +2114,7 @@ fn quote_as_expr_while(
             // is the only known possible value returnable by `while` loop.
             let ret_val = #(#new_attrs)* #label #while_token #cond #body ;
 
-            fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger|
+            fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger|
                 logger.borrow_mut() #extra_borrow .log_loop_end());
 
             ret_val

@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use fcl_proc_macros::loggable;
 
-use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
-#[cfg(feature = "singlethreaded")]
-use fcl::CallLogger;
+use fcl::common::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
+#[cfg(feature = "single_threaded")]
+use fcl::common::CallLogger;
 
 // By default the tests run in parallel in different threads. That is why they affect each other's log.
 // In particular the log becomes multithreaded, i.e. some tests' log is thread-indented, some function calls
@@ -68,7 +68,7 @@ mod single_thread {
         {
             #[loggable]
             mod t {
-                fn f(p1: usize, p2: bool) -> f32 {
+                fn f(_p1: usize, _p2: bool) -> f32 {
                     -1.01
                 }
                 pub fn g() {
@@ -386,7 +386,7 @@ mod single_thread {
 
         // Flush the log:
         THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
+            #[cfg(feature = "single_threaded")]
             let logger = logger.borrow_mut();
 
             // The test output ends with the repeat count that needs to be flushed.
@@ -430,7 +430,7 @@ mod single_thread {
 
         // Flush the log:
         THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
+            #[cfg(feature = "single_threaded")]
             let logger = logger.borrow_mut();
 
             // The test output ends with the repeat count that needs to be flushed.
@@ -499,7 +499,7 @@ mod single_thread {
         }));
 
         THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
+            #[cfg(feature = "single_threaded")]
             let logger = logger.borrow_mut();
 
             // The test output ends with the repeat count that needs to be flushed.

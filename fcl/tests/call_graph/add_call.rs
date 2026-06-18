@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use fcl_proc_macros::loggable;
 
-#[cfg(feature = "singlethreaded")]
-use fcl::CallLogger;
-use fcl::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
+#[cfg(feature = "single_threaded")]
+use fcl::common::CallLogger;
+use fcl::common::call_log_infra::instances::{THREAD_DECORATOR, THREAD_LOGGER};
 
 // High-level logic to test:
 //     [{call | loop_body}  // Previous sibling.
@@ -74,6 +74,9 @@ mod single_thread {
 
     #[test]
     fn differs_from_prev_sibling() {
+        // // #[cfg(feature = "single_threaded")]
+        // use fcl::common::CallLogger;
+
         // A: `differs_from_prev_sibling`:
         // previous_sibling_with_diff_name() {}
         // // Test the log: Only the log above.
@@ -219,7 +222,7 @@ mod single_thread {
 
         // Flush the log:
         THREAD_LOGGER.with(|logger| {
-            #[cfg(feature = "singlethreaded")]
+            #[cfg(feature = "single_threaded")]
             let logger = logger.borrow_mut();
 
             logger.borrow_mut().flush();

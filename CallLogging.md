@@ -18,14 +18,21 @@
           * No dependencies
         * All the code is for `#![cfg(feature = "full")]` only. No code otherwise.
       * fcl_proc_macros crate
-        * Empty procedural attribute macros: 
+        * Cargo.toml:
+          * ```
+            [features] 
+            default = [ "multithreaded" ] 
+            common = []                    # Most of the code is `#[cfg(feature = "common")]`.
+            single_threaded = ["common"]   # Code has exta `borrow[_mut]()`.
+            multithreaded = ["common"]     # Is the same as (or instead of) "common".
+            ```
+          * No dependencies by default
+        * By default (`#[cfg(not(feature = "common"))] mod common`) empty procedural attribute macros only: 
           * `#[loggable]` 
           * `#[non_loggable]`.
-        * No other code
-          * No intermediate procedural attribute macros: `#[loggable_block_contents]`.
-        * Cargo.toml: 
-          * `[features] full = []`. No default feature (no code by default).
-          * No dependencies
+          * No other code
+            * No intermediate procedural attribute macros: `#[loggable_block_contents]`.
+        * All the common code is in common mod
       * fcl crate 
         * By default empty macros only: 
           * push_logging_is_on, 
@@ -33,7 +40,7 @@
           * logging_is_on, 
           * set_logging_is_on, 
           * set_thread_indent
-        * No other code
+        * No other code by default
           * No instances
         * Cargo.toml:
           * ```toml
@@ -41,34 +48,40 @@
             fcl_proc_macros = { path = "../fcl_proc_macros" }
 
             [features] 
-            default = [ "full" ]
-            minimum = [
+            common = [
               "code_commons/full",
-              "fcl_proc_macros/full",
+              \# dependencies
+            ]
+            single_threading = [
+              "common",
+              "fcl_proc_macros/single_threaded",
               \# dependencies
             ]
             multithreading = [ 
-              "minimum"
+              "common"
+              "fcl_proc_macros/{multithreaded | minimum}",
               \# dependencies
             ]
             std_output_sync = [ 
-              "minimum"
+              "common"
               \# dependencies
             ]
+            \# TODO: Consider the features below for fcl_proc_macros crate too, so that the
+            \#    params, closure_coords, and ret_val logging code is not generated if the corresponding 
+            \#    feature is not enabled.
             log_params = [ 
-              "minimum"
+              "common"
               \# dependencies
             ]
             log_closure_coords = [ 
-              "minimum"
+              "common"
               \# dependencies
             ]
             log_ret_val = [ 
-              "minimum"
+              "common"
               \# dependencies
             ]
-
-            full = [
+            full_multithreading = [
               "multithreading",
               "std_output_sync",
               "log_params",
@@ -76,18 +89,38 @@
               "log_ret_val",
               \# No extra code and dependencies
             ]
+            full_single_threading = [
+              "single_threading",
+              "std_output_sync",
+              "log_params",
+              "log_closure_coords",
+              "log_ret_val",
+              \# No extra code and dependencies
+            ]
+            default = [ "full_multithreading" ]
             ```
-          * No dependencies
-    * Then "minimum" ("minimal") feature of fcl crate 
-      * single-threaded code with "minimal writer" (somehow related to std output sync/redir), 
+          * No dependencies by default.
+        * Idle: `, default-features = false` in user's "Cargo.toml".
+    * Then "common" feature of fcl crate 
+      * The code common for single-threading and multithreading.
+      * Common code with "minimal writer" (somehow related to std output sync/redir), 
         None of:
+        * single-threding-specific code.
         * multithreading support
         * "std output sync"
         * "log_params".
         * "log_closure_coords"
         * "log_ret_val"
       * Cargo.toml: Added dependencies for that code.
-    * Then "multithreading" (requires "minimal"?)
+    * Then "single-threading" (requires "common")
+      * single-threading code, 
+      * None of
+        * "std output sync"
+        * "log_params".
+        * "log_closure_coords"
+        * "log_ret_val"
+      * Cargo.toml: Added dependencies for that code.
+    * Then "multithreading" (requires "common")
       * multithreading code, 
       * None of
         * "std output sync"
@@ -103,6 +136,8 @@
     * All of that is the "full" feature, and that feature is the default.
   * To deactivate "all" (use "idle") - `default-features = false`.
 * Using FCL for a specific build configuration only (not debug, not release, but some `fcl[_{debug|release}]`)
+* #[cfg(any(feature = "log_merger", feature = "std_output_sync"))]
+  Review in detail "std_output_sync", strict border with "log_merger".
 * Code TODOs
 * Documentation
   * User Manual
@@ -222,6 +257,43 @@
   * Practicing Rust with FCL
 
 # Unsorted
+* TODO: DOc:  
+  Feature "prefix_loging" may not be applicable to those who develop Rust code in C manner (or their Rust code has to expose C ABI) in a sense that all the functions are defined at the global level, rather than inside of the other entities, like namespaces, classes, structs, etc. In those cases the function names consist of single identifiers. Function prefixing is not applicable for those cases and the feature "prefix_logging" can be turned off to accelerate compilation, run, and lower down the binary size. 
+* TODO: CallLoggerArbiter to a separate file.
+* TODO: Review 
+  * the whole feature "std_output_sync" and its border with "log_merger".
+    * Does "std_output_sync" require "log_merger"? If yes then consider stopping this dependency so that 
+      "std_output_sync" works even without "log_merger" when every thread has its own log.
+      "std_output_sync" must not use `THREAD_SHARED_WRITER`.
+    * std output must bypass the html_decorator (coloring).
+  * Writer creation: how can user pass a writer; what features need to be added so that the user can avoid 
+    creating the default writer (`stdout()`) but create/add one's own.
+  * Separate writer (logger) for each thread (e.g. `stdout()` for `main()` and `stderr()` for a spawned thread).
+* TODO: Consider using different names for features and attribute args:
+  * "params_logging" feature and {`log_params`, `skip_params`} args,
+  * "closure_coords_logging" and `{log,skip}_closure_coords`.
+* TODO: closure_coords -> closure_span
+* TODO: "log_prefix" feature (some users work in "C" mode - all the funcs are global, not in `mod`, `trait`s, `impl`s.).
+* TODO: "log_generic_params" feature.
+* TODO: Consider "single_threaded" -> "single-threaded".
+* TODO:
+  * The concept of writer (stdout(), stderr(), etc.) -> `Log[ger]`.
+  * ThreadSharedWriter -> LogMerger  
+    WriterAdapter -> MergerAdapter
+  * Decorators
+    * TODO: Decorator -> Log(Interpreter|Recorder) (later on use "Decorator" for HTMLDecorator,
+      XmlDecorator, JsonDecorator, BashDecorator, NoneDecorator)
+    * TODO: Different decorators (code-like, tree-like) = different features.
+* TODO: Doc: Where FCL is needed:
+  * If the debugger is absent
+    * Quickly evaluate which function and/or in which thread has panicked (But that's what the stack trace is for). 
+      Which functions were called before it, with which parameters and ret vals.
+    * Quickly evaluate if any threads panicked silently/unnoticed (but that's what the default panic hook is for). Maybe better "evaluate which sequence of function calls took the thread to a panic"?
+* TODO: Hook the C/C++'s std output funcs and sync like with `[e]print[ln]()`.
+* TODO: Consider a mode with multiple threads and the "single_threaded" feature, for cases where a thread of interest 
+  logs the function calls, all other threads poll a var. Minimal writer (`stdout`), sync is in there. 
+  Thread synchronization (mutex) is sacrificed for speed.
+  Add it to the section of thread log distortion. 
 * TODO: If the user's code and panic handler do not do any std output then the output sync is not needed. 
   Consider a feature for that ("no_std_output_sync") and consider reusing the feature "minimal_writer" for that.
 * Utilize "fcl\src\thoughts.txt".

@@ -10,7 +10,7 @@
 //             logger
 //                 .borrow_mut()
 //                 .borrow_mut() // This is the difference from multithreaded.rs. The 
-//                 // `#[cfg(feature = "singlethreaded")]` cannot be applied to this line only.
+//                 // `#[cfg(feature = "single_threaded")]` cannot be applied to this line only.
 //                 .set_thread_indent($expr)
 //         })
 //     };
@@ -78,12 +78,24 @@
 //     };
 // }
 
-impl Drop for crate::call_log_infra::CallLoggerArbiter {
+impl Drop for crate::common::call_log_infra::CallLoggerArbiter {
     /// Flushes
     /// * the repeat count,
-    /// * the std output
-    /// in the end of `main()`, if the `main()` itself is not logged (but the internals are).
+    /// * the stdandard output,
+    /// 
+    /// releases the thread logging infrastructure (thread-local data).
+    /// 
+    /// NOTE: In the single-threaded case, if the `main()` itself is not logged but the internals are, 
+    /// those above need to be flushed. The flush is done after the termination of `main()` during the global data destruction.
+    /// 
+    /// NOTE: In multithreaded case that flush is done by `ThreadGateAdapter::drop()`.
+    /// 
+    /// TODO: Istead of invoking `remove_thread_logger()` here and in `ThreadGateAdapter::drop()` coinsider 
+    /// invoking `remove_thread_logger()` in `THREAD_LOGGER`'s `drop()`, so that both for single-threaded and multithreaded case
+    /// the thread-local data are destroyed _before_ destroying the global data.
+    /// Currently here, for the `main()` thread, the thread-local data are released during the destruction of the global data,
+    /// which does not look right.
     fn drop(&mut self) {
-        self.remove_thread_logger(); // In multithreaded case this is done by `ThreadGateAdapter::drop()`.
+        self.remove_thread_logger();
     }
 }

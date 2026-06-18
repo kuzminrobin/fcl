@@ -56,13 +56,13 @@ fn mod_fn() {
             log_contents,
             concat!(
                 "noargs(_p: 1) {\n",
-                "  noargs::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  noargs::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // noargs().\n",
                 "skip(..) {\n",
-                "  skip::closure{..}(..) {} -> 0\n",
+                "  skip::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // skip().\n",
                 "log(_p: 1) {\n",
-                "  log::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  log::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // log().\n",
             )
         );
@@ -103,16 +103,16 @@ fn mod_fn() {
             log_contents,
             concat!(
                 "m::absent(_p: 1) {\n",
-                "  m::absent::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::absent::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::absent().\n",
                 "m::noargs(_p: 1) {\n",
-                "  m::noargs::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::noargs::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::noargs().\n",
                 "m::skip(..) {\n",
-                "  m::skip::closure{..}(..) {} -> 0\n",
+                "  m::skip::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // m::skip().\n",
                 "m::log(_p: 1) {\n",
-                "  m::log::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::log::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::log().\n",
             )
         );
@@ -153,16 +153,16 @@ fn mod_fn() {
             log_contents,
             concat!(
                 "m::absent(..) {\n",
-                "  m::absent::closure{..}(..) {} -> 0\n",
+                "  m::absent::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // m::absent().\n",
                 "m::noargs(..) {\n",
-                "  m::noargs::closure{..}(..) {} -> 0\n",
+                "  m::noargs::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // m::noargs().\n",
                 "m::skip(..) {\n",
-                "  m::skip::closure{..}(..) {} -> 0\n",
+                "  m::skip::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // m::skip().\n",
                 "m::log(_p: 1) {\n",
-                "  m::log::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::log::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::log().\n",
             )
         );
@@ -203,16 +203,16 @@ fn mod_fn() {
             log_contents,
             concat!(
                 "m::absent(_p: 1) {\n",
-                "  m::absent::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::absent::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::absent().\n",
                 "m::noargs(_p: 1) {\n",
-                "  m::noargs::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::noargs::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::noargs().\n",
                 "m::skip(..) {\n",
-                "  m::skip::closure{..}(..) {} -> 0\n",
+                "  m::skip::closure{", dots!(), "}(..) {} -> 0\n",
                 "} // m::skip().\n",
                 "m::log(_p: 1) {\n",
-                "  m::log::closure{0,0:0,0}(x: 0) {} -> 0\n",
+                "  m::log::closure{", closure_coords!(), "}(x: 0) {} -> 0\n",
                 "} // m::log().\n",
             )
         );
