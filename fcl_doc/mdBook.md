@@ -2287,3 +2287,21 @@ h() {
 So, it may be reasonable to write the "more sophisticated" log analizer _now_ and use for both the single-threaded and multithreaded cases with the default test command `cargo test [-p fcl]`.
 
 Unclear is how to run the tests with FCL's features "singlethreaded" and "minimal_writer" _on_ and _off_. TODO - find out.
+
+## Testing instructions 
+```
+cargo test -- --test-threads=1 
+cargo run --no-default-features --features "single_threaded ret_val_logging" --bin user_all
+
+# Every feature (including none - `--no-default-features`):
+common
+log_merger
+std_output_sync
+params_logging
+closure_coords_logging
+ret_val_logging
+single_threaded
+multithreaded
+full_single_threaded
+full_multithreaded
+```

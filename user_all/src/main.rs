@@ -99,11 +99,13 @@ pub fn main() {
 
         struct MyTupleStructS(MyPoint, char);
         fn fts(MyTupleStructS(MyPoint { x: _x, y: _y }, _char): MyTupleStructS) {}
+        #[cfg(feature = "common")]
         assert!(fcl::logging_is_on!());
         fcl::push_logging_is_on!(false);
         assert!(!fcl::logging_is_on!());
         fts(MyTupleStructS(MyPoint { x: -3, y: 8 }, 'h')); // main()::fts(MyTupleStructS(MyPoint{x: -3, y: _y: 8}, char: 'h')) {}
         fcl::pop_logging_is_on!();
+        #[cfg(feature = "common")]
         assert!(fcl::logging_is_on!());
 
         fn fs(&[_a, _b, ref _i @ .., _y, _z]: &[i32; 6]) {}

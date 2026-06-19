@@ -29,6 +29,7 @@ pub enum WriterKind {
 // against unifying/deduping, 
 // preserving invariants (see below), and choosing a more optimal place for Box<dyn Write>.
 pub struct ThreadSharedWriter {
+    #[cfg(feature = "std_output_sync")]
     writer_kind: WriterKind,
     writer: Box<dyn Write>,
     override_writer: Option<std::fs::File>, // TODO: Consider Option<dyn Write> if there's nothing std::fs::File-specific.
@@ -39,7 +40,7 @@ impl ThreadSharedWriter {
     /// Creates the new `ThreadSharedWriter` with the writer passed as an argument.
     /// If the argument is `None` then the `std::io::stdio::stdout()` is used.
     pub fn new(fcl_writer: Option<FclWriter>) -> Self {
-        let (writer, writer_kind): (Box<dyn Write>, WriterKind) = match fcl_writer {
+        let (writer, _writer_kind): (Box<dyn Write>, WriterKind) = match fcl_writer {
             None => (Box::new(stdout()), WriterKind::Stdout),   // TODO: Consider extracting `stdout()` to a file of defaults.
             Some(writer) => match writer {
                 FclWriter::Stdout => (Box::new(stdout()), WriterKind::Stdout),
@@ -48,14 +49,17 @@ impl ThreadSharedWriter {
             },
         };
         Self {
-            writer_kind,
+            #[cfg(feature = "std_output_sync")]
+            writer_kind: _writer_kind,  // TODO: Review the border between (feature = "log_merger", feature = "std_output_sync")
             writer,
             override_writer: None,
         }
     }
+    #[cfg(feature = "std_output_sync")]
     pub fn get_writer_kind(&self) -> WriterKind {
         self.writer_kind
     }
+    #[cfg(feature = "std_output_sync")]
     pub fn set_writer(&mut self, file: std::fs::File) {
         self.override_writer = Some(file); // TODO: What about updating `writer_kind`? Isn't that update 
         // required to preserve the invariant of `writer_kind: WriterKind::Other`?
@@ -81,6 +85,7 @@ impl Write for ThreadSharedWriter {
 
 pub type ThreadSharedWriterPtr = Arc<RefCell<ThreadSharedWriter>>; // TODO: Consider -> Arc<RefCell<dyn Write>>.
 
+#[cfg(feature = "log_merger")]
 /// The adapter for the writer.
 /// 
 /// Is used per-thread in the environements with the writer access sinchronization, 
@@ -91,6 +96,7 @@ pub struct WriterAdapter {
     writer: ThreadSharedWriterPtr,
 }
 
+#[cfg(feature = "log_merger")]
 impl WriterAdapter {
     /// Creates new `WriterAdapter` with the writer passed as an argument.
     pub fn new(writer: ThreadSharedWriterPtr) -> Self {
@@ -98,6 +104,7 @@ impl WriterAdapter {
     }
 }
 
+#[cfg(feature = "log_merger")]
 impl Write for WriterAdapter {
     /// Forwards the call to the writer's `Write::write()`.
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {

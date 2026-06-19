@@ -5,10 +5,65 @@ edition = "2024"
 
 [dependencies]
 fcl_proc_macros = { path = "../fcl_proc_macros" }
-# fcl_proc_macros = { path = "../fcl_proc_macros", features = ["idle"] }    # Instrumentation is OFF.
-fcl = { path = "../fcl" }
+fcl = { path = "../fcl", default-features = false }
 
 # fcl = { path = "../fcl", features = ["singlethreaded"] }
 # fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
 # fcl = { path = "../fcl", features = ["minimal_writer"] }
 # fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }
+
+[features] 
+
+common = [
+    "fcl/common",
+]
+
+log_merger = [                          
+    "common",
+    "fcl/log_merger"
+]
+
+std_output_sync = [                     # Synchronizes the FCL log and {the user's and default panic hook's} standard output.
+    "common",
+    "fcl/std_output_sync"
+]
+
+params_logging = [                      # Function and closure parameter logging.
+    "common",
+    "fcl/params_logging",
+]
+
+closure_coords_logging = [              # Closure coordinates/span logging (file line and colon number of closure definition start and end).
+    "common",
+    "fcl/closure_coords_logging",
+]
+
+ret_val_logging = [                     # Function and closure return value logging (TODO: add `loop` return value logging).
+    "common",
+    "fcl/ret_val_logging",
+]
+single_threaded = [                     # Single-threaded functionality.
+    "common",
+    "fcl/single_threaded",
+]
+multithreaded = [
+    "common",
+    "fcl/multithreaded",
+]
+full_single_threaded = [                # Full set of features for single-threaded use (causes undefined behavior for multithreaded user code).
+    "single_threaded",
+    "log_merger",
+    "std_output_sync",
+    "params_logging",
+    "closure_coords_logging",
+    "ret_val_logging",
+]
+full_multithreaded = [                  # Full set of features for multithreaded use (also works for single-threaded user code).
+    "multithreaded",
+    "log_merger",
+    "std_output_sync",
+    "params_logging",
+    "closure_coords_logging",
+    "ret_val_logging",
+]
+#default = [ "full_multithreaded" ]

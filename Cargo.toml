@@ -2,7 +2,9 @@
 [workspace]
 resolver = "3"
 
-members = [ "code_commons",
+members = [ 
+    "code_commons",     # FCL-independent code. Can be re-used by other crates.
+
     # Rust code.
     "fcl", 
     

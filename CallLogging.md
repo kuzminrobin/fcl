@@ -135,9 +135,9 @@
       * "log_ret_val"         (requires "minimal"?)
     * All of that is the "full" feature, and that feature is the default.
   * To deactivate "all" (use "idle") - `default-features = false`.
-* Using FCL for a specific build configuration only (not debug, not release, but some `fcl[_{debug|release}]`)
 * #[cfg(any(feature = "log_merger", feature = "std_output_sync"))]
   Review in detail "std_output_sync", strict border with "log_merger".
+* Using FCL for a specific build configuration only (not debug, not release, but some `fcl[_{debug|release}]`)
 * Code TODOs
 * Documentation
   * User Manual
@@ -257,6 +257,11 @@
   * Practicing Rust with FCL
 
 # Unsorted
+* TODO: Warnings: `cargo run --no-default-features --features "multithreaded log_merger" --bin user_all`
+* TODO: Test 
+  * The whole set of features 
+  * `cargo run --no-default-features --features "single_threaded std_output_sync" --bin user_all`  
+    Bug: `main::m::g() { { // Loop body start.` - the loop body is not repeat-counted (every iteration is shown).
 * TODO: Doc and code: Charts
   * [FCL2](https://docs.google.com/drawings/d/153vvOK3PBwTy5VNIUO8-AvHWlwRcKzqCIgJ3aVzO6oM/edit)
   * [FCL2_1thrd](https://docs.google.com/drawings/d/1jXFrzBZcH8ShvA72amLBksMnra_ZzeErG1GMR7ijw2E/edit).
