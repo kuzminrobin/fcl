@@ -8,21 +8,15 @@ proc-macro = true
 
 
 [dependencies]
-
 # NOTE: Defines `proc_macro2` (with underscore).
 proc-macro2 = { version = "1.0.95", optional = true, default-features = false }     #, features = ["span-locations"] }     
-# proc-macro2 = { version = "1.0.95", features = ["span-locations"] }     # Defines `proc_macro2` (with underscore).
-
+# proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
 quote = { version = "1.0", optional = true }
-# quote = "1.0"
-
 syn = { version = "2.0", optional = true }          #, default-features = false }      #, features = ["full"] }
-#syn = { version = "2.0", features = ["full"] }
 
 
 [features] 
-common = [                          # Code common for "single_threaded" and "multithreaded".
-                                    # Most of the code is `#[cfg(feature = "common")]`.
+common = [                          # Code common for "single_threaded" and "multithreaded". Most of the code.
     "dep:proc-macro2",              #   Enable "proc-macro2/span-locations" (dependency and feature).
     "proc-macro2/span-locations",
 
@@ -36,13 +30,5 @@ params_logging = [ "common" ]       # Logs the fn and closure params.
 closure_coords_logging = [ "common" ]   # Logs the closure coordianates.
 ret_val_logging = [ "common" ]      # Log the function and closure (TODO: loop) return values.
 
-
 single_threaded = ["common"]        # Code has exta `.borrow[_mut]()`.
 multithreaded = ["common"]          # At the moment of writing is the same as "common".
-
-# default = [ "multithreaded", "ret_val_logging", "ret_val_logging" ]              # Tmp.
-
-#[features]
-## idle = []                           # Instrumentation is skipped.
-## default = ["singlethreaded"]
-#single_threaded = []

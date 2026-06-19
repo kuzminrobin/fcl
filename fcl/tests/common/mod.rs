@@ -20,7 +20,6 @@ pub(crate) fn substitute_log_writer() -> Rc<RefCell<Vec<u8>>> {
     log
 }
 
-// #[cfg(feature = "closure_coords_logging")]
 /// Replaces in the passed argument the closure coordiantes in the [`COORDS_RE_SLICE`] format 
 /// with the `"0,0:0,0"`, returns the result as a `String`.
 // TODO: Consider coverting to a macro to preserve the error coordinates in `panic`.
@@ -39,9 +38,6 @@ pub(crate) fn zero_out_closure_coords(log: Rc<RefCell<Vec<u8>>>) -> String {
         };
         coords_regex.replace_all(&output, "closure{0,0:0,0}")
     };
-    // #[cfg(not(feature = "closure_coords_logging"))]
-    // let output = output.replace("closure{}", "closure{0,0:0,0}");
-
     output.to_string()
 }
 
@@ -65,7 +61,6 @@ macro_rules! test_assert {
 pub use crate::test_assert; // Re-export as `crate::common::test_assert` (in addition to `crate::test_assert`).
 // TODO: Consider `-> pub(crate) use test_assert`.
 
-// #[cfg(feature = "closure_coords_logging")]
 macro_rules! get_coords_slice {
     ($log_contents:expr, $beginning:expr, $end:expr $(,)?) => {{
 
@@ -105,7 +100,6 @@ macro_rules! get_coords_slice {
         &$log_contents[coords_start_idx .. coords_end_idx]
     }}
 }
-// #[cfg(feature = "closure_coords_logging")]
 pub(crate) use get_coords_slice;
 
 #[cfg(feature = "closure_coords_logging")]
@@ -136,11 +130,8 @@ macro_rules! assert_coords_slice {
 macro_rules! assert_coords_slice {
     ($coords_slice:expr) => { assert_eq!($coords_slice, "") }
 }
-
-// #[cfg(feature = "closure_coords_logging")]
 pub(crate) use assert_coords_slice;
 
-// #[cfg(feature = "closure_coords_logging")]
 /// Asserts that
 /// * the `log` starts with the `beginning`,
 /// * the `log` ends with the `end`,
@@ -185,10 +176,8 @@ macro_rules! assert_begin_coords_end {
         $crate::common::assert_coords_slice!(coords_slice);
     }};
 }
-// #[cfg(feature = "closure_coords_logging")]
 pub(crate) use assert_begin_coords_end;
 
-// #[cfg(feature = "closure_coords_logging")]
 /// * Flushes the log
 /// * Invokes `assert_except_closure_coords!()` with the same parameters
 /// * Clears the log
@@ -206,7 +195,6 @@ macro_rules! assert_coords_are_in_between {
         $log.borrow_mut().clear();
     }};
 }
-// #[cfg(feature = "closure_coords_logging")]
 pub(crate) use assert_coords_are_in_between;
 
 /// Flushes the log (to log the cached calls, repeat count, to prevent subsequent call caching).

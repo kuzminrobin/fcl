@@ -257,6 +257,15 @@
   * Practicing Rust with FCL
 
 # Unsorted
+* TODO: Doc and code: Charts
+  * [FCL2](https://docs.google.com/drawings/d/153vvOK3PBwTy5VNIUO8-AvHWlwRcKzqCIgJ3aVzO6oM/edit)
+  * [FCL2_1thrd](https://docs.google.com/drawings/d/1jXFrzBZcH8ShvA72amLBksMnra_ZzeErG1GMR7ijw2E/edit).
+* TODO: Review the multiple threads with "single_threaded" case (non-blocking/parallel multithreading):
+  * Is `CallLoggerArbiter` needed? Does avoiding it means loosing "std_output_sync"?
+  * `CallLoggerArbiter`. There may be corruption when one reads the `thread_loggers` collection and the other one writes (adds/removes), 
+    or a competitive write.  
+    The mutex must sync the access to the collection (sync read and write only). After the access no need to sync the call to `CallLogInfra`.
+  * The `THREAD_LOGGER`'s pointer must be `Arc`, not `Rc`.
 * TODO: DOc:  
   Feature "prefix_loging" may not be applicable to those who develop Rust code in C manner (or their Rust code has to expose C ABI) in a sense that all the functions are defined at the global level, rather than inside of the other entities, like namespaces, classes, structs, etc. In those cases the function names consist of single identifiers. Function prefixing is not applicable for those cases and the feature "prefix_logging" can be turned off to accelerate compilation, run, and lower down the binary size. 
 * TODO: CallLoggerArbiter to a separate file.

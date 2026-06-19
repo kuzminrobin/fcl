@@ -32,11 +32,6 @@ fn quote_as_expr_array(
     if non_loggable_found {
         return quote! { #expr_array };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_array };
-    //     }
-    // }
     let elems = {
         if loggable_found {
             quote! { #elems } // TODO: Test.
@@ -48,17 +43,9 @@ fn quote_as_expr_array(
             }
             traversed_elems
         }
-
-        // let mut traversed_elems = quote! {};
-        // for elem in elems {
-        //     let traversed_elem = quote_as_expr(elem, None, attr_args);
-        //     traversed_elems = quote! { #traversed_elems #traversed_elem , };
-        // }
-        // traversed_elems
     };
 
     quote! { #(#new_attrs)* [ #elems ] }
-    // quote! { #(#attrs)* [ #elems ] }
 }
 
 fn quote_as_expr_assign(
@@ -78,11 +65,6 @@ fn quote_as_expr_assign(
     if non_loggable_found {
         return quote! { #expr_assign };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_assign };
-    //     }
-    // }
 
     let (left, right) = if loggable_found {
         (quote! { #left }, quote! { #right }) // TODO: Test.
@@ -92,11 +74,8 @@ fn quote_as_expr_assign(
             quote_as_expr(right, None, enclosing_item_attr_args), // TODO: Test.
         )
     };
-    // let left = quote_as_expr(left, None, enclosing_item_attr_args);
-    // let right = quote_as_expr(right, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #left #eq_token #right }
-    // quote! { #(#attrs)* #left #eq_token #right }
 }
 
 fn quote_as_init(init: &syn::LocalInit, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
@@ -279,21 +258,14 @@ fn quote_as_expr_async(
     if non_loggable_found {
         return quote! { #expr_async };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_async };
-    //     }
-    // }
 
     let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
     };
-    // let block = quote_as_block(block, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #async_token #capture #block } // TODO: Test.
-    // quote! { #(#attrs)* #async_token #capture #block }
 }
 
 fn quote_as_expr_await(
@@ -313,21 +285,14 @@ fn quote_as_expr_await(
     if non_loggable_found {
         return quote! { #expr_await };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_await };
-    //     }
-    // }
 
     let base = if loggable_found {
         quote! { #base } // TODO: Test.
     } else {
         quote_as_expr(base, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let base = quote_as_expr(base, None, attr_args);
 
     quote! { #(#new_attrs)* #base #dot_token #await_token } // TODO: Test.
-    // quote! { #(#attrs)* #base #dot_token #await_token }
 }
 
 /// Handles the binary operator expressions (like `a + b`, `a += b`).
@@ -348,11 +313,6 @@ fn quote_as_expr_binary(
     if non_loggable_found {
         return quote! { #expr_binary };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_binary };
-    //     }
-    // }
 
     let (left, right) = if loggable_found {
         (quote! { #left }, quote! { #right }) // TODO: Test.
@@ -362,11 +322,8 @@ fn quote_as_expr_binary(
             quote_as_expr(right, None, enclosing_item_attr_args), // TODO: Test.
         )
     };
-    // let left = quote_as_expr(left, None, enclosing_item_attr_args);
-    // let right = quote_as_expr(right, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #left #op #right }
-    // quote! { #(#attrs)* #left #op #right }
 }
 
 fn quote_as_expr_block(
@@ -384,21 +341,14 @@ fn quote_as_expr_block(
     if non_loggable_found {
         return quote! { #expr_block };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_block };
-    //     }
-    // }
 
     let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
     };
-    // let block = quote_as_block(block, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #label #block }
-    // quote! { #(#attrs)* #label #block }
 }
 
 /// Handles a `break ['label] [<break return value>]`.
@@ -418,11 +368,6 @@ fn quote_as_expr_break(
     if non_loggable_found {
         return quote! { #expr_break };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_break };
-    //     }
-    // }
 
     let expr = expr.as_ref().map(|expr| {
         if loggable_found {
@@ -430,11 +375,9 @@ fn quote_as_expr_break(
         } else {
             quote_as_expr(expr, None, enclosing_item_attr_args)
         }
-        // quote_as_expr(expr, None, enclosing_item_attr_args)
     });
 
     quote! { #(#new_attrs)* #break_token #label #expr }
-    // quote! { #(#attrs)* #break_token #label #expr }
 }
 
 /// Handles a function call expression: `invoke(a, b)`, `<expr>(<expr>, <expr>)`.
@@ -465,11 +408,6 @@ fn quote_as_expr_call(
     if non_loggable_found {
         return quote! { #expr_call }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_call };
-    //     }
-    // }
 
     let mut is_print_func_name = false;
 
@@ -489,22 +427,9 @@ fn quote_as_expr_call(
                     traversed_args = quote! { #traversed_args #traversed_arg, }
                 }
                 traversed_args // TODO: Test.
-            }, // quote_as_expr(args, None, enclosing_item_attr_args),
+            },
         )
     };
-    // let func = quote_as_expr(
-    //     func,
-    //     Some(&mut is_print_func_name),
-    //     enclosing_item_attr_args,
-    // );
-    // let args = {
-    //     let mut traversed_args = quote! {};
-    //     for arg in args {
-    //         let traversed_arg = quote_as_expr(arg, None, enclosing_item_attr_args);
-    //         traversed_args = quote! { #traversed_args #traversed_arg, }
-    //     }
-    //     traversed_args
-    // };
 
     let mut ret_val = quote! { #(#new_attrs)* #func ( #args ) };
 
@@ -528,21 +453,6 @@ fn quote_as_expr_call(
                 })
             }
         };
-        // #[cfg(feature = "single_threaded")]
-        // let thread_logger_access = quote! {
-        //     { // Limit the sope to avoid the `use std::borrow::BorrowMut` below causing warnings or conflicts.
-        //         use std::borrow::BorrowMut;
-        //         fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-        //             logger.borrow_mut().borrow_mut().maybe_flush();
-        //         })
-        //     }
-        // };
-        // #[cfg(feature = "multithreaded")]
-        // let thread_logger_access = quote! {
-        //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-        //         logger.borrow_mut().maybe_flush();
-        //     })
-        // };
         ret_val = quote! {
             {
                 #thread_logger_access;
@@ -571,21 +481,14 @@ fn quote_as_expr_cast(
     if non_loggable_found {
         return quote! { #expr_cast }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_cast };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #expr #as_token #ty }
-    // quote! { #(#attrs)* #expr #as_token #ty }
 }
 
 /// Handles a closure expression: `|a, b| a + b`.
@@ -612,11 +515,6 @@ pub fn quote_as_expr_closure(
     if non_loggable_found {
         return quote! { #expr_closure }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_closure };
-    //     }
-    // }
 
     #[cfg(feature = "params_logging")]
     fn closure_input_vals(
@@ -657,32 +555,6 @@ pub fn quote_as_expr_closure(
     let (get_inputs_str_code, pass_inputs_str_code) = (
         quote!{}, quote!{}
     );
-
-    // // Get the token stream of {{param names and values} optional string}:
-    // #[cfg(feature = "params_logging")]
-    // let input_vals = closure_input_vals(inputs, enclosing_item_attr_args)
-    // /*if inputs.is_empty() {
-    //     quote! { None }
-    // } else {
-    //     match enclosing_item_attr_args.params_logging {
-    //         ParamsLogging::Log => {
-    //             let mut param_format_str = String::new();
-    //             let mut param_list = quote! {};
-    //             for (idx, input_pat) in inputs.iter().enumerate() {
-    //                 if idx != 0 {
-    //                     param_format_str.push_str(", ");
-    //                 }
-    //                 update_param_data_from_pat(input_pat, &mut param_format_str, &mut param_list);
-    //             }
-    //             quote! { Some(format!(#param_format_str, #param_list)) }
-    //         }
-    //         ParamsLogging::Skip => {
-    //             quote! { Some(String::from("..")) }
-    //         }
-    //     }
-    // }*/;
-    // #[cfg(not(feature = "params_logging"))]
-    // let input_vals = quote! {};
 
     // Closure coordinates:
     #[cfg(feature = "closure_coords_logging")]
@@ -726,29 +598,17 @@ pub fn quote_as_expr_closure(
     } else {
         quote_as_expr(&**body, None, &attr_args) // TODO: Test.
     };
-    // let body = { quote_as_expr(&**body, None, &attr_args) };
 
     let extra_borrow = if cfg!(feature = "single_threaded") {
         quote! { .borrow_mut() }
     } else {
         quote! {}
     };
-    // // `logging_is_on()`:
-    // let logging_is_on = quote! {
-    //     logger.borrow()
-    // };
-    // #[cfg(feature = "single_threaded")]
-    // let logging_is_on = quote! {
-    //     #logging_is_on.borrow()
-    // };
-    // let logging_is_on = quote! {
-    //     #logging_is_on.logging_is_on()
-    // };
 
     #[cfg(feature = "ret_val_logging")]
     let ret_val_logging_code = quote! {
         use fcl::common::{MaybePrint};
-        // Uncondititonally tell the `callee_logger` what closure returns,
+        // Uncondititonally tell the `callee_logger` what the closure returns,
         // since if the closure's return type is not specified explicitly
         // then the return type is determined with the type inference
         // which is not available now at pre-compile (preprocessing) time.
@@ -768,15 +628,14 @@ pub fn quote_as_expr_closure(
         #lifetimes #constness #movability #asyncness #capture
         #or1_token #inputs #or2_token #output
         {
-            use fcl::common::{CallLogger/*, MaybePrint*/};
+            use fcl::common::{CallLogger};
 
-            let ret_val = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| { // NOTE: The `logger` is used in `logging_is_on`.
-                // // NOTE: Borrows the params, has to be in front of the `body`
-                // // that moves the params to the `body` closure.
-                // //
-                // // At run time get the parameter names and values string:
+            let ret_val = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
+                // NOTE: Borrows the params, has to be in front of the `body`
+                // that moves the params to the `body` closure.
+                //
+                // At run time get the parameter names and values string:
                 #get_inputs_str_code;
-                // let param_val_str = #input_vals;
 
                 // Get the body as a closure (to be executed later):
                 let mut body = #capture || { #body };
@@ -784,7 +643,6 @@ pub fn quote_as_expr_closure(
                 // If logging is off then do nothing
                 // except executing the body and returning the value:
                 if ! logger.borrow() #extra_borrow .logging_is_on() {
-                // if ! #logging_is_on {
                     return body();
                 }
                 // Else (logging is on):
@@ -793,22 +651,12 @@ pub fn quote_as_expr_closure(
                 let mut callee_logger = fcl::common::CalleeLogger::new(
                     #log_closure_name_str,
                     #pass_inputs_str_code   // NOTE: Comma `,` is not allowed here? TODO: Find out for sure.
-                    // #input_vals     // NOTE: Comma `,` is not allowed here.
-                    // param_val_str
                 );
 
                 // Execute the body and catch the return value:
                 let ret_val = body();
 
                 #ret_val_logging_code;
-                // // Uncondititonally tell the `callee_logger` what closure returns,
-                // // since if the closure's return type is not specified explicitly
-                // // then the return type is determined with the type inference
-                // // which is not available now at pre-compile (preprocessing) time.
-                // // In other words, at pre-compile time we don't know for sure
-                // // if {the closure return type is the unit type `()` and the return value logging can be skipped}.
-                // let ret_val_str = format!("{}", ret_val.maybe_print());
-                // callee_logger.set_ret_val(ret_val_str);
 
                 // Log the return, like `} // f()::closure{3,7:5:11}() -> 5.`,
                 // in the `callee_logger` destructor and return the value:
@@ -851,21 +699,14 @@ fn quote_as_expr_field(
     if non_loggable_found {
         return quote! { #expr_field }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_field };
-    //     }
-    // }
 
     let base = if loggable_found {
         quote! { #base } // TODO: Test.
     } else {
         quote_as_expr(&**base, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let base = quote_as_expr(&**base, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #base #dot_token #member }
-    // quote! { #(#attrs)* #base #dot_token #member }
 }
 
 /// Handles the block of `loop`, `for`, and `while` loops.
@@ -890,17 +731,6 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
     } else {
         quote! {}
     };
-    // // Get the multithreading-dependent `logging_is_on()` call token stream:
-    // let logging_is_on = quote! {
-    //     logger.borrow()
-    // };
-    // #[cfg(feature = "single_threaded")]
-    // let logging_is_on = quote! {
-    //     #logging_is_on.borrow()
-    // };
-    // let logging_is_on = quote! {
-    //     #logging_is_on.logging_is_on()
-    // };
 
     quote! {
         {
@@ -909,12 +739,11 @@ fn quote_as_loop_block(block: &syn::Block, attr_args: &AttrArgs) -> proc_macro2:
             // by enabling/disabling the logging during the iterations.
             //
             // To accelerate, this reading can be placed in front of the loop
-            // (but the check `if logging_is_on` still needs to be in every iteration),
+            // (but the check `let _loopbody_logger = if logging_is_on {` still needs to be in every iteration),
             // such that the reading and the loop are in one extra scope (`{ let logging_is_on = ..; loop }`),
             // and at the end of that scope the `logging_is_on` dies.
             let logging_is_on = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                 logger.borrow() #extra_borrow .logging_is_on()
-                // #logging_is_on
             });
 
             let _loopbody_logger = if logging_is_on {
@@ -960,11 +789,6 @@ fn quote_as_expr_for_loop(
     if non_loggable_found {
         return quote! { #expr_for_loop }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_for_loop };
-    //     }
-    // }
 
     let (expr, body) = if loggable_found {
         (quote! { #expr }, quote! { #body }) // TODO: Test.
@@ -974,8 +798,6 @@ fn quote_as_expr_for_loop(
             quote_as_loop_block(body, enclosing_item_attr_args),    // TODO: Test.
         )
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-    // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
     let extra_borrow = if cfg!(feature = "single_threaded") {
         quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "single_threaded")]`, either update or document.
@@ -1016,25 +838,18 @@ fn quote_as_expr_group(
     if non_loggable_found {
         return quote! { #expr_group }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_group };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     // NOTE:
     // Intention: `quote! { { #(#attrs)* #group_token #expr } }`
     // Issue: the trait bound `syn::token::Group: quote::ToTokens` is not satisfied
     // Workaround:
     quote! { { #(#new_attrs)* #expr } }
-    // quote! { { #(#attrs)* #expr } }
 }
 
 /// Handles an `if` expression with an optional `else` block: `if expr { ... } else { ... }`.
@@ -1055,11 +870,6 @@ fn quote_as_expr_if(
     if non_loggable_found {
         return quote! { #expr_if }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_if };
-    //     }
-    // }
 
     let (cond, then_branch, else_branch) = if loggable_found {
         (
@@ -1078,18 +888,9 @@ fn quote_as_expr_if(
             quote! { #else_token #expr }
         }); // TODO: Test.
         (cond, then_branch, else_branch)
-        // quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
 
-    // let cond = quote_as_expr(&**cond, None, enclosing_item_attr_args);
-    // let then_branch = quote_as_block(then_branch, enclosing_item_attr_args);
-    // let else_branch = else_branch.as_ref().map(|(else_token, expr)| {
-    //     let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-    //     quote! { #else_token #expr }
-    // });
-
     quote! { #(#new_attrs)* #if_token #cond #then_branch #else_branch }
-    // quote! { #(#attrs)* #if_token #cond #then_branch #else_branch }
 }
 
 /// Handles a square bracketed indexing expression: `vect[2]`.
@@ -1110,11 +911,6 @@ fn quote_as_expr_index(
     if non_loggable_found {
         return quote! { #expr_index }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_index };
-    //     }
-    // }
 
     let (expr, index) = if loggable_found {
         (quote! { #expr }, quote! { #index }) // TODO: Test.
@@ -1124,11 +920,8 @@ fn quote_as_expr_index(
             quote_as_expr(&**index, None, enclosing_item_attr_args), // TODO: Test.
         )
     };
-    // let expr  = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-    // let index = quote_as_expr(&**index, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #expr [ #index ] }
-    // quote! { #(#attrs)* #expr [ #index ] }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -1154,11 +947,6 @@ fn quote_as_expr_let(
     if non_loggable_found {
         return quote! { #expr_let }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_let };
-    //     }
-    // }
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -1169,10 +957,8 @@ fn quote_as_expr_let(
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #let_token #pat #eq_token #expr }
-    // quote! { #(#attrs)* #let_token #pat #eq_token #expr }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -1197,18 +983,12 @@ fn quote_as_expr_loop(
     if non_loggable_found {
         return quote! { #expr_loop }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_loop };
-    //     }
-    // }
 
     let body = if loggable_found {
         quote! { #body } // TODO: Test.
     } else {
         quote_as_loop_block(body, enclosing_item_attr_args) // TODO: Test.
     };
-    // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
     let extra_borrow = if cfg!(feature = "single_threaded") {
         quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "single_threaded")]`, either update or document.
@@ -1271,28 +1051,11 @@ pub fn quote_as_macro(
                 quote! {}
             };
 
-            let thread_logger_access = quote! {
+            *maybe_flush_invocation = quote! {
                 fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     logger.borrow_mut() #extra_borrow .maybe_flush();
                 })
             };
-            // #[cfg(feature = "single_threaded")]
-            // let thread_logger_access = quote! {
-            //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            //         logger.borrow_mut().borrow_mut().maybe_flush();
-            //     })
-            // };
-            // #[cfg(feature = "multithreaded")]
-            // let thread_logger_access = quote! {
-            //     fcl::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
-            //         logger.borrow_mut().maybe_flush();
-            //     })
-            // };
-
-            *maybe_flush_invocation = thread_logger_access;
-            // *maybe_flush_invocation = quote! {  // TODO: Consider `*maybe_flush_invocation = thread_logger_access`.
-            //     #thread_logger_access;
-            // }
         }
     }
     quote! { #macro_ } // TODO: Consider returning `()`.
@@ -1423,11 +1186,6 @@ fn quote_as_expr_match(
     if non_loggable_found {
         return quote! { #expr_match }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_match };
-    //     }
-    // }
 
     let (expr, arms) = if loggable_found {
         (quote! { #expr }, quote! { #(#arms)* }) // TODO: Test.
@@ -1441,15 +1199,7 @@ fn quote_as_expr_match(
         (expr, traveresed_arms)
     };
 
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-    // let mut traveresed_arms = quote! {};
-    // for arm in arms {
-    //     let traversed_arm = quote_as_arm(arm, enclosing_item_attr_args);
-    //     traveresed_arms = quote! { #traveresed_arms #traversed_arm }
-    // }
-
     quote! { #(#new_attrs)* #match_token #expr { #arms } }
-    // quote! { #(#attrs)* #match_token #expr { #traveresed_arms } }
 }
 
 /// Handles a method call expression: `x.foo::<T>(a, b)`.
@@ -1473,11 +1223,6 @@ fn quote_as_expr_method_call(
     if non_loggable_found {
         return quote! { #expr_method_call }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_method_call };
-    //     }
-    // }
 
     let (receiver, args) = if loggable_found {
         (quote! { #receiver }, quote! { #args }) // TODO: Test.
@@ -1498,22 +1243,7 @@ fn quote_as_expr_method_call(
         (receiver, traversed_args)
     }; // TODO: Test.
 
-    // let receiver = quote_as_expr(&**receiver, None, enclosing_item_attr_args);
-    // // // Likely not applicable for instrumenting the run time functions and
-    // // // closures (as opposed to compile time const functions and closures).
-    // // let turbofish = match turbofish {
-    // //     Some(angle_bracketed_generic_arguments) =>
-    // //         Some(quote_as_angle_bracketed_generic_arguments(angle_bracketed_generic_arguments, enclosing_item_attr_args)),
-    // //     _ => turbofish
-    // // };
-    // let mut traversed_args = quote! {};
-    // for arg in args {
-    //     let traversed_arg = quote_as_expr(arg, None, enclosing_item_attr_args);
-    //     traversed_args = quote! { #traversed_args #traversed_arg, }
-    // }
-
     quote! { #(#new_attrs)* #receiver #dot_token #method #turbofish ( #args ) }
-    // quote! { #(#attrs)* #receiver #dot_token #method #turbofish ( #traversed_args ) }
 }
 
 /// Handles a parenthesized expression: `(a + b)`.
@@ -1533,21 +1263,14 @@ fn quote_as_expr_paren(
     if non_loggable_found {
         return quote! { #expr_paren }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_paren };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* ( #expr ) }
-    // quote! { #(#attrs)* ( #expr ) }
 }
 
 /// Handles a path like `core::mem::replace` possibly containing generic parameters
@@ -1600,11 +1323,6 @@ fn quote_as_expr_range(
     if non_loggable_found {
         return quote! { #expr_range }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_range };
-    //     }
-    // }
 
     let (start, end) = if loggable_found {
         (Some(quote! { #start }), Some(quote! { #end })) // TODO: Test.
@@ -1617,15 +1335,8 @@ fn quote_as_expr_range(
             .map(|end| quote_as_expr(&**end, None, enclosing_item_attr_args));
         (start, end) // TODO: Test.
     };
-    // let start = start
-    //     .as_ref()
-    //     .map(|start| quote_as_expr(&**start, None, enclosing_item_attr_args));
-    // let end = end
-    //     .as_ref()
-    //     .map(|end| quote_as_expr(&**end, None, enclosing_item_attr_args));
 
     quote! { #(#new_attrs)* #start #limits #end }
-    // quote! { #(#attrs)* #start #limits #end }
 }
 
 /// Handles an address-of operation: `&raw const place` or `&raw mut place`.
@@ -1646,21 +1357,14 @@ fn quote_as_expr_raw_addr(
     if non_loggable_found {
         return quote! { #expr_raw_addr }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_raw_addr };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #and_token #raw #mutability #expr }
-    // quote! { #(#attrs)* #and_token #raw #mutability #expr }
 }
 
 /// Handles a referencing operation: `&a` or `&mut a`.
@@ -1680,21 +1384,14 @@ fn quote_as_expr_reference(
     if non_loggable_found {
         return quote! { #expr_reference }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_reference };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #and_token #mutability #expr }
-    // quote! { #(#attrs)* #and_token #mutability #expr }
 }
 fn quote_as_expr_repeat(
     expr_repeat: &syn::ExprRepeat,
@@ -1714,11 +1411,6 @@ fn quote_as_expr_repeat(
     if non_loggable_found {
         return quote! { #expr_repeat }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_repeat };
-    //     }
-    // }
 
     let (expr, len) = if loggable_found {
         (quote! { #expr }, quote! { #len }) // TODO: Test.
@@ -1727,11 +1419,8 @@ fn quote_as_expr_repeat(
         let len = quote_as_expr(&**len, None, enclosing_item_attr_args); // TODO: Test.
         (expr, len)
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
-    // let len = quote_as_expr(&**len, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* [ #expr #semi_token #len ] }
-    // quote! { #(#attrs)* [ #expr #semi_token #len ] }
 }
 
 /// Handles a `return`, with an optional value to be returned.
@@ -1750,22 +1439,15 @@ fn quote_as_expr_return(
     if non_loggable_found {
         return quote! { #expr_return }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_return };
-    //     }
-    // }
     let expr = expr.as_ref().map(|expr| {
         if loggable_found {
             quote! { #expr } // TODO: Test.
         } else {
             quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
         }
-        // quote_as_expr(&**expr, None, enclosing_item_attr_args)
     });
 
     quote! { #(#new_attrs)* #return_token #expr }
-    // quote! { #(#attrs)* #return_token #expr }
 }
 
 fn quote_as_field_value(field: &syn::FieldValue, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
@@ -1815,11 +1497,6 @@ fn quote_as_expr_struct(
     if non_loggable_found {
         return quote! { #expr_struct }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_struct };
-    //     }
-    // }
 
     // `quote!{ #qself }`: Error: the trait bound `syn::QSelf: quote::ToTokens` is not satisfied
     // WARNING: The interpretation of {qself and path} combination below is questionable.
@@ -1868,20 +1545,8 @@ fn quote_as_expr_struct(
             .map(|expr| quote_as_expr(&**expr, None, enclosing_item_attr_args));
         (fields, rest) // TODO: Test.
     };
-    // let fields = {
-    //     let mut traversed_fileds = quote! {};
-    //     for field in fields {
-    //         let traversed_field = quote_as_field_value(field, enclosing_item_attr_args);
-    //         traversed_fileds = quote! { #traversed_fileds #traversed_field, };
-    //     }
-    //     traversed_fileds
-    // };
-    // let rest = rest
-    //     .as_ref()
-    //     .map(|expr| quote_as_expr(&**expr, None, enclosing_item_attr_args));
 
     quote! { #(#new_attrs)* #qself_and_apth { #fields #dot2_token #rest } }
-    // quote! { #(#attrs)* #qself_and_apth { #fields #dot2_token #rest } }
 }
 
 /// Handles a try-expression: `expr?`.
@@ -1900,21 +1565,14 @@ fn quote_as_expr_try(
     if non_loggable_found {
         return quote! { #expr_try }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_try };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #expr #question_token }
-    // quote! { #(#attrs)* #expr #question_token }
 }
 
 /// Handles a `try` block: `try { ... }`.
@@ -1937,21 +1595,14 @@ fn quote_as_expr_try_block(
     if non_loggable_found {
         return quote! { #expr_try_block }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_try_block };
-    //     }
-    // }
 
     let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
     };
-    // let block = quote_as_block(block, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #try_token #block }
-    // quote! { #(#attrs)* #try_token #block }
 }
 
 /// Handles a tuple expression: `(a, b, c, d)`.
@@ -1971,11 +1622,6 @@ fn quote_as_expr_tuple(
     if non_loggable_found {
         return quote! { #expr_tuple }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_tuple };
-    //     }
-    // }
 
     let elems = if loggable_found {
         quote! { #elems } // TODO: Test.
@@ -1987,17 +1633,8 @@ fn quote_as_expr_tuple(
         }
         traversed_elems // TODO: Test.
     };
-    // let elems = {
-    //     let mut traversed_elems = quote! {};
-    //     for elem in elems {
-    //         let traversed_elem = quote_as_expr(elem, None, enclosing_item_attr_args);
-    //         traversed_elems = quote! { #traversed_elems #traversed_elem, }
-    //     }
-    //     traversed_elems
-    // };
 
     quote! { #(#new_attrs)*( #elems ) }
-    // quote! { #(#attrs)*( #elems ) }
 }
 
 /// Handles a unary operation: `!x`, `*x`.
@@ -2017,21 +1654,14 @@ fn quote_as_expr_unary(
     if non_loggable_found {
         return quote! { #expr_unary }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_unary };
-    //     }
-    // }
 
     let expr = if loggable_found {
         quote! { #expr } // TODO: Test.
     } else {
         quote_as_expr(&**expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(&**expr, None, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #op #expr }
-    // quote! { #(#attrs)* #op #expr }
 }
 
 /// Handles an unsafe block: `unsafe { ... }`.
@@ -2051,21 +1681,14 @@ fn quote_as_expr_unsafe(
     if non_loggable_found {
         return quote! { #expr_unsafe }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_unsafe };
-    //     }
-    // }
 
     let block = if loggable_found {
         quote! { #block } // TODO: Test.
     } else {
         quote_as_block(block, enclosing_item_attr_args) // TODO: Test.
     };
-    // let block = quote_as_block(block, enclosing_item_attr_args);
 
     quote! { #(#new_attrs)* #unsafe_token #block }
-    // quote! { #(#attrs)* #unsafe_token #block }
 }
 
 /// Handles a `while` loop: `while expr { ... }`.
@@ -2086,11 +1709,6 @@ fn quote_as_expr_while(
     if non_loggable_found {
         return quote! { #expr_while }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_while };
-    //     }
-    // }
 
     let (cond, body) = if loggable_found {
         (quote! { #cond }, quote! { #body }) // TODO: Test.
@@ -2100,8 +1718,6 @@ fn quote_as_expr_while(
             quote_as_loop_block(body, enclosing_item_attr_args),    // TODO: Test.
         )
     };
-    // let cond = quote_as_expr(&**cond, None, enclosing_item_attr_args);
-    // let body = quote_as_loop_block(body, enclosing_item_attr_args);
 
     let extra_borrow = if cfg!(feature = "single_threaded") {
         quote! { .borrow_mut() } // TODO: Test with `#[cfg(feature = "single_threaded")]`, either update or document.
@@ -2138,11 +1754,6 @@ fn quote_as_expr_yield(
     if non_loggable_found {
         return quote! { #expr_yield }; // TODO: Test.
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #expr_yield };
-    //     }
-    // }
 
     let expr = expr.as_ref().map(|ref_boxed_expr| {
         if loggable_found {
@@ -2150,11 +1761,9 @@ fn quote_as_expr_yield(
         } else {
             quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args) // TODO: Test.
         }
-        // quote_as_expr(&**ref_boxed_expr, None, enclosing_item_attr_args)
     });
 
     quote! { #(#new_attrs)* #yield_token #expr }
-    // quote! { #(#attrs)* #yield_token #expr }
 }
 
 // NOTE:

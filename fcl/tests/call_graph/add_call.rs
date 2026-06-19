@@ -74,9 +74,6 @@ mod single_thread {
 
     #[test]
     fn differs_from_prev_sibling() {
-        // // #[cfg(feature = "single_threaded")]
-        // use fcl::common::CallLogger;
-
         // A: `differs_from_prev_sibling`:
         // previous_sibling_with_diff_name() {}
         // // Test the log: Only the log above.

@@ -167,10 +167,6 @@ fn traversed_block_from_sig(
     let (get_inputs_str_code, pass_inputs_str_code) = (
         quote!{}, quote!{}
     );
-    // #[cfg(feature = "params_logging")]
-    // let inputs = input_vals(inputs, attr_args);
-    // #[cfg(not(feature = "params_logging"))]
-    // let inputs = quote! { None };
 
     #[cfg(feature = "ret_val_logging")]
     let ret_val_logging_code = if let syn::ReturnType::Type(..) = output {
@@ -221,22 +217,11 @@ fn traversed_block_from_sig(
         } else {
             quote! {}
         };
-        // // Get the multithreading-dependent `logging_is_on()` call token stream:
-        // let logging_is_on = quote! {
-        //     logger.borrow()
-        // };
-        // #[cfg(feature = "single_threaded")]
-        // let logging_is_on = quote! {
-        //     #logging_is_on.borrow()
-        // };
-        // let logging_is_on = quote! {
-        //     #logging_is_on.logging_is_on()
-        // };
 
         // Return the token stream of the instrumented function call:
         quote! {
             {
-                use fcl::common::{CallLogger, /*MaybePrint*/};
+                use fcl::common::{CallLogger};
 
                 let ret_val = fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
                     // NOTE: Borrows the parameters. Has to be ahead of the `body`
@@ -257,7 +242,6 @@ fn traversed_block_from_sig(
                     // If logging is off then do nothing
                     // except executing the body and returning the value:
                     if !logger.borrow() #extra_borrow .logging_is_on() {
-                    // if !#logging_is_on {
                         return body();
                     }
                     // Else (loggign is on):
@@ -286,19 +270,12 @@ fn traversed_block_from_sig(
                     // Log the call, like `f<char, u8>(param: 5) {`:
                     let mut callee_logger = fcl::common::CalleeLogger::new(&generic_func_name,
                         #pass_inputs_str_code    // NOTE: Comma is not allowed here? TODO.
-                        // #inputs     // NOTE: Comma is not allowed here.
-                        // param_val_str
                     );
 
                     // Execute the function body and catch the return value:
                     let ret_val = body();
 
                     #ret_val_logging_code;
-                    // // Convert the return value to string and assign to the logger:
-                    // if #returns_something {
-                    //     let ret_val_str = format!("{}", ret_val.maybe_print());
-                    //     callee_logger.set_ret_val(ret_val_str);
-                    // }
 
                     // Log the return (and the return value), like `} -> 5 // f().`
                     // in the `CalleeLogger` destructor and return the value to the caller:
@@ -368,16 +345,6 @@ fn quote_as_item_fn(
     //     //     Meta::NameValue(meta_name_value) => println!("NameValue Path: {:?}", meta_name_value.path.get_ident()),
     //     // }
     //     // println!("attr: {:?}", attr.meta);
-
-    //     if attr.is_non_loggable() {
-    //         // println!("}} {:?} // non_loggable", sig.ident);
-    //         return quote! { #item_fn };
-    //     }
-    //     new_attrs.push(if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
     // }
 
     let block = if loggable_found {
@@ -400,8 +367,6 @@ fn quote_as_item_fn(
     let ret_token_stream = quote! { #(#new_attrs)* #vis #sig #block };
     // println!("quote_as_item_fn()::ret_val: {}", ret_val);
     ret_token_stream
-    // quote! { #(#new_attrs)* #vis #sig #block }
-    // quote! { #(#attrs)* #vis #sig #block }
 }
 
 // // Likely not applicable for instrumenting the run time functions and
@@ -427,11 +392,6 @@ fn quote_as_impl_item_fn(
     if non_loggable_found {
         return quote! { #impl_item_fn };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #impl_item_fn };
-    //     }
-    // }
 
     let block = if loggable_found {
         // After updating/adding the params of/to #[loggable(<params>)]
@@ -441,9 +401,7 @@ fn quote_as_impl_item_fn(
     } else {
         traversed_block_from_sig(block, sig, enclosing_item_attr_args) // TODO: Test.
     };
-    // let block = traversed_block_from_sig(block, sig, enclosing_item_attr_args);
     quote! { #(#new_attrs)* #vis #defaultness #sig #block } // TODO: Test.
-    // quote! { #(#attrs)* #vis #defaultness #sig #block }
 }
 fn quote_as_impl_item(impl_item: &syn::ImplItem, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
     match impl_item {
@@ -479,19 +437,6 @@ fn quote_as_item_impl(
     if non_loggable_found {
         return quote! { #item_impl };
     }
-    // let mut new_attrs = vec![];
-    // let mut loggable_found = false;
-
-    // for attr in attrs {
-    //     if attr.is_non_loggable() {
-    //         return quote! { #item_impl };
-    //     }
-    //     new_attrs.push(if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
-    // }
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -540,7 +485,6 @@ fn quote_as_item_impl(
     };
 
     quote! { #(#new_attrs)* #defaultness #unsafety #impl_token #generics #trait_ #self_ty { #items } }
-    // quote! { #(#attrs)* #defaultness #unsafety #impl_token #generics #trait_ #self_ty { #items } }
 }
 
 /// Handles the `macro_rules` definiton.
@@ -745,19 +689,6 @@ fn quote_as_item_mod(
     if non_loggable_found {
         return quote! { #item_mod };
     }
-    // let mut new_attrs = vec![];
-    // let mut loggable_found = false;
-
-    // for attr in attrs {
-    //     if attr.is_non_loggable() {
-    //         return quote! { #item_mod };
-    //     }
-    //     new_attrs.push(if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
-    // }
 
     let content = if loggable_found {
         // No item traversing. The items are passed as they are.
@@ -813,11 +744,6 @@ fn quote_as_item_static(
     if non_loggable_found {
         return quote! { #item_static };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #item_static };
-    //     }
-    // }
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -830,9 +756,7 @@ fn quote_as_item_static(
     } else {
         quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
     };
-    // let expr = quote_as_expr(expr, None, enclosing_item_attr_args);
     quote! { #(#new_attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
-    // quote! { #(#attrs)* #vis #static_token #mutability #ident #colon_token #ty #eq_token #expr #semi_token }
 }
 // // Likely not applicable for instrumenting the run time functions and
 // // closures (as opposed to compile time const functions and closures).
@@ -888,22 +812,15 @@ fn quote_as_trait_item_const(
     if non_loggable_found {
         return quote! { #trait_item_const };
     }
-    // for attr in attrs {
-    //     if attr.is_traverse_stopper() {
-    //         return quote! { #trait_item_const };
-    //     }
-    // }
     let default = default.as_ref().map(|(eq_token, expr)| {
         let expr = if loggable_found {
             quote! { #expr } // TODO: Test.
         } else {
             quote_as_expr(expr, None, enclosing_item_attr_args) // TODO: Test.
         };
-        // let expr = quote_as_expr(expr, None, enclosing_item_attr_args);
         quote! { #eq_token #expr }
     });
     quote! {  #(#new_attrs)* #const_token #ident #generics #colon_token #ty #default #semi_token }
-    // quote! {  #(#attrs)* #const_token #ident #generics #colon_token #ty #default #semi_token }
 }
 
 fn quote_as_trait_item_fn(
@@ -922,19 +839,6 @@ fn quote_as_trait_item_fn(
     if non_loggable_found {
         return quote! { #trait_item_fn };
     }
-    // let mut new_attrs = vec![];
-    // let mut loggable_found = false;
-    // for attr in attrs {
-    //     if attr.is_non_loggable() {
-    //         // if attr.is_traverse_stopper() {
-    //         return quote! { #trait_item_fn };
-    //     }
-    //     new_attrs.push(if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
-    // }
     let default = default.as_ref().map(|block| {
         if loggable_found {
             quote! { #block }
@@ -943,7 +847,6 @@ fn quote_as_trait_item_fn(
         }
     });
     quote! { #(#new_attrs)* #sig #default #semi_token }
-    // quote! { #(#attrs)* #sig #default #semi_token }
 }
 
 /// Handles a macro invocation within the definition of a trait
@@ -963,18 +866,6 @@ fn quote_as_trait_item_macro_rules_invocation(
     if non_loggable_found {
         return quote! { #trait_item_macro };
     }
-    // let mut new_attrs = vec![];
-    // let mut loggable_found = false;
-    // for attr in attrs {
-    //     if attr.is_non_loggable() {
-    //         return quote! { #trait_item_macro };
-    //     }
-    //     new_attrs.push(if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
-    // }
     if loggable_found {
         // For the macro invocations with `#[loggable` combine
         // the enclosing entity's args of `#[loggable`
@@ -983,25 +874,10 @@ fn quote_as_trait_item_macro_rules_invocation(
         // and leave the macro invocation as is for the subsequent individual macro-expansion
         // of `#[loggable` (with combined args) for this macro invocation.
         quote! { #(#new_attrs)* #mac #semi_token }
-        // quote! { #trait_item_macro }
     } else {
         // Leave the non-annotated macro invocations as they are.
         quote! { #trait_item_macro }
-        // traversed_block_from_sig(block, sig, enclosing_item_attr_args)
     }
-    /*
-        let mac =
-
-        let default = default.as_ref().map(|block| {
-            if loggable_found {
-                quote! { #block }
-            } else {
-                traversed_block_from_sig(block, sig, enclosing_item_attr_args)
-            }
-        });
-        quote! { #(#new_attrs)* #sig #default #semi_token }
-    */
-    // quote! {}
 }
 
 fn quote_as_trait_item(item: &syn::TraitItem, attr_args: &AttrArgs) -> proc_macro2::TokenStream {
@@ -1046,19 +922,6 @@ fn quote_as_item_trait(
     if non_loggable_found {
         return quote! { #item_trait };
     }
-    // let mut new_attrs = vec![];
-    // let mut loggable_found = false;
-
-    // for attr in attrs {
-    //     if attr.is_non_loggable() {
-    //         return quote! { #item_trait };
-    //     }
-    //     new_attrs.push(if_loggable_then_combine_attr_args(
-    //         attr,
-    //         &mut loggable_found,
-    //         enclosing_item_attr_args,
-    //     ));
-    // }
 
     // // Likely not applicable for instrumenting the run time functions and
     // // closures (as opposed to compile time const functions and closures).
@@ -1101,7 +964,9 @@ fn quote_as_item_trait(
         }
         traversed_items
     };
-    quote! { #(#new_attrs)* #vis #unsafety #auto_token // #restriction
+    quote! { #(#new_attrs)* #vis #unsafety #auto_token 
+    // NOTE: Future: `restriction`. Unused, but reserved for RFC 3323 restrictions.
+    // #restriction
     #trait_token #ident #generics #colon_token #supertraits { #items } } // NOTE: The `#brace_token` instead of `{` here (to retain the brace span info) 
     // requires a pair token insted of `}`. Otherewise the `#brace_token #items }` causes a brace mismatch.
 }
@@ -1276,7 +1141,6 @@ fn quote_as_item_macro_rules_invocation(
     };
 
     quote! { #(#attrs)* #quoted_macro_name #bang_token #quoted_delimited_macro_args #semi_token }
-    // quote! { #quoted_attrs #quoted_macro_name #bang_token #quoted_delimited_macro_args #semi_token }
 }
 
 /// Handles the macro invocation, which includes `macro_rules!` definitions.

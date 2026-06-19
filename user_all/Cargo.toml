@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-fcl = { path = "../fcl" }
 fcl_proc_macros = { path = "../fcl_proc_macros" }
 # fcl_proc_macros = { path = "../fcl_proc_macros", features = ["idle"] }    # Instrumentation is OFF.
+fcl = { path = "../fcl" }
 
 # fcl = { path = "../fcl", features = ["singlethreaded"] }
 # fcl_proc_macros = { path = "../fcl_proc_macros", features = ["singlethreaded"] }

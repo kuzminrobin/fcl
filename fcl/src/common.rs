@@ -1,22 +1,3 @@
-// #[cfg(not(feature = "common"))]
-// #[macro_export]
-// macro_rules! extra_borrow {
-//     () => {};
-// }
-
-// #[cfg(not(feature = "common"))]
-// #[macro_export]
-// macro_rules! extra_borrow_mut {
-//     () => {};
-// }
-
-
-// #![cfg(not(feature = "idle"))]
-// //#![cfg(feature = "idle")]
-
-
-// #![feature(specialization)]
-
 pub mod call_log_infra;
 pub mod decorators;
 #[cfg(feature = "multithreaded")]
@@ -29,16 +10,17 @@ pub mod singlethreaded;
 use call_log_infra::instances::THREAD_LOGGER;
 
 // TODO: 
-//  Make sure the `extra_borrow[_mut]` macros are not visible to the user.
-//  Not applicable since used by user-visible macros like `logging_is_on!()`.
-//  Why those are macros rather than functions? Consider making all of those the functions defined depending on a feature "single_threaded", "multithreaded".
+//  Why are those the macros rather than the functions? Consider making all of those the functions 
+//      defined depending on a feature "single_threaded", "multithreaded".
+//      Functions are less likely to be optimized out.
+//      Actually if all the user-facing macros are made functions, then the `extra_borrow[_mut]` ones can become private.
+//  Make sure the `extra_borrow[_mut]` macros are not visible to the user. Not applicable since used by user-visible macros like `logging_is_on!()`.
 
 #[cfg(feature = "single_threaded")]
 #[macro_export]
 macro_rules! extra_borrow {     
     ($logger:expr) => {
         $logger.borrow()
-        // let logger = $logger.borrow();
     }
 }
 #[cfg(feature = "multithreaded")]
@@ -52,7 +34,6 @@ macro_rules! extra_borrow {
 macro_rules! extra_borrow_mut {
     ($logger:expr) => {
         $logger.borrow_mut()
-        // let logger = $logger.borrow_mut();
     }
 }
 #[cfg(feature = "multithreaded")]
@@ -93,7 +74,6 @@ macro_rules! push_logging_is_on {
         fcl::common::call_log_infra::instances::THREAD_LOGGER.with(|logger| {
             use fcl::common::CallLogger;
             let logger = fcl::extra_borrow_mut!(logger);
-            // fcl::extra_borrow_mut!(logger);
             logger.borrow_mut().push_logging_is_on($expr)
         })
     };

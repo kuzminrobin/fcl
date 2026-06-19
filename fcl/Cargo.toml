@@ -4,66 +4,70 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-filedescriptor = { version = "0.8.3", optional = true }
-tempfile = { version = "3.20.0", optional = true }
+filedescriptor = { version = "0.8.3", optional = true }     # Standard output synchronization.
+tempfile = { version = "3.20.0", optional = true }          # Standard output synchronization.
+regex = { version = "1.12.3", optional = true }             # Integration tests.
 #serial_test = { version = "3.2.0", optional = true }
 #serial_test = { version = "3.3.1", optional = true }
-regex = { version = "1.12.3", optional = true }         # tests
 
-
-code_commons = { path = "../code_commons", optional = true, default-features = false }
-# code_commons = { path = "../code_commons" }
+code_commons = { path = "../code_commons", optional = true }    # , default-features = false
 
 # TODO: Consider removing "fcl_proc_macros" crate dependency to avoid discrepancy between 
 # the user-chosen and fcl-crate-chosen features of the "fcl_proc_macros" crate.
-fcl_proc_macros = { path = "../fcl_proc_macros", optional = true, default-features = false }
-#fcl_proc_macros = { path = "../fcl_proc_macros", features = ["multithreaded"] }
-#fcl_proc_macros = { path = "../fcl_proc_macros" }                   # For doc comments examples, integration tests. 
-#fcl_proc_macros = { path = "../fcl_proc_macros", features = ["single_threaded"] }
-
-###########
+fcl_proc_macros = { path = "../fcl_proc_macros", optional = true }   # , default-features = false     # Doc comments examples, integration tests. 
 
 [features] 
-common = [
+# If no features are used then exposes just empty macros 
+# `{pop,push}_logging_is_on!()`, `[set_]logging_is_on!()`, `set_thread_indent!()`.
+
+# Code common for "multithreaded" and "single-threaded" features. Most of the code. 
+# Incomplete feature - doesn't compile without either "multithreaded" or "single-threaded".
+common = [                              
     "dep:code_commons",
     "code_commons/common",
-    # dependencies
 ]
-log_merger = [                          # Merges multiuple thread logs to one.
+
+# Merges multiuple thread logs to one.
+# TODO: Sentences below are applicable after a strict border between "log_merger" and "std_output_sync" is reviewed.
+# Is redundant for "single-threaded".
+# Can be turned off if the user wants FCL to use a separate writer/logger for each user's thread.
+log_merger = [                          
     "common"
 ]
-std_output_sync = [ 
+
+std_output_sync = [                     # Synchronizes the FCL log and {the user's and default panic hook's} standard output.
     "dep:filedescriptor",
     "dep:tempfile",
     "common",
     # "log_merger"    # TODO: "std_output_sync" must not require "log_merger".
 ]
-params_logging = [ 
+
+params_logging = [                      # Function and closure parameter logging.
     "code_commons/params_logging",
     "fcl_proc_macros/params_logging",
     "common",
 ]
-closure_coords_logging = [
+
+closure_coords_logging = [              # Closure coordinates/span logging (file line and colon number of closure definition start and end).
     "common",
     "fcl_proc_macros/closure_coords_logging",
     "dep:regex",
 ]
-ret_val_logging = [ 
+
+ret_val_logging = [                     # Function and closure return value logging (TODO: add `loop` return value logging).
     "code_commons/ret_val_logging",
     "fcl_proc_macros/ret_val_logging",
     "common"
 ]
-single_threaded = [
-    "fcl_proc_macros/single_threaded",  # TODO: Must not depend on "fcl_proc_macros".
+single_threaded = [                     # Single-threaded functionality.
     "common",
-    # dependencies
+    "fcl_proc_macros/single_threaded",  # TODO: Must not depend on "fcl_proc_macros".
 ]
 multithreaded = [
     "common",
-    "fcl_proc_macros/multithreaded",
-    # dependencies
+    "fcl_proc_macros/multithreaded",    # TODO: Must not depend on "fcl_proc_macros".
 ]
-full_single_threaded = [
+full_single_threaded = [                # Full set of features for single-threaded use (causes undefined behavior for multithreaded user code).
     "single_threaded",
     "log_merger",
     "std_output_sync",
@@ -72,7 +76,7 @@ full_single_threaded = [
     "ret_val_logging",
     # No extra code and dependencies
 ]
-full_multithreaded = [
+full_multithreaded = [                  # Full set of features for multithreaded use (also works for single-threaded user code).
     "multithreaded",
     "log_merger",
     "std_output_sync",
@@ -81,19 +85,4 @@ full_multithreaded = [
     "ret_val_logging",
     # No extra code and dependencies
 ]
-default = [ "full_multithreaded" ]  #"params_logging" ] #"std_output_sync" ]  # "log_merger" ]  # "common" ] #
-# default = [ "full_multithreaded" ]
-
-# ##################
-# [features]
-# #idle = [                    # No code of this crate is compiled.
-# #    "code_commons/idle",    # No code of this crate is compiled.
-# #    "fcl_proc_macros/idle"  # Instrumentation is skipped.
-# #] 
-# ##idle = [] # No code of this crate is compiled.
-# 
-# # default = ["singlethreaded"]
-# singlethreaded = []
-# #singlethreaded = [ "fcl_proc_macros/singlethreaded" ]
-# 
-# minimal_writer = [ "singlethreaded" ]
+default = [ "full_multithreaded" ]

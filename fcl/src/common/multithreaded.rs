@@ -179,6 +179,7 @@ impl CallLogger for ThreadGatekeeper {
     fn log_loop_end(&mut self) {
         self.call_logger_arbiter.borrow_mut().log_loop_end()
     }
+    // // TODO:
     // #[cfg(feature = "ret_val_logging")]
     // fn set_loop_ret_val(&mut self, ret_val: String);
 }

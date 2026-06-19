@@ -1,7 +1,4 @@
-// #[cfg(not(feature = "minimal_writer"))]
 use std::cell::LazyCell;
-// #[cfg(feature = "multithreaded")]
-// use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc, sync::LazyLock, thread};
 
 use crate::common::CallLogger;
@@ -9,20 +6,17 @@ use crate::common::decorators::{LogDecorator, ThreadSpecific};
 use code_commons::{CallGraph, CoderunNotifiable};
 
 #[cfg(feature = "std_output_sync")]
-// #[cfg(not(feature = "minimal_writer"))]
 use crate::common::output_sync::StdOutputRedirector;
 #[cfg(feature = "std_output_sync")]
 use writer::{ThreadSharedWriterPtr, WriterKind};
 
 #[cfg(feature = "log_merger")]
-// #[cfg(not(feature = "minimal_writer"))]
-use writer::{/*, ThreadSharedWriterPtr */ WriterAdapter /*, WriterKind */};
+use writer::{WriterAdapter};
 
 #[cfg(any(feature = "log_merger", feature = "std_output_sync"))]
 use writer::THREAD_SHARED_WRITER;
 
 #[cfg(any(feature = "log_merger", feature = "std_output_sync"))]
-// #[cfg(not(feature = "minimal_writer"))]
 mod writer;
 
 /// A macro containing the error message in case of an unexpected absence of a logger for the corresponding thread.
@@ -223,7 +217,6 @@ impl ThreadIndents {
 /// such that if all the output goes to the same place, the user's (and panic's) output
 /// is shown at the right moment of the function call log.
 #[cfg(feature = "std_output_sync")]
-// #[cfg(not(feature = "minimal_writer"))]
 struct OutputSync {
     /// Optional pointer to the thread-shared writer.
     /// TODO: Used for ...
@@ -251,7 +244,6 @@ pub struct CallLoggerArbiter {
 
     /// Container of the output synchronization resources.
     #[cfg(feature = "std_output_sync")]
-    // #[cfg(not(feature = "minimal_writer"))]
     output_sync: OutputSync,
 }
 
@@ -259,7 +251,7 @@ impl CallLoggerArbiter {
     /// Cretaes new `CallLoggerArbiter` instance.
     pub fn new(
         #[cfg(feature = "std_output_sync")]
-        // #[cfg(not(feature = "minimal_writer"))]
+        // #[cfg(not(feature = "minimal_writer"))]      -> "log_merger"
         thread_shared_writer: Option<ThreadSharedWriterPtr>,
     ) -> Self {
         return Self {
@@ -268,7 +260,6 @@ impl CallLoggerArbiter {
             thread_indents: ThreadIndents::new(None),
 
             #[cfg(feature = "std_output_sync")]
-            // #[cfg(not(feature = "minimal_writer"))]
             output_sync: OutputSync {
                 thread_shared_writer,
                 stderr_redirector: None,
@@ -315,15 +306,7 @@ impl CallLoggerArbiter {
             let thread_indent_id = *thread_indent_id; // Released the mutable borrow.
 
             // Flush the possible trailing repeat count and standard output.
-            // #[cfg(not(feature = "minimal_writer"))] // TODO: Remove this line, call unconditionally.
             self.sync_fcl_and_std_output(true);
-
-            // // Not needed any more after the call above became unconditional.
-            // #[cfg(feature = "minimal_writer")]
-            // if let Some((logger, ..)) = self.get_thread_logger(thread::current().id()) {
-            //     // TODO: Consider `_logger.flush()` instead of the whole repeated `if let`.
-            //     logger.flush();
-            // }
 
             if self.thread_loggers.remove(&current_thread_id).is_none() {
                 // The current function is the exception regarding the invocation of the macro below
@@ -337,7 +320,6 @@ impl CallLoggerArbiter {
         // thread-local data destruction in the unwinding panic runtime (after the FCL's panic hook).
 
         #[cfg(feature = "std_output_sync")]
-        // #[cfg(not(feature = "minimal_writer"))]
         if self.thread_loggers.is_empty() {
             // The last remaining (`main()`) thread is terminating, its thread_local data are being destroyed;
             // or `main()` has panicked earlier and the last thread has terminated while
@@ -352,7 +334,6 @@ impl CallLoggerArbiter {
     }
 
     /// Replaces the default panic hook with the `CallLoggerArbiter`'s own one.
-    // #[cfg(not(feature = "minimal_writer"))] // TODO: Remove. The FCL log needs to be flushed before the default panic hook anyway. Even with no std output sync and with minimal writer.
     pub fn set_panic_sync(&mut self) {
         unsafe {
             *(*ORIGINAL_PANIC_HANDLER).borrow_mut() = Some(std::panic::take_hook());
@@ -362,7 +343,6 @@ impl CallLoggerArbiter {
 
     /// Sets up the `stdout` and `stderr` redirectors for the user's code.
     #[cfg(feature = "std_output_sync")]
-    // #[cfg(not(feature = "minimal_writer"))]
     pub fn set_std_output_sync(&mut self) {
         let Some(thread_shared_writer) = self.output_sync.thread_shared_writer.clone() else {
             return;
@@ -455,7 +435,6 @@ impl CallLoggerArbiter {
     /// Then the hook calls the default panic hook that
     /// * logs the panic to the `stderr`
     /// * and invokes the (aborting or unwinding) panic runtime.
-    // #[cfg(not(feature = "minimal_writer"))]
     fn panic_hook(panic_hook_info: &std::panic::PanicHookInfo<'_>) {
         unsafe {
             let mut arbiter = None;
@@ -494,24 +473,6 @@ impl CallLoggerArbiter {
                         let stderr_msg = format!("(stderr copy) {}", &msg);
                         eprintln!("{}", &stderr_msg);
                     }
-                    // macro_rules! REPORT_TO_STD {
-                    //     () => {
-                    //         let msg = format!(
-                    //             "{} {} {}: '{}'.\n{}. {}.",
-                    //             "While FCL was busy (arbiter and/or writer borrowed) the",
-                    //             get_thread_name_and_id(),
-                    //             THREAD_PANICKED,
-                    //             panic_hook_info,
-                    //             SYNC_MSG,
-                    //             DEBUGGER_MSG
-                    //         );
-                    //         let stdout_msg = format!("(stdout copy) {}", &msg);
-                    //         println!("{}", &stdout_msg);
-
-                    //         let stderr_msg = format!("(stderr copy) {}", &msg);
-                    //         eprintln!("{}", &stderr_msg);
-                    //     }
-                    // }
                     #[cfg(feature = "log_merger")]
                     match (*THREAD_SHARED_WRITER).try_borrow_mut() {
                         Ok(mut writer) => {
@@ -528,22 +489,6 @@ impl CallLoggerArbiter {
                         }
                         Err(_e) => {
                             report_to_std(panic_hook_info);
-                            // REPORT_TO_STD!();
-
-                            // let msg = format!(
-                            //     "{} {} {}: '{}'.\n{}. {}.",
-                            //     "While FCL was busy (arbiter and/or writer borrowed) the",
-                            //     get_thread_name_and_id(),
-                            //     THREAD_PANICKED,
-                            //     panic_hook_info,
-                            //     SYNC_MSG,
-                            //     DEBUGGER_MSG
-                            // );
-                            // let stdout_msg = format!("(stdout copy) {}", &msg);
-                            // println!("{}", &stdout_msg);
-
-                            // let stderr_msg = format!("(stderr copy) {}", &msg);
-                            // eprintln!("{}", &stderr_msg);
                         }
                     }
                     #[cfg(not(feature = "log_merger"))]

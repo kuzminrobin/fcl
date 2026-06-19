@@ -85,7 +85,7 @@ mod single_thread {
                     std::str::from_utf8_unchecked(&*log.borrow()),
                     concat!(
                         "t::g() {\n",
-                        "  t::f(p1: 0, p2: true) {} -> -1.01\n",
+                        "  t::f(_p1: 0, _p2: true) {} -> -1.01\n",
                         "  // t::f() repeats 2 time(s).\n",
                         "} // t::g().\n",
                     )

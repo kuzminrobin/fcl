@@ -9,6 +9,3 @@ edition = "2024"
 common = []
 params_logging = [ "common" ]
 ret_val_logging = [ "common" ]
-
-# Tmp
-# default = [ "ret_val_logging", "ret_val_logging", ]

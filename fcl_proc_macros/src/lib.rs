@@ -17,7 +17,8 @@ mod items;
 /// associated funtion suppresses the instrumentation for that function.
 ///
 /// # Examples
-/// ```compile_fail, E0432, E0433, E0599
+/// ```compile_fail, E0433, E0599
+/// // , E0432
 /// use fcl_proc_macros::{loggable, non_loggable};
 ///
 /// struct MyStruct;
@@ -57,10 +58,11 @@ pub fn non_loggable(
 /// Instruments the item and nested definitions recursively to be logged
 /// by the Function Call Logger (FCL).
 /// ### Examples
-/// ```compile_fail, E0432, E0433, E0599
-/// use fcl_proc_macros::{loggable, non_loggable};
+/// ```compile_fail, E0433, E0599
+/// // , E0432
+/// // use fcl_proc_macros::{loggable, non_loggable};
 ///
-/// #[loggable] // Automatically instruments the nested items.
+/// #[fcl_proc_macros::loggable] // Automatically instruments the nested items.
 /// mod my_module {
 ///
 ///     struct MyStruct;
@@ -72,7 +74,7 @@ pub fn non_loggable(
 ///             );
 ///         }
 ///         
-///         #[non_loggable] // Suppresses the automatic instrumentation recursively.
+///         #[fcl_proc_macros::non_loggable] // Suppresses the automatic instrumentation recursively.
 ///         fn assoc_func_non_loggable(&self) {} // This associated function and its local entities don't get instrumented.
 ///     }
 /// }
@@ -96,7 +98,8 @@ pub fn non_loggable(
 /// then its parameter block will be logged as `()`, otherwise `(..)`.
 ///
 /// ### Examples
-/// ```compile_fail, E0432, E0433, E0599
+/// ```compile_fail, E0433, E0599
+/// // , E0432
 /// use fcl_proc_macros::loggable;
 ///
 /// #[loggable] // Log by defualt the function and closure parameters inside of module `m` recursively
@@ -196,10 +199,6 @@ pub fn loggable_block_contents(
 
 #[cfg(feature = "common")]
 mod common {
-    // // #[cfg(feature = "common")]
-    // #[macro_use]
-    // mod consts;
-
     use crate::consts;
     use quote::quote;
 

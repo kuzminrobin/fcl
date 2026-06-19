@@ -190,10 +190,6 @@ impl CoderunNotifiable for CodeLikeDecorator {
             indents.1,
             name,
             param_vals,
-            // param_vals
-            //     .as_ref()
-            //     .map(|string| string.as_str())
-            //     .unwrap_or(&""),
         ); // E.g. "<thread_indent><indent>sibling() {"
         self.line_end_pending = true; // '\n' pending. Won't be printed if there will be no nested calls (immediate "}\n").
     }
@@ -398,10 +394,6 @@ impl CoderunNotifiable for TreeLikeDecorator {
             self.indent_step_call,
             name,
             param_vals,
-            // param_vals
-            //     .as_ref()
-            //     .map(|string| string.as_str())
-            //     .unwrap_or(&"")
         ); // E.g."<thread_indent><indent>+-sibling", "| | | | +-sibling"
     }
 
